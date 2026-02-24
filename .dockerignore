@@ -1,0 +1,14 @@
+.git
+.gitignore
+**/.DS_Store
+**/Thumbs.db
+
+myChatbot/node_modules
+myChatbot/dist
+myChatbot/.env
+myChatbot/.env.*
+!myChatbot/.env.example
+
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
