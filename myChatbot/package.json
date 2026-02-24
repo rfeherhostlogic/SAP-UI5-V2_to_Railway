@@ -9,7 +9,8 @@
     "start:ui5": "ui5 serve --port 8080",
     "start:api": "node server/chat-proxy.js",
     "build": "ui5 build",
-    "test": "node --test server/test/*.test.js"
+    "test": "node --test server/test/*.test.js",
+    "hash:password": "node scripts/hash-password.js"
   },
   "devDependencies": {
     "@ui5/cli": "^3",
@@ -17,6 +18,7 @@
     "ui5-middleware-simpleproxy": "^3.4.1"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "multer": "^2.0.2",
