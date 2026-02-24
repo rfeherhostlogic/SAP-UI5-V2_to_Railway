@@ -1,0 +1,112 @@
+.chatPage {
+  --chat-bg: #f3f5f8;
+  --chat-surface: #ffffff;
+  --chat-border: #d8dee8;
+  --chat-text-muted: #637286;
+  --chat-user-start: #d9ecff;
+  --chat-user-end: #bcdcff;
+  --chat-ai-start: #ffffff;
+  --chat-ai-end: #f7f9fc;
+  background: linear-gradient(180deg, #f6f8fb 0%, var(--chat-bg) 100%);
+}
+
+.chatShell {
+  max-width: 860px;
+  margin: 0 auto;
+  min-height: calc(100vh - 4rem);
+  justify-content: space-between;
+}
+
+.chatPanel {
+  background: var(--chat-surface);
+  border: 1px solid var(--chat-border);
+  border-radius: 0.85rem;
+  padding: 0.8rem;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  margin-top: 0.25rem;
+  margin-bottom: 0.75rem;
+  flex: 1 1 auto;
+  min-height: 52vh;
+}
+
+.chatList {
+  background: transparent;
+}
+
+.chatAvatar {
+  margin-right: 0.45rem;
+  margin-top: 0.25rem;
+  border: 1px solid var(--chat-border);
+}
+
+.chatBubble {
+  max-width: 76%;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.85rem;
+  margin: 0.2rem 0;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+}
+
+.chatBubbleAi {
+  background: linear-gradient(180deg, var(--chat-ai-start) 0%, var(--chat-ai-end) 100%);
+  border: 1px solid var(--chat-border);
+}
+
+.chatBubbleUser {
+  background: linear-gradient(145deg, var(--chat-user-start) 0%, var(--chat-user-end) 100%);
+  color: #12314f;
+}
+
+.chatBubbleUser .sapMText {
+  color: #12314f;
+}
+
+.chatBubbleMeta {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-bottom: 0.2rem;
+}
+
+.chatComposer {
+  background: var(--chat-surface);
+  border: 1px solid var(--chat-border);
+  border-radius: 0.85rem;
+  padding: 0.75rem;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  margin-bottom: 0.35rem;
+}
+
+.chatSendButton {
+  margin-top: 0.55rem;
+  width: 100%;
+  border-radius: 0.65rem;
+}
+
+.chatComposer .sapMTextArea {
+  border-radius: 0.65rem;
+}
+
+.chatComposer .sapMTextAreaInner {
+  color: #1b2430;
+}
+
+.chatBubbleAi .sapMText,
+.chatBubbleAi .chatBubbleMeta {
+  color: #1f2a37;
+}
+
+.chatBubbleUser .chatBubbleMeta {
+  color: rgba(18, 49, 79, 0.75);
+}
+
+@media (max-width: 720px) {
+  .chatBubble {
+    max-width: 90%;
+  }
+  .chatShell {
+    min-height: auto;
+  }
+  .chatPanel {
+    min-height: 45vh;
+  }
+}

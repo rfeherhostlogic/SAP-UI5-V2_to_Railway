@@ -1,0 +1,154 @@
+﻿<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:smartchart="sap.ui.comp.smartchart"
+  xmlns:unif="sap.ui.unified"
+  controllerName="sap.suite.ui.commons.demo.tutorial.controller.JokerPrompt">
+  <Page title="Joker Prompt" class="sapUiContentPadding jokerPromptPage" showHeader="false">
+    <VBox class="jokerPromptShell" width="100%">
+      <Title text="Joker leiras" level="H3" class="sapUiTinyMarginBottom"/>
+      <ObjectStatus text="{= ${jokers>/selectedJoker/title} ? ${jokers>/selectedJoker/title} : 'Nincs kivalasztott joker' }" state="Information" class="sapUiTinyMarginBottom"/>
+      <Text text="{jokers>/selectedJoker/description}" wrapping="true" class="sapUiSmallMarginBottom jokerPromptDesc"/>
+
+      <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-4' }" width="100%">
+        <Label text="Kerdes"/>
+        <TextArea value="{jokers>/dummy4Question}" rows="4" growing="true" growingMaxLines="8" width="100%" placeholder="Pl.: Az 1005 rendeles milyen osszegu volt?"/>
+
+        <Panel
+          headerText="Schema hint"
+          expandable="true"
+          expanded="false"
+          class="sapUiSmallMarginTop">
+          <HBox justifyContent="End" class="sapUiTinyMarginBottom">
+            <Button
+              text="Schema hint frissitese"
+              icon="sap-icon://refresh"
+              type="Transparent"
+              press=".onRefreshDummy4SchemaHint"
+              enabled="{= ${jokers>/generating} ? false : true }"/>
+          </HBox>
+          <TextArea value="{jokers>/dummy4SchemaHint}" rows="4" growing="true" growingMaxLines="10" width="100%" placeholder="Tabla: oszlop1, oszlop2"/>
+        </Panel>
+
+        <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">
+          <Button text="Futtatas" type="Emphasized" press=".onRunDummy4" busy="{jokers>/generating}" enabled="{= ${jokers>/generating} ? false : true }"/>
+          <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/generating} ? false : true }" class="sapUiTinyMarginBegin"/>
+        </HBox>
+
+        <Panel
+          headerText="Generalt SQL"
+          expandable="true"
+          expanded="false"
+          class="sapUiSmallMarginTop">
+          <TextArea value="{jokers>/dummy4GeneratedSql}" editable="false" rows="5" width="100%"/>
+        </Panel>
+
+        <Label text="Eredmeny" class="sapUiSmallMarginTop"/>
+        <TextArea value="{jokers>/dummy4Summary}" editable="false" rows="2" width="100%"/>
+
+        <Panel headerText="Adat preview (max 50 sor)" class="sapUiMediumMarginTop" visible="{= ${jokers>/dummy4Rows}.length > 0 }">
+          <smartchart:SmartChart
+            id="dummy4SmartChart"
+            entitySet="ResultSet"
+            enableAutoBinding="true"
+            useVariantManagement="false"
+            useChartPersonalisation="false"
+            chartType="column"
+            showFullScreenButton="true"
+            showChartTooltip="true"
+            showDrillButtons="true"
+            header="Smart Chart"
+            height="420px"
+            visible="{jokers>/dummy4ChartReady}"/>
+          <VBox id="dummy4LocalChartHost" class="sapUiSmallMarginTop"/>
+
+          <Table id="dummy4PreviewTable" growing="true" growingThreshold="50" inset="false"/>
+        </Panel>
+      </VBox>
+
+      <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-5' }" width="100%">
+        <Label text="PDF dokumentum"/>
+        <unif:FileUploader
+          id="dummy5FileUploader"
+          width="100%"
+          fileType="pdf"
+          sameFilenameAllowed="true"
+          uploadOnChange="false"
+          buttonText="PDF valasztasa"
+          change=".onDummy5FileChange"/>
+
+        <ObjectStatus
+          text="{= ${jokers>/dummy5FileName} ? 'Fajl: ' + ${jokers>/dummy5FileName} : 'Nincs feltoltott PDF' }"
+          state="{= ${jokers>/dummy5DocToken} ? 'Success' : 'Information' }"
+          class="sapUiTinyMarginTop"/>
+
+        <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">
+          <Button
+            text="Rovid osszegzes"
+            type="Emphasized"
+            press=".onRunDummy5Summary"
+            busy="{jokers>/generating}"
+            enabled="{= ${jokers>/generating} ? false : (${jokers>/dummy5DocToken} ? true : false) }"/>
+          <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/generating} ? false : true }" class="sapUiTinyMarginBegin"/>
+        </HBox>
+
+        <Label text="Kerdes a PDF-hez" class="sapUiSmallMarginTop"/>
+        <TextArea value="{jokers>/dummy5Question}" rows="3" growing="true" growingMaxLines="8" width="100%" placeholder="Pl.: Melyik a dokumentum 3 legfontosabb allitasa?"/>
+
+        <Button
+          text="Kerdezes"
+          type="Transparent"
+          press=".onRunDummy5Ask"
+          class="sapUiTinyMarginTop"
+          enabled="{= ${jokers>/generating} ? false : (${jokers>/dummy5DocToken} ? true : false) }"/>
+
+        <Label text="Osszegzes" class="sapUiSmallMarginTop"/>
+        <TextArea value="{jokers>/dummy5Summary}" editable="false" rows="4" width="100%"/>
+
+        <Label text="Valasz" class="sapUiSmallMarginTop"/>
+        <TextArea value="{jokers>/dummy5Answer}" editable="false" rows="5" width="100%"/>
+      </VBox>
+
+      <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-7' }" width="100%">
+        <Panel headerText="Bemenet (RAG osszehasonlitas)" class="sapUiSmallMarginBottom">
+          <VBox class="sapUiSmallMargin">
+            <Text text="A cegneveket kotelezoen idezojelben add meg: &quot;Cég név&quot; (pl. &quot;Roli Foods&quot;)." wrapping="true"/>
+            <Label text="Ceg A (idezojellel)"/>
+            <Input value="{jokers>/dummy7CompanyA}" placeholder="&quot;Roli Foods&quot;"/>
+            <Label text="Ceg B (idezojellel)" class="sapUiSmallMarginTop"/>
+            <Input value="{jokers>/dummy7CompanyB}" placeholder="&quot;Varga Retail&quot;"/>
+            <Label text="Fokusz (opcionalis)" class="sapUiSmallMarginTop"/>
+            <Input value="{jokers>/dummy7Focus}" placeholder="Pl.: leverage risk es cash flow"/>
+          </VBox>
+        </Panel>
+
+        <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">
+          <Button
+            text="Osszehasonlitas futtatasa"
+            type="Emphasized"
+            press=".onRunDummy7Compare"
+            busy="{jokers>/generating}"
+            enabled="{= ${jokers>/generating} ? false : true }"/>
+          <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/generating} ? false : true }" class="sapUiTinyMarginBegin"/>
+        </HBox>
+
+        <ObjectStatus text="{jokers>/dummy7Result}" state="Information" class="sapUiMediumMarginTop"/>
+      </VBox>
+
+      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' }" width="100%">
+        <TextArea value="{jokers>/promptInput}" rows="10" growing="true" growingMaxLines="16" width="100%" placeholder="Ide ird a feldolgozando szoveget..."/>
+
+        <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">
+          <Button text="Generate" type="Emphasized" press=".onGenerate" busy="{jokers>/generating}" enabled="{= ${jokers>/generating} ? false : true }"/>
+          <Button text="Send" type="Transparent" press=".onSend" enabled="{= ${jokers>/generating} ? false : true }" class="sapUiTinyMarginBegin"/>
+          <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/generating} ? false : true }" class="sapUiTinyMarginBegin"/>
+        </HBox>
+
+        <Panel headerText="AI valasz" class="sapUiMediumMarginTop jokerResultPanel" visible="{= ${jokers>/resultText} ? true : false }">
+          <Text text="{jokers>/resultText}" wrapping="true"/>
+        </Panel>
+      </VBox>
+    </VBox>
+  </Page>
+</mvc:View>
+

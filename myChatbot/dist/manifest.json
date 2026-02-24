@@ -1,0 +1,145 @@
+{
+  "_version": "1.21.0",
+  "sap.app": {
+    "_version": "1.1.0",
+    "id": "sap.suite.ui.commons.demo.tutorial",
+    "type": "application",
+    "i18n": {
+      "bundleUrl": "i18n/i18n.properties",
+      "supportedLocales": [""],
+      "fallbackLocale": ""
+    },
+    "applicationVersion": {
+      "version": "1.0.0"
+    },
+    "title": "{{title}}",
+    "description": "{{appDescription}}",
+    "resources": "resources.json",
+    "ach": "ach",
+    "sourceTemplate": {
+      "id": "ui5template.basicSAPUI5ApplicationProject",
+      "version": "1.40.12"
+    }
+  },
+  "sap.ui": {
+    "_version": "1.1.0",
+    "technology": "UI5",
+    "icons": {
+      "icon": "",
+      "favIcon": "",
+      "phone": "",
+      "phone@2": "",
+      "tablet": "",
+      "tablet@2": ""
+    },
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": true
+    },
+    "supportedThemes": [
+      "sap_hcb",
+      "sap_hcw",
+      "sap_belize"
+    ]
+  },
+  "sap.ui5": {
+    "_version": "1.1.0",
+    "rootView": {
+      "viewName": "sap.suite.ui.commons.demo.tutorial.view.App",
+      "type": "XML"
+    },
+    "dependencies": {
+      "minUI5Version": "1.50.0",
+      "libs": {
+        "sap.ui.core": {},
+        "sap.m": {},
+        "sap.ui.layout": {},
+        "sap.tnt": {}
+      }
+    },
+    "contentDensities": {
+      "compact": true,
+      "cozy": true
+    },
+    "resources": {
+      "css": [
+        {
+          "uri": "css/chat.css"
+        },
+        {
+          "uri": "css/jokers.css"
+        }
+      ]
+    },
+    "models": {
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": {
+          "bundleName": "sap.suite.ui.commons.demo.tutorial.i18n.i18n",
+          "async": true,
+          "supportedLocales": [""],
+          "fallbackLocale": ""
+        }
+      },
+      "app": {
+        "type": "sap.ui.model.json.JSONModel"
+      },
+      "chat": {
+        "type": "sap.ui.model.json.JSONModel"
+      },
+      "reports": {
+        "type": "sap.ui.model.json.JSONModel",
+        "uri": "model/data/ReportData.json"
+      },
+      "jokers": {
+        "type": "sap.ui.model.json.JSONModel"
+      }
+    },
+    "routing": {
+      "config": {
+        "routerClass": "sap.m.routing.Router",
+        "viewType": "XML",
+        "viewPath": "sap.suite.ui.commons.demo.tutorial.view",
+        "controlId": "app",
+        "controlAggregation": "pages",
+        "transition": "slide",
+        "bypassed": {
+          "target": ["login"]
+        }
+      },
+      "routes": [
+        {
+          "pattern": "",
+          "name": "login",
+          "target": "login"
+        },
+        {
+          "pattern": "main",
+          "name": "main",
+          "target": "main"
+        },
+        {
+          "pattern": "main/{menuKey}",
+          "name": "mainMenu",
+          "target": "main"
+        },
+        {
+          "pattern": "main/jokers/{jokerId}",
+          "name": "jokerPrompt",
+          "target": "main"
+        }
+      ],
+      "targets": {
+        "login": {
+          "viewName": "Login",
+          "viewLevel": 0
+        },
+        "main": {
+          "viewName": "Main",
+          "viewLevel": 1
+        }
+      }
+    }
+  }
+}

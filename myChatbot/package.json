@@ -1,0 +1,26 @@
+{
+  "name": "tutorial.icecream",
+  "version": "1.0.0",
+  "private": true,
+  "author": "SAP SE",
+  "scripts": {
+    "start": "concurrently -k -n UI5,API \"ui5 serve --port 8080\" \"node server/chat-proxy.js\"",
+    "start:ui5": "ui5 serve --port 8080",
+    "start:api": "node server/chat-proxy.js",
+    "build": "ui5 build",
+    "test": "node --test server/test/*.test.js"
+  },
+  "devDependencies": {
+    "@ui5/cli": "^3",
+    "concurrently": "^9.2.1",
+    "ui5-middleware-simpleproxy": "^3.4.1"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^2.0.2",
+    "pdf-parse": "^2.4.5",
+    "pdfkit": "^0.17.2",
+    "sqlite3": "^5.1.7"
+  }
+}

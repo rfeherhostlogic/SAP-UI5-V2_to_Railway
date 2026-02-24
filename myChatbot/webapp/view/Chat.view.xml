@@ -1,0 +1,52 @@
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  controllerName="sap.suite.ui.commons.demo.tutorial.controller.Chat">
+  <Page title="Chat" class="sapUiContentPadding chatPage" showHeader="false">
+    <VBox width="100%" renderType="Bare" class="chatShell">
+      <VBox class="chatPanel">
+        <List items="{chat>/messages}" showSeparators="None" growing="true" growingScrollToLoad="true" class="chatList">
+          <CustomListItem>
+            <VBox width="100%">
+              <HBox width="100%" justifyContent="Start" visible="{= ${chat>role} !== 'user' }">
+                <Avatar initials="AI" displaySize="XS" class="chatAvatar"/>
+                <VBox class="chatBubble chatBubbleAi">
+                  <Text text="AI" class="chatBubbleMeta"/>
+                  <Text text="{chat>content}" wrapping="true" width="100%"/>
+                </VBox>
+              </HBox>
+              <HBox width="100%" justifyContent="End" visible="{= ${chat>role} === 'user' }">
+                <VBox class="chatBubble chatBubbleUser">
+                  <Text text="{= ${app>/userName} || 'Te' }" class="chatBubbleMeta"/>
+                  <Text text="{chat>content}" wrapping="true" width="100%"/>
+                </VBox>
+              </HBox>
+            </VBox>
+          </CustomListItem>
+        </List>
+      </VBox>
+
+      <VBox class="chatComposer">
+        <TextArea
+          value="{app>/draftMessage}"
+          width="100%"
+          rows="3"
+          placeholder="Irj egy uzenetet..."
+          growing="true"
+          growingMaxLines="8"/>
+        <Button
+          text="Kuldes"
+          icon="sap-icon://paper-plane"
+          type="Emphasized"
+          press=".onSend"
+          class="chatSendButton"
+          enabled="{= ${app>/busy} ? false : (${app>/draftMessage} ? true : false) }"/>
+      </VBox>
+
+      <HBox alignItems="Center" visible="{app>/busy}">
+        <BusyIndicator size="1.5rem"/>
+        <Text text="Valasz keszul..." class="sapUiSmallMarginBegin"/>
+      </HBox>
+    </VBox>
+  </Page>
+</mvc:View>

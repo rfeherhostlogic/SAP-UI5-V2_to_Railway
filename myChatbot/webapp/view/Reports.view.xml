@@ -1,0 +1,20 @@
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  controllerName="sap.suite.ui.commons.demo.tutorial.controller.Reports">
+  <Page title="Pajzs" class="sapUiContentPadding" showHeader="false">
+    <VBox width="100%">
+      <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiTinyMarginBottom">
+        <Title text="Elérhető adatbázis táblák" level="H3"/>
+        <Button text="Frissítés" icon="sap-icon://refresh" press=".onRefreshPreview" enabled="{= !${reports>/busy} }"/>
+      </HBox>
+      <Text text="Táblánként maximum 10 sor jelenik meg." class="sapUiSmallMarginBottom"/>
+      <HBox alignItems="Center" visible="{reports>/busy}" class="sapUiSmallMarginBottom">
+        <BusyIndicator size="1rem"/>
+        <Text text="Betöltés..." class="sapUiTinyMarginBegin"/>
+      </HBox>
+      <MessageStrip text="{reports>/error}" visible="{= ${reports>/error} ? true : false }" type="Error" showIcon="true" class="sapUiSmallMarginBottom"/>
+      <VBox id="dbPreviewHost" width="100%"/>
+    </VBox>
+  </Page>
+</mvc:View>

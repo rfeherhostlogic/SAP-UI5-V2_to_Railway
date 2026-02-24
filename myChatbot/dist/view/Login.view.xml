@@ -1,0 +1,22 @@
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:form="sap.ui.layout.form"
+  controllerName="sap.suite.ui.commons.demo.tutorial.controller.Login">
+  <Page title="Bejelentkezes" class="sapUiContentPadding">
+    <VBox width="100%" alignItems="Center" justifyContent="Center">
+      <Panel width="420px" headerText="Chatbot belepes" class="sapUiResponsiveMargin">
+        <form:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="4" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="1" columnsL="1" columnsM="1" singleContainerFullSize="false">
+          <Label text="Nev"/>
+          <Input value="{app>/loginName}" placeholder="Roli"/>
+          <Label text="Jelszo"/>
+          <Input type="Password" value="{app>/loginPassword}" placeholder="demo"/>
+        </form:SimpleForm>
+        <VBox class="sapUiSmallMarginTop">
+          <Button text="Belepes" type="Emphasized" press=".onLogin" width="100%"/>
+        </VBox>
+      </Panel>
+      <Text text="Tipp: Nev = Roli, jelszo = demo" class="sapUiTinyMarginTop"/>
+    </VBox>
+  </Page>
+</mvc:View>

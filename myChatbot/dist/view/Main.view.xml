@@ -1,0 +1,39 @@
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:tnt="sap.tnt"
+  controllerName="sap.suite.ui.commons.demo.tutorial.controller.Main">
+  <tnt:ToolPage id="toolPage">
+    <tnt:header>
+      <tnt:ToolHeader>
+        <HBox alignItems="Center">
+          <Image src="https://techwave.net/wp-content/uploads/2021/12/cropped-cropped-cropped-Techwave.png" height="2rem" decorative="false" alt="Techwave logo"/>
+          <Title text="AI Chatbot Portal" class="sapUiTinyMarginBegin"/>
+        </HBox>
+        <ToolbarSpacer/>
+        <Text text="{= ${app>/userName} ? 'Bejelentkezve: ' + ${app>/userName} : '' }"/>
+        <Button text="Kijelentkezes" type="Transparent" press=".onLogout"/>
+      </tnt:ToolHeader>
+    </tnt:header>
+    <tnt:sideContent>
+      <tnt:SideNavigation selectedKey="{app>/selectedMenuKey}" itemSelect=".onItemSelect">
+        <tnt:NavigationList>
+          <tnt:NavigationListItem text="Chat" key="chat" icon="sap-icon://discussion-2"/>
+          <tnt:NavigationListItem text="Riportok" key="reports" icon="sap-icon://table-view">
+            <tnt:items>
+              <tnt:NavigationListItem text="Jokerek" key="jokers" icon="sap-icon://favorite"/>
+            </tnt:items>
+          </tnt:NavigationListItem>
+        </tnt:NavigationList>
+      </tnt:SideNavigation>
+    </tnt:sideContent>
+    <tnt:mainContents>
+      <NavContainer id="mainNav">
+        <mvc:XMLView id="chatView" viewName="sap.suite.ui.commons.demo.tutorial.view.Chat"/>
+        <mvc:XMLView id="reportsView" viewName="sap.suite.ui.commons.demo.tutorial.view.Reports"/>
+        <mvc:XMLView id="jokersView" viewName="sap.suite.ui.commons.demo.tutorial.view.Jokers"/>
+        <mvc:XMLView id="jokerPromptView" viewName="sap.suite.ui.commons.demo.tutorial.view.JokerPrompt"/>
+      </NavContainer>
+    </tnt:mainContents>
+  </tnt:ToolPage>
+</mvc:View>

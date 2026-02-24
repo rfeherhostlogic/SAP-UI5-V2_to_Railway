@@ -1,0 +1,39 @@
+{
+  "queries": [
+    {
+      "id": "q1",
+      "title": "Osszes rendeles osszeg ugyfelenkent",
+      "sql": "SELECT c.CustomerName, SUM(so.NetAmount) AS TotalAmount\nFROM Customer c\nJOIN SalesOrder so ON so.CustomerId = c.CustomerId\nGROUP BY c.CustomerName\nORDER BY TotalAmount DESC;"
+    },
+    {
+      "id": "q2",
+      "title": "Rendelesek orszagonkent",
+      "sql": "SELECT c.Country, COUNT(*) AS Orders, SUM(so.NetAmount) AS TotalAmount\nFROM Customer c\nJOIN SalesOrder so ON so.CustomerId = c.CustomerId\nGROUP BY c.Country\nORDER BY TotalAmount DESC;"
+    }
+  ],
+  "selectedQueryId": "q1",
+  "selectedQuery": {
+    "id": "q1",
+    "title": "Osszes rendeles osszeg ugyfelenkent",
+    "sql": "SELECT c.CustomerName, SUM(so.NetAmount) AS TotalAmount\nFROM Customer c\nJOIN SalesOrder so ON so.CustomerId = c.CustomerId\nGROUP BY c.CustomerName\nORDER BY TotalAmount DESC;"
+  },
+  "customers": [
+    { "CustomerId": 1, "CustomerName": "Roli Foods", "Country": "HU", "Segment": "SMB" },
+    { "CustomerId": 2, "CustomerName": "Varga Retail", "Country": "HU", "Segment": "Enterprise" },
+    { "CustomerId": 3, "CustomerName": "Bright Supplies", "Country": "DE", "Segment": "SMB" },
+    { "CustomerId": 4, "CustomerName": "Alpine Sports", "Country": "AT", "Segment": "Midmarket" },
+    { "CustomerId": 5, "CustomerName": "Iberia Market", "Country": "ES", "Segment": "Enterprise" }
+  ],
+  "salesOrders": [
+    { "SalesOrderId": 1001, "CustomerId": 1, "OrderDate": "2025-11-02", "NetAmount": 1200.50, "Currency": "EUR" },
+    { "SalesOrderId": 1002, "CustomerId": 2, "OrderDate": "2025-11-05", "NetAmount": 5400.00, "Currency": "EUR" },
+    { "SalesOrderId": 1003, "CustomerId": 3, "OrderDate": "2025-11-12", "NetAmount": 980.75, "Currency": "EUR" },
+    { "SalesOrderId": 1004, "CustomerId": 4, "OrderDate": "2025-11-21", "NetAmount": 2150.00, "Currency": "EUR" },
+    { "SalesOrderId": 1005, "CustomerId": 1, "OrderDate": "2025-12-03", "NetAmount": 760.00, "Currency": "EUR" },
+    { "SalesOrderId": 1006, "CustomerId": 5, "OrderDate": "2025-12-07", "NetAmount": 4300.00, "Currency": "EUR" },
+    { "SalesOrderId": 1007, "CustomerId": 2, "OrderDate": "2025-12-12", "NetAmount": 1250.25, "Currency": "EUR" },
+    { "SalesOrderId": 1008, "CustomerId": 4, "OrderDate": "2025-12-19", "NetAmount": 1890.40, "Currency": "EUR" },
+    { "SalesOrderId": 1009, "CustomerId": 3, "OrderDate": "2026-01-08", "NetAmount": 650.00, "Currency": "EUR" },
+    { "SalesOrderId": 1010, "CustomerId": 5, "OrderDate": "2026-01-15", "NetAmount": 3100.00, "Currency": "EUR" }
+  ]
+}

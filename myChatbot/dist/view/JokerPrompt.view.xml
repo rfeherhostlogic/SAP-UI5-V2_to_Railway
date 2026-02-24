@@ -1,0 +1,63 @@
+﻿<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  controllerName="sap.suite.ui.commons.demo.tutorial.controller.JokerPrompt">
+  <Page title="Joker Prompt" class="sapUiContentPadding jokerPromptPage" showHeader="false">
+    <VBox class="jokerPromptShell" width="100%">
+      <Title text="Joker leiras" level="H3" class="sapUiTinyMarginBottom"/>
+      <ObjectStatus text="{= ${jokers>/selectedJoker/title} ? ${jokers>/selectedJoker/title} : 'Nincs kivalasztott joker' }" state="Information" class="sapUiTinyMarginBottom"/>
+      <Text text="{jokers>/selectedJoker/description}" wrapping="true" class="sapUiSmallMarginBottom jokerPromptDesc"/>
+
+      <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-4' }" width="100%">
+        <Label text="Kerdes"/>
+        <TextArea value="{jokers>/dummy4Question}" rows="4" growing="true" growingMaxLines="8" width="100%" placeholder="Pl.: Az 1005 rendeles milyen osszegu volt?"/>
+
+        <Label text="Schema hint" class="sapUiSmallMarginTop"/>
+        <TextArea value="{jokers>/dummy4SchemaHint}" rows="4" growing="true" growingMaxLines="10" width="100%" placeholder="Tabla: oszlop1, oszlop2"/>
+
+        <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">
+          <Button text="Futtatas" type="Emphasized" press=".onRunDummy4" busy="{jokers>/generating}" enabled="{= ${jokers>/generating} ? false : true }"/>
+          <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/generating} ? false : true }" class="sapUiTinyMarginBegin"/>
+        </HBox>
+
+        <Label text="Generalt SQL" class="sapUiSmallMarginTop"/>
+        <TextArea value="{jokers>/dummy4GeneratedSql}" editable="false" rows="5" width="100%"/>
+
+        <Label text="Eredmeny" class="sapUiSmallMarginTop"/>
+        <TextArea value="{jokers>/dummy4Summary}" editable="false" rows="2" width="100%"/>
+
+        <Panel headerText="Adat preview (max 50 sor)" class="sapUiMediumMarginTop" visible="{= ${jokers>/dummy4Rows}.length > 0 }">
+          <Table items="{jokers>/dummy4Rows}" growing="true" growingThreshold="50" inset="false">
+            <columns>
+              <Column>
+                <Text text="Adatsor"/>
+              </Column>
+            </columns>
+            <items>
+              <ColumnListItem>
+                <cells>
+                  <Text text="{jokers>__rowText}" wrapping="true"/>
+                </cells>
+              </ColumnListItem>
+            </items>
+          </Table>
+        </Panel>
+      </VBox>
+
+      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' }" width="100%">
+        <TextArea value="{jokers>/promptInput}" rows="10" growing="true" growingMaxLines="16" width="100%" placeholder="Ide ird a feldolgozando szoveget..."/>
+
+        <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">
+          <Button text="Generate" type="Emphasized" press=".onGenerate" busy="{jokers>/generating}" enabled="{= ${jokers>/generating} ? false : true }"/>
+          <Button text="Send" type="Transparent" press=".onSend" enabled="{= ${jokers>/generating} ? false : true }" class="sapUiTinyMarginBegin"/>
+          <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/generating} ? false : true }" class="sapUiTinyMarginBegin"/>
+        </HBox>
+
+        <Panel headerText="AI valasz" class="sapUiMediumMarginTop jokerResultPanel" visible="{= ${jokers>/resultText} ? true : false }">
+          <Text text="{jokers>/resultText}" wrapping="true"/>
+        </Panel>
+      </VBox>
+    </VBox>
+  </Page>
+</mvc:View>
+

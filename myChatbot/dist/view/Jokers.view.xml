@@ -1,0 +1,26 @@
+﻿<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  controllerName="sap.suite.ui.commons.demo.tutorial.controller.Jokers">
+  <Page title="Jokerek" class="sapUiContentPadding jokerPage" showHeader="false">
+    <VBox class="jokerShell" width="100%">
+      <Title text="Jokerek" level="H2" class="sapUiTinyMarginBottom"/>
+      <Text text="Valassz egy jokert. Csempe kattintasra megnyilik a prompt oldal." class="jokerIntro sapUiSmallMarginBottom"/>
+
+      <FlexBox items="{jokers>/tiles}" wrap="Wrap" class="jokerTileGrid">
+        <items>
+          <GenericTile class="jokerTile" header="{jokers>title}" subheader="{jokers>subtitle}" frameType="OneByOne" press=".onTilePress">
+            <tileContent>
+              <TileContent footer="{jokers>footer}">
+                <content>
+                  <ImageContent src="sap-icon://ai"/>
+                </content>
+              </TileContent>
+            </tileContent>
+          </GenericTile>
+        </items>
+      </FlexBox>
+    </VBox>
+  </Page>
+</mvc:View>
+
