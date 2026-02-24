@@ -189,6 +189,8 @@ sap.ui.define([
 			// create the views based on the url/hash
 			this.getRouter().initialize();
 
+			this._restoreAuthSession();
+
 			// simple auth guard
 			this.getRouter().attachBeforeRouteMatched(function(oEvent) {
 				var sName = oEvent.getParameter("name");
@@ -197,6 +199,34 @@ sap.ui.define([
 					this.getRouter().navTo("login", {}, true);
 				}
 			}.bind(this));
+		},
+		_restoreAuthSession: function() {
+			var oAppModel = this.getModel("app");
+
+			fetch("/api/auth/me", {
+				method: "GET",
+				credentials: "same-origin"
+			}).then(function(oResponse) {
+				if (!oResponse.ok) {
+					return null;
+				}
+				return oResponse.json();
+			}).then(function(oData) {
+				if (!oData || !oData.user) {
+					return;
+				}
+
+				oAppModel.setProperty("/isAuthenticated", true);
+				oAppModel.setProperty("/userName", oData.user.displayName || oData.user.username || "");
+				oAppModel.setProperty("/loginName", oData.user.username || "");
+
+				var sHash = window.location.hash || "";
+				if (!sHash || sHash === "#" || sHash === "#/" || sHash.indexOf("login") >= 0) {
+					this.getRouter().navTo("main", {}, true);
+				}
+			}.bind(this)).catch(function() {
+				// No active session or server unavailable; keep login screen.
+			});
 		},
 		createContent: function() {
 			// create root view

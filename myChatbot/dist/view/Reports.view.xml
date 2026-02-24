@@ -2,60 +2,19 @@
   xmlns:mvc="sap.ui.core.mvc"
   xmlns="sap.m"
   controllerName="sap.suite.ui.commons.demo.tutorial.controller.Reports">
-  <Page title="Riportok" class="sapUiContentPadding" showHeader="false">
+  <Page title="Pajzs" class="sapUiContentPadding" showHeader="false">
     <VBox width="100%">
-      <Panel headerText="SQL minta" class="sapUiSmallMarginBottom">
-        <VBox class="sapUiSmallMargin">
-          <Select items="{reports>/queries}" selectedKey="{reports>/selectedQueryId}" change=".onQueryChange" width="100%">
-            <core:Item key="{reports>id}" text="{reports>title}" xmlns:core="sap.ui.core"/>
-          </Select>
-          <TextArea value="{reports>/selectedQuery/sql}" rows="6" width="100%" editable="false" growing="true" growingMaxLines="10" class="sapUiSmallMarginTop"/>
-        </VBox>
-      </Panel>
-
-      <Panel headerText="Customers" class="sapUiSmallMarginBottom">
-        <Table items="{reports>/customers}" inset="false" width="100%">
-          <columns>
-            <Column><Text text="ID"/></Column>
-            <Column><Text text="Name"/></Column>
-            <Column><Text text="Country"/></Column>
-            <Column><Text text="Segment"/></Column>
-          </columns>
-          <items>
-            <ColumnListItem>
-              <cells>
-                <Text text="{reports>CustomerId}"/>
-                <Text text="{reports>CustomerName}"/>
-                <Text text="{reports>Country}"/>
-                <Text text="{reports>Segment}"/>
-              </cells>
-            </ColumnListItem>
-          </items>
-        </Table>
-      </Panel>
-
-      <Panel headerText="Sales Orders">
-        <Table items="{reports>/salesOrders}" inset="false" width="100%">
-          <columns>
-            <Column><Text text="Order ID"/></Column>
-            <Column><Text text="Customer ID"/></Column>
-            <Column><Text text="Order Date"/></Column>
-            <Column hAlign="End"><Text text="Net Amount"/></Column>
-            <Column><Text text="Currency"/></Column>
-          </columns>
-          <items>
-            <ColumnListItem>
-              <cells>
-                <Text text="{reports>SalesOrderId}"/>
-                <Text text="{reports>CustomerId}"/>
-                <Text text="{reports>OrderDate}"/>
-                <Text text="{reports>NetAmount}"/>
-                <Text text="{reports>Currency}"/>
-              </cells>
-            </ColumnListItem>
-          </items>
-        </Table>
-      </Panel>
+      <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiTinyMarginBottom">
+        <Title text="Elérhető adatbázis táblák" level="H3"/>
+        <Button text="Frissítés" icon="sap-icon://refresh" press=".onRefreshPreview" enabled="{= !${reports>/busy} }"/>
+      </HBox>
+      <Text text="Táblánként maximum 10 sor jelenik meg." class="sapUiSmallMarginBottom"/>
+      <HBox alignItems="Center" visible="{reports>/busy}" class="sapUiSmallMarginBottom">
+        <BusyIndicator size="1rem"/>
+        <Text text="Betöltés..." class="sapUiTinyMarginBegin"/>
+      </HBox>
+      <MessageStrip text="{reports>/error}" visible="{= ${reports>/error} ? true : false }" type="Error" showIcon="true" class="sapUiSmallMarginBottom"/>
+      <VBox id="dbPreviewHost" width="100%"/>
     </VBox>
   </Page>
 </mvc:View>

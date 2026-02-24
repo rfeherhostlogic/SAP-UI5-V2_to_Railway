@@ -1,0 +1,194 @@
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:core="sap.ui.core"
+  xmlns:unif="sap.ui.unified"
+  controllerName="sap.suite.ui.commons.demo.tutorial.controller.Noah">
+  <Page title="Noah" class="sapUiContentPadding noahPage" showHeader="false">
+    <HBox class="noahShell" renderType="Bare" wrap="Wrap">
+      <VBox class="noahMain">
+        <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiTinyMarginBottom">
+          <Title text="Noah" level="H2"/>
+          <ObjectStatus text="{= 'Allapot: ' + ${noah>/state} }" state="Information"/>
+        </HBox>
+        <Text text="{noah>/statusText}" visible="{= ${noah>/statusText} ? true : false }" class="sapUiTinyMarginBottom"/>
+
+        <VBox id="noahChatPanel" class="noahChatPanel">
+          <List id="noahMessageList" items="{noah>/messages}" showSeparators="None" class="noahMsgList">
+            <CustomListItem>
+              <VBox width="100%">
+                <HBox width="100%" justifyContent="Start" visible="{= ${noah>role} !== 'user' }">
+                  <Avatar initials="AI" displaySize="XS" class="chatAvatar noahAvatar"/>
+                  <VBox class="chatBubble chatBubbleAi noahBubbleAi">
+                    <Text text="AI" class="chatBubbleMeta"/>
+                    <Text text="{noah>content}" wrapping="true" width="100%"/>
+                  </VBox>
+                </HBox>
+                <HBox width="100%" justifyContent="End" visible="{= ${noah>role} === 'user' }">
+                  <VBox class="chatBubble chatBubbleUser noahBubbleUser">
+                    <Text text="{= ${app>/userName} || 'Te' }" class="chatBubbleMeta"/>
+                    <Text text="{noah>content}" wrapping="true" width="100%"/>
+                  </VBox>
+                </HBox>
+              </VBox>
+            </CustomListItem>
+          </List>
+        </VBox>
+
+        <VBox class="noahComposer sapUiSmallMarginTop">
+          <VBox id="noahDropZone" class="noahDropZone sapUiTinyMarginBottom">
+            <Text text="Huzd ide a fajlokat, vagy valaszd ki a fajlpickerrel."/>
+          </VBox>
+
+          <unif:FileUploader
+            id="noahFileUploader"
+            width="100%"
+            sameFilenameAllowed="true"
+            multiple="true"
+            uploadOnChange="false"
+            buttonText="Fajlok kivalasztasa"
+            change=".onNoahFileChange"/>
+
+          <List items="{noah>/attachments}" visible="{= ${noah>/attachments}.length > 0 }" class="sapUiTinyMarginTop">
+            <CustomListItem>
+              <HBox justifyContent="SpaceBetween" alignItems="Center">
+                <Text text="{= ${noah>name} + ' (' + ${noah>type} + ', ' + ${noah>size} + ' B)' }" wrapping="false"/>
+                <Button icon="sap-icon://decline" type="Transparent" press=".onRemoveAttachment"/>
+              </HBox>
+            </CustomListItem>
+          </List>
+
+          <TextArea
+            value="{noah>/draftMessage}"
+            width="100%"
+            rows="3"
+            placeholder="Irj egy uzenetet..."
+            growing="true"
+            growingMaxLines="8"
+            class="sapUiTinyMarginTop"/>
+
+          <HBox class="sapUiTinyMarginTop" wrap="Wrap">
+            <Select
+              width="16rem"
+              selectedKey="{noah>/manualSelectedCardId}"
+              change=".onManualCardSelectChange"
+              enabled="{= ${noah>/state} !== 'ROUTING' &amp;&amp; ${noah>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah>/state} !== 'CHATTING' }"
+              items="{noah>/manualCardOptions}">
+              <core:Item key="{noah>id}" text="{noah>name}"/>
+            </Select>
+            <Button
+              text="Kuldes"
+              type="Emphasized"
+              icon="sap-icon://paper-plane"
+              press=".onSendNoah"
+              class="sapUiTinyMarginBegin"
+              enabled="{= ${noah>/state} !== 'ROUTING' &amp;&amp; ${noah>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah>/state} !== 'CHATTING' }"/>
+            <Button
+              text="Cancel"
+              type="Reject"
+              class="sapUiTinyMarginBegin"
+              press=".onCancelRun"
+              visible="{= ${noah>/state} === 'ROUTING' || ${noah>/state} === 'RUNNING_CARD' || ${noah>/state} === 'CHATTING' }"/>
+          </HBox>
+        </VBox>
+      </VBox>
+
+      <VBox class="noahSide">
+        <Panel
+          headerText="Kivalasztott kartya"
+          class="noahCardPanel sapUiSmallMarginBottom"
+          visible="{= ${noah>/activeCard} ? true : false }">
+          <VBox class="noahCardHeader">
+            <Title text="{noah>/activeCard/name}" level="H4"/>
+            <Text text="{noah>/activeCard/description}" wrapping="true"/>
+          </VBox>
+
+          <List items="{noah>/activeCardRuntimeFields}" showSeparators="None">
+            <CustomListItem>
+              <VBox>
+                <HBox justifyContent="SpaceBetween" alignItems="Center">
+                  <Label text="{noah>label}" required="{noah>required}"/>
+                  <Button
+                    text="Frissites"
+                    icon="sap-icon://refresh"
+                    type="Transparent"
+                    press=".onRefreshCardFieldDefault"
+                    visible="{= ${noah>field_id} === 'schema_hint' }"
+                    enabled="{= ${noah>/state} !== 'ROUTING' &amp;&amp; ${noah>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah>/state} !== 'CHATTING' }"/>
+                </HBox>
+                <Input
+                  value="{noah>value}"
+                  placeholder="{noah>placeholder}"
+                  visible="{= ${noah>type} !== 'textarea' }"
+                  enabled="{= ${noah>/state} !== 'RUNNING_CARD' }"/>
+                <TextArea
+                  value="{noah>value}"
+                  placeholder="{noah>placeholder}"
+                  rows="3"
+                  growing="true"
+                  visible="{= ${noah>type} === 'textarea' }"
+                  enabled="{= ${noah>/state} !== 'RUNNING_CARD' }"/>
+              </VBox>
+            </CustomListItem>
+          </List>
+
+          <HBox class="sapUiTinyMarginTop" wrap="Wrap">
+            <Button
+              text="Kartya futtatasa"
+              type="Emphasized"
+              press=".onRunActiveCard"
+              enabled="{= ${noah>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah>/activeCard} ? true : false }"/>
+            <Button
+              text="Megerositem"
+              type="Accept"
+              press=".onConfirmCardYes"
+              class="sapUiTinyMarginBegin"
+              visible="{= ${noah>/pendingConfirmation} ? true : false }"/>
+            <Button
+              text="Megsem"
+              type="Reject"
+              press=".onConfirmCardNo"
+              class="sapUiTinyMarginBegin"
+              visible="{= ${noah>/pendingConfirmation} ? true : false }"/>
+          </HBox>
+
+          <Panel
+            headerText="Adat preview (max 50 sor)"
+            class="sapUiSmallMarginTop"
+            visible="{= ${noah>/dummy4PreviewRows}.length > 0 }">
+            <Label text="Generalt SQL" class="sapUiTinyMarginBottom"/>
+            <TextArea value="{noah>/dummy4GeneratedSql}" rows="3" editable="false" width="100%" class="sapUiTinyMarginBottom"/>
+            <Table id="noahDummy4PreviewTable" growing="true" growingThreshold="50" inset="false"/>
+          </Panel>
+        </Panel>
+
+        <Panel headerText="Router naplo" class="noahRouterPanel">
+          <HBox justifyContent="SpaceBetween" class="sapUiTinyMarginBottom">
+            <ObjectStatus text="{= 'Osszes dontes: ' + ${noah>/routerLog}.length }" state="Information"/>
+          </HBox>
+          <List id="noahRouterLogList" items="{noah>/routerLog}" class="noahRouterList">
+            <CustomListItem class="noahRouterItem">
+              <VBox>
+                <HBox justifyContent="SpaceBetween" alignItems="Center">
+                  <Title level="H6" text="{= ${noah>selected_card_id} ? ${noah>selected_card_id} : 'normal-chat' }"/>
+                  <ObjectStatus
+                    text="{= 'conf: ' + ${noah>confidence} }"
+                    state="{= Number(${noah>confidence}) >= 0.8 ? 'Success' : (Number(${noah>confidence}) >= 0.55 ? 'Warning' : 'Error') }"/>
+                </HBox>
+                <Text text="{noah>rationale_short}" wrapping="true"/>
+                <Text text="{noah>timestamp}" class="sapUiTinyMarginTop noahRouterTimestamp"/>
+              </VBox>
+            </CustomListItem>
+          </List>
+        </Panel>
+
+        <MessageStrip
+          visible="{= ${noah>/error} ? true : false }"
+          text="{noah>/error}"
+          type="Error"
+          showIcon="true"
+          class="sapUiSmallMarginTop"/>
+      </VBox>
+    </HBox>
+  </Page>
+</mvc:View>

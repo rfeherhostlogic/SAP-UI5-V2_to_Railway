@@ -4,7 +4,8 @@
   "private": true,
   "author": "SAP SE",
   "scripts": {
-    "start": "concurrently -k -n UI5,API \"ui5 serve --port 8080\" \"node server/chat-proxy.js\"",
+    "start": "node server/chat-proxy.js",
+    "dev": "concurrently -k -n UI5,API \"ui5 serve --port 8080\" \"node server/chat-proxy.js\"",
     "start:ui5": "ui5 serve --port 8080",
     "start:api": "node server/chat-proxy.js",
     "build": "ui5 build",

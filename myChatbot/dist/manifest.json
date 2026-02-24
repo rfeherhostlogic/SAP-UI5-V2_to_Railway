@@ -54,8 +54,12 @@
       "libs": {
         "sap.ui.core": {},
         "sap.m": {},
+        "sap.ui.unified": {},
         "sap.ui.layout": {},
-        "sap.tnt": {}
+        "sap.tnt": {},
+        "sap.ui.comp": {},
+        "sap.chart": {},
+        "sap.viz": {}
       }
     },
     "contentDensities": {
@@ -69,6 +73,15 @@
         },
         {
           "uri": "css/jokers.css"
+        },
+        {
+          "uri": "css/discovery.css"
+        },
+        {
+          "uri": "css/noah.css"
+        },
+        {
+          "uri": "css/login.css"
         }
       ]
     },
@@ -93,6 +106,12 @@
         "uri": "model/data/ReportData.json"
       },
       "jokers": {
+        "type": "sap.ui.model.json.JSONModel"
+      },
+      "discovery": {
+        "type": "sap.ui.model.json.JSONModel"
+      },
+      "noah": {
         "type": "sap.ui.model.json.JSONModel"
       }
     },

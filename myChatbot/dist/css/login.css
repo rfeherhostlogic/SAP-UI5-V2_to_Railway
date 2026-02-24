@@ -1,0 +1,14 @@
+.loginPage {
+  background-image:
+    linear-gradient(rgba(6, 23, 43, 0.50), rgba(6, 23, 43, 0.38)),
+    url("../img/login-bg.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.loginCard {
+  backdrop-filter: blur(3px);
+  border-radius: 0.9rem;
+  box-shadow: 0 12px 28px rgba(2, 8, 23, 0.22);
+}

@@ -18,7 +18,16 @@ sap.ui.define([
       }
     },
 
-    onLogout: function() {
+    onLogout: async function() {
+      try {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "same-origin"
+        });
+      } catch (_err) {
+        // A kliensoldali kileptetes akkor is fusson le, ha a szerver nem elerheto.
+      }
+
       var oAppModel = this.getView().getModel("app");
       oAppModel.setProperty("/isAuthenticated", false);
       oAppModel.setProperty("/userName", "");

@@ -3,12 +3,13 @@
   xmlns="sap.m"
   xmlns:tnt="sap.tnt"
   controllerName="sap.suite.ui.commons.demo.tutorial.controller.Main">
-  <tnt:ToolPage id="toolPage">
+  <tnt:ToolPage id="toolPage" sideExpanded="{app>/sideNavExpanded}">
     <tnt:header>
       <tnt:ToolHeader>
+        <Button icon="sap-icon://menu2" type="Transparent" press=".onToggleSideNav"/>
         <HBox alignItems="Center">
           <Image src="https://techwave.net/wp-content/uploads/2021/12/cropped-cropped-cropped-Techwave.png" height="2rem" decorative="false" alt="Techwave logo"/>
-          <Title text="AI Chatbot Portal" class="sapUiTinyMarginBegin"/>
+          <Title text="HelloAI Portal" class="sapUiTinyMarginBegin"/>
         </HBox>
         <ToolbarSpacer/>
         <Text text="{= ${app>/userName} ? 'Bejelentkezve: ' + ${app>/userName} : '' }"/>
@@ -16,15 +17,20 @@
       </tnt:ToolHeader>
     </tnt:header>
     <tnt:sideContent>
-      <tnt:SideNavigation selectedKey="{app>/selectedMenuKey}" itemSelect=".onItemSelect">
-        <tnt:NavigationList>
-          <tnt:NavigationListItem text="Chat" key="chat" icon="sap-icon://discussion-2"/>
-          <tnt:NavigationListItem text="Riportok" key="reports" icon="sap-icon://table-view">
-            <tnt:items>
-              <tnt:NavigationListItem text="Jokerek" key="jokers" icon="sap-icon://favorite"/>
-            </tnt:items>
-          </tnt:NavigationListItem>
-        </tnt:NavigationList>
+      <tnt:SideNavigation selectedKey="{app>/selectedMenuKey}" itemSelect=".onItemSelect" expanded="{app>/sideNavExpanded}">
+        <tnt:item>
+          <tnt:NavigationList>
+            <tnt:NavigationListItem text="Noah" key="noah" icon="sap-icon://customer-view"/>
+            <tnt:NavigationListItem text="Chat" key="chat" icon="sap-icon://discussion-2"/>
+            <tnt:NavigationListItem text="Jokerek" key="jokers" icon="sap-icon://favorite"/>
+            <tnt:NavigationListItem text="Felfedezés" key="discovery" icon="sap-icon://search"/>
+          </tnt:NavigationList>
+        </tnt:item>
+        <tnt:fixedItem>
+          <tnt:NavigationList>
+            <tnt:NavigationListItem text="Pajzs" key="reports" icon="sap-icon://shield"/>
+          </tnt:NavigationList>
+        </tnt:fixedItem>
       </tnt:SideNavigation>
     </tnt:sideContent>
     <tnt:mainContents>
@@ -32,6 +38,8 @@
         <mvc:XMLView id="chatView" viewName="sap.suite.ui.commons.demo.tutorial.view.Chat"/>
         <mvc:XMLView id="reportsView" viewName="sap.suite.ui.commons.demo.tutorial.view.Reports"/>
         <mvc:XMLView id="jokersView" viewName="sap.suite.ui.commons.demo.tutorial.view.Jokers"/>
+        <mvc:XMLView id="discoveryView" viewName="sap.suite.ui.commons.demo.tutorial.view.Discovery"/>
+        <mvc:XMLView id="noahView" viewName="sap.suite.ui.commons.demo.tutorial.view.Noah"/>
         <mvc:XMLView id="jokerPromptView" viewName="sap.suite.ui.commons.demo.tutorial.view.JokerPrompt"/>
       </NavContainer>
     </tnt:mainContents>

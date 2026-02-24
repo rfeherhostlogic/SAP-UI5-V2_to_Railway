@@ -13,11 +13,17 @@ const PDFDocument = require("pdfkit");
 const { executeDummy4, SQL_PROMPTS, SUMMARY_PROMPTS } = require("./dummy4Service");
 
 const app = express();
-const PORT = process.env.CHAT_PROXY_PORT || 4000;
+const PORT = Number(process.env.PORT || process.env.CHAT_PROXY_PORT || 4000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const DUMMY7_MODEL = process.env.DUMMY7_MODEL || "gpt-4.1";
 const DUMMY7_VECTOR_STORE_ID = "vs_698f417bc0e481919720698508275ad3";
+const APP_SESSION_SECRET = process.env.APP_SESSION_SECRET || "replace-this-in-production";
+const APP_SESSION_TTL_MS = Number(process.env.APP_SESSION_TTL_MS || (1000 * 60 * 60 * 12));
+const AUTH_COOKIE_NAME = "mychatbot_session";
+const UI_DIST_DIR = path.resolve(__dirname, "../dist");
+const UI_WEBAPP_DIR = path.resolve(__dirname, "../webapp");
+const UI_STATIC_DIR = fs.existsSync(UI_DIST_DIR) ? UI_DIST_DIR : UI_WEBAPP_DIR;
 const DISCOVERY_DB_PATH = path.resolve(
   process.env.SQLITE_DB_PATH || path.join(__dirname, "../webapp/model/db/sample.sqlite")
 );
@@ -32,6 +38,24 @@ let oDummy4ChartCache = null;
 const oDummy5Docs = new Map();
 const oDiscoverySpecSessions = new Map();
 const oDiscoveryJobs = new Map();
+const oAuthSessions = new Map();
+const AUTH_USERS = [
+  {
+    username: "HelloAdam",
+    displayName: "HelloAdam",
+    passwordSha256: "c908c1557b63583ef071b3a9c27dc2509eef6af4e4ba671a71ca1d8c60e243dc"
+  },
+  {
+    username: "HelloLaci",
+    displayName: "HelloLaci",
+    passwordSha256: "93382a50bcaf2f0a87c86623165f72d63e7c52b46bfb6b49c60c67033da6b2df"
+  },
+  {
+    username: "HelloRoli",
+    displayName: "HelloRoli",
+    passwordSha256: "6ba66bebd3913aebc9ec87bd84624410572101a7b5747770233829002ddc55e0"
+  }
+];
 const oDummy5Upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -285,6 +309,133 @@ const NOAH_CARDS = [
 ];
 
 app.use(express.json({ limit: "1mb" }));
+
+function sha256(value) {
+  return crypto.createHash("sha256").update(String(value || ""), "utf8").digest("hex");
+}
+
+function timingSafeHexEqual(a, b) {
+  const sA = String(a || "");
+  const sB = String(b || "");
+  if (sA.length !== sB.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(Buffer.from(sA, "hex"), Buffer.from(sB, "hex"));
+}
+
+function findAuthUser(username) {
+  const sUsername = String(username || "").trim().toLowerCase();
+  return AUTH_USERS.find(function(user) {
+    return String(user.username || "").toLowerCase() === sUsername;
+  }) || null;
+}
+
+function publicAuthUser(user) {
+  if (!user) {
+    return null;
+  }
+  return {
+    username: user.username,
+    displayName: user.displayName || user.username
+  };
+}
+
+function parseCookies(req) {
+  const header = String((req && req.headers && req.headers.cookie) || "");
+  return header.split(";").reduce(function(acc, part) {
+    const idx = part.indexOf("=");
+    if (idx <= 0) {
+      return acc;
+    }
+    const key = part.slice(0, idx).trim();
+    const val = part.slice(idx + 1).trim();
+    acc[key] = decodeURIComponent(val);
+    return acc;
+  }, {});
+}
+
+function setAuthCookie(res, token) {
+  const isProduction = process.env.NODE_ENV === "production";
+  const parts = [
+    AUTH_COOKIE_NAME + "=" + encodeURIComponent(String(token || "")),
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    "Max-Age=" + Math.max(0, Math.floor(APP_SESSION_TTL_MS / 1000))
+  ];
+  if (isProduction) {
+    parts.push("Secure");
+  }
+  res.setHeader("Set-Cookie", parts.join("; "));
+}
+
+function clearAuthCookie(res) {
+  res.setHeader("Set-Cookie", [
+    AUTH_COOKIE_NAME + "=",
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    "Max-Age=0"
+  ].join("; "));
+}
+
+function cleanupAuthSessions() {
+  const now = Date.now();
+  Array.from(oAuthSessions.entries()).forEach(function(entry) {
+    const token = entry[0];
+    const session = entry[1];
+    if (!session || !session.expiresAt || session.expiresAt <= now) {
+      oAuthSessions.delete(token);
+    }
+  });
+}
+
+function createAuthSession(user) {
+  cleanupAuthSessions();
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const token = sha256(APP_SESSION_SECRET + ":" + rawToken);
+  const now = Date.now();
+  oAuthSessions.set(token, {
+    token: token,
+    username: user.username,
+    displayName: user.displayName || user.username,
+    createdAt: now,
+    expiresAt: now + APP_SESSION_TTL_MS
+  });
+  return token;
+}
+
+function getAuthSession(req) {
+  cleanupAuthSessions();
+  const cookies = parseCookies(req);
+  const token = String(cookies[AUTH_COOKIE_NAME] || "").trim();
+  if (!token) {
+    return null;
+  }
+  const session = oAuthSessions.get(token);
+  if (!session) {
+    return null;
+  }
+  if (session.expiresAt <= Date.now()) {
+    oAuthSessions.delete(token);
+    return null;
+  }
+  session.expiresAt = Date.now() + APP_SESSION_TTL_MS;
+  return session;
+}
+
+function requireAuth(req, res, next) {
+  const session = getAuthSession(req);
+  if (!session) {
+    res.status(401).json({ error: "Bejelentkezes szukseges." });
+    return;
+  }
+  req.authUser = {
+    username: session.username,
+    displayName: session.displayName || session.username
+  };
+  next();
+}
 
 function dummy5Token() {
   return crypto.randomUUID ? crypto.randomUUID() : (Date.now() + "_" + Math.random().toString(36).slice(2));
@@ -2013,6 +2164,68 @@ app.get("/api/health", function(_req, res) {
   res.json({ ok: true });
 });
 
+app.get("/api/auth/me", function(req, res) {
+  const session = getAuthSession(req);
+  if (!session) {
+    res.status(401).json({ error: "Nincs aktiv session." });
+    return;
+  }
+  res.json({
+    authenticated: true,
+    user: {
+      username: session.username,
+      displayName: session.displayName || session.username
+    }
+  });
+});
+
+app.post("/api/auth/login", function(req, res) {
+  const username = String(req.body && req.body.username ? req.body.username : "").trim();
+  const password = String(req.body && req.body.password ? req.body.password : "");
+
+  if (!username || !password) {
+    res.status(400).json({ error: "Felhasznalonev es jelszo kotelezo." });
+    return;
+  }
+
+  const user = findAuthUser(username);
+  const passwordHash = sha256(password);
+  if (!user || !timingSafeHexEqual(passwordHash, user.passwordSha256)) {
+    res.status(401).json({ error: "Hibas belepesi adatok." });
+    return;
+  }
+
+  const token = createAuthSession(user);
+  setAuthCookie(res, token);
+  res.json({
+    authenticated: true,
+    user: publicAuthUser(user)
+  });
+});
+
+app.post("/api/auth/logout", function(req, res) {
+  const session = getAuthSession(req);
+  if (session && session.token) {
+    oAuthSessions.delete(session.token);
+  } else {
+    const cookies = parseCookies(req);
+    const token = String(cookies[AUTH_COOKIE_NAME] || "").trim();
+    if (token) {
+      oAuthSessions.delete(token);
+    }
+  }
+  clearAuthCookie(res);
+  res.json({ ok: true });
+});
+
+app.use("/api", function(req, res, next) {
+  if (req.path === "/health" || req.path === "/auth/me" || req.path === "/auth/login" || req.path === "/auth/logout") {
+    next();
+    return;
+  }
+  requireAuth(req, res, next);
+});
+
 app.get("/api/prompts/dummy4", function(_req, res) {
   res.json({
     sqlPrompt: SQL_PROMPTS,
@@ -3080,7 +3293,18 @@ app.post("/api/jokers/dummy4", async function(req, res) {
   }
 });
 
+app.use(express.static(UI_STATIC_DIR));
+
+app.get("*", function(req, res) {
+  if (String(req.path || "").startsWith("/api/")) {
+    res.status(404).json({ error: "Ismeretlen API endpoint." });
+    return;
+  }
+  res.sendFile(path.join(UI_STATIC_DIR, "index.html"));
+});
+
 app.listen(PORT, function() {
   console.log("Chat proxy elindult: http://127.0.0.1:" + PORT);
+  console.log("UI static dir:", UI_STATIC_DIR);
 });
 
