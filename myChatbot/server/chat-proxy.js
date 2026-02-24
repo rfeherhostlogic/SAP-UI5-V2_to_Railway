@@ -8,6 +8,7 @@ const { spawn } = require("child_process");
 const sqlite3 = require("sqlite3").verbose();
 const express = require("express");
 const multer = require("multer");
+const bcrypt = require("bcryptjs");
 const { PDFParse } = require("pdf-parse");
 const PDFDocument = require("pdfkit");
 const { executeDummy4, SQL_PROMPTS, SUMMARY_PROMPTS } = require("./dummy4Service");
@@ -39,23 +40,7 @@ const oDummy5Docs = new Map();
 const oDiscoverySpecSessions = new Map();
 const oDiscoveryJobs = new Map();
 const oAuthSessions = new Map();
-const AUTH_USERS = [
-  {
-    username: "HelloAdam",
-    displayName: "HelloAdam",
-    passwordSha256: "c908c1557b63583ef071b3a9c27dc2509eef6af4e4ba671a71ca1d8c60e243dc"
-  },
-  {
-    username: "HelloLaci",
-    displayName: "HelloLaci",
-    passwordSha256: "93382a50bcaf2f0a87c86623165f72d63e7c52b46bfb6b49c60c67033da6b2df"
-  },
-  {
-    username: "HelloRoli",
-    displayName: "HelloRoli",
-    passwordSha256: "6ba66bebd3913aebc9ec87bd84624410572101a7b5747770233829002ddc55e0"
-  }
-];
+const AUTH_USERS = loadAuthUsersFromEnv();
 const oDummy5Upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -314,13 +299,39 @@ function sha256(value) {
   return crypto.createHash("sha256").update(String(value || ""), "utf8").digest("hex");
 }
 
-function timingSafeHexEqual(a, b) {
-  const sA = String(a || "");
-  const sB = String(b || "");
-  if (sA.length !== sB.length) {
-    return false;
+function loadAuthUsersFromEnv() {
+  const raw = String(process.env.APP_USERS_JSON || "[]").trim();
+  let parsed = [];
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    console.error("[auth] APP_USERS_JSON parse hiba:", err && err.message ? err.message : String(err));
+    parsed = [];
   }
-  return crypto.timingSafeEqual(Buffer.from(sA, "hex"), Buffer.from(sB, "hex"));
+
+  if (!Array.isArray(parsed)) {
+    console.error("[auth] APP_USERS_JSON tomb kell legyen.");
+    return [];
+  }
+
+  const users = parsed.map(function(item) {
+    return {
+      username: String(item && item.username ? item.username : "").trim(),
+      displayName: String(item && (item.displayName || item.username) ? (item.displayName || item.username) : "").trim(),
+      passwordHash: String(item && item.passwordHash ? item.passwordHash : "").trim()
+    };
+  }).filter(function(user) {
+    return !!user.username && !!user.passwordHash && /^\$2[aby]\$/.test(user.passwordHash);
+  });
+
+  if (users.length === 0) {
+    console.warn("[auth] Nincs ervenyes felhasznalo az APP_USERS_JSON valtozoban.");
+  } else {
+    console.log("[auth] Betoltott felhasznalok:", users.map(function(u) { return u.username; }).join(", "));
+  }
+
+  return users;
 }
 
 function findAuthUser(username) {
@@ -2179,7 +2190,7 @@ app.get("/api/auth/me", function(req, res) {
   });
 });
 
-app.post("/api/auth/login", function(req, res) {
+app.post("/api/auth/login", async function(req, res) {
   const username = String(req.body && req.body.username ? req.body.username : "").trim();
   const password = String(req.body && req.body.password ? req.body.password : "");
 
@@ -2189,8 +2200,15 @@ app.post("/api/auth/login", function(req, res) {
   }
 
   const user = findAuthUser(username);
-  const passwordHash = sha256(password);
-  if (!user || !timingSafeHexEqual(passwordHash, user.passwordSha256)) {
+  if (!user) {
+    res.status(401).json({ error: "Hibas belepesi adatok." });
+    return;
+  }
+
+  const ok = await bcrypt.compare(password, user.passwordHash).catch(function() {
+    return false;
+  });
+  if (!ok) {
     res.status(401).json({ error: "Hibas belepesi adatok." });
     return;
   }
