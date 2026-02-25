@@ -1328,6 +1328,24 @@ async function smartSegGenerateSqlWithOpenAI(prompt, schemaHint) {
     .trim();
 }
 
+function smartSegNormalizeGeneratedSql(sqlText) {
+  let s = String(sqlText || "").trim();
+  if (!s) {
+    return "";
+  }
+
+  // Remove accidental SQL comments that LLMs often append.
+  s = s
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--[^\r\n]*/g, " ")
+    .trim();
+
+  // Allow a single trailing semicolon from the LLM, but keep internal semicolons blocked by validator.
+  s = s.replace(/;\s*$/g, "").trim();
+
+  return s;
+}
+
 async function smartSegQuerySqlSource(opts) {
   const prompt = String(opts && opts.prompt ? opts.prompt : "").trim();
   if (!prompt) {
@@ -1347,7 +1365,8 @@ async function smartSegQuerySqlSource(opts) {
 
   const schemaTables = await loadSqlTableMetadata(DISCOVERY_DB_PATH);
   const schemaHint = buildSchemaHintFromTables(schemaTables);
-  const generatedSql = await smartSegGenerateSqlWithOpenAI(prompt, schemaHint);
+  const generatedSqlRaw = await smartSegGenerateSqlWithOpenAI(prompt, schemaHint);
+  const generatedSql = smartSegNormalizeGeneratedSql(generatedSqlRaw);
   const validation = validateSelectSql(generatedSql, parseSchemaHint(schemaHint));
 
   if (!validation.ok) {
@@ -1377,6 +1396,7 @@ async function smartSegQuerySqlSource(opts) {
       prompt: prompt,
       interpreted_query: prompt,
       generated_sql: finalSql,
+      generated_sql_raw: generatedSqlRaw,
       schema_hint: schemaHint,
       matched_record_ids: uniqIds,
       matched_count: uniqIds.length,
