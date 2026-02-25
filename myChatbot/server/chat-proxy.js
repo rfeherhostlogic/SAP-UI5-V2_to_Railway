@@ -1412,6 +1412,35 @@ function smartSegExtractIdsFromText(text) {
   return Array.from(new Set(matches.map(function(item) { return String(item); })));
 }
 
+async function smartSegResolveCustomerIdsByNames(names) {
+  const uniqueNames = Array.from(new Set((names || []).map(function(v) {
+    return String(v || "").trim();
+  }).filter(Boolean)));
+  if (uniqueNames.length === 0) {
+    return [];
+  }
+
+  const db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
+  try {
+    const ids = new Set();
+    for (let i = 0; i < uniqueNames.length; i += 1) {
+      const rows = await sqliteAllParams(
+        db,
+        "SELECT CustomerId FROM Customer WHERE lower(CustomerName) LIKE ? LIMIT 10",
+        ["%" + uniqueNames[i].toLowerCase().replace(/\s+/g, "%") + "%"]
+      );
+      rows.forEach(function(row) {
+        if (row && row.CustomerId != null) {
+          ids.add(String(row.CustomerId));
+        }
+      });
+    }
+    return Array.from(ids);
+  } finally {
+    await closeSqlite(db);
+  }
+}
+
 async function smartSegQueryRagSource(opts) {
   const prompt = String(opts && opts.prompt ? opts.prompt : "").trim();
   if (!prompt) {
@@ -1444,10 +1473,12 @@ async function smartSegQueryRagSource(opts) {
       model: OPENAI_MODEL,
       instructions: [
         "Te egy smart segmentation RAG asszisztens vagy.",
-        "A SMART_SEGMENT vector store dokumentumai alapjan keress relevans rekord ID-kat.",
-        "Kizárólag numerikus customer/record id-kat adj vissza JSON formaban:",
-        "{\"record_ids\":[\"1001\",\"1002\"],\"note\":\"...\"}",
-        "Ha nincs talalat, record_ids legyen ures tomb."
+        "A SMART_SEGMENT vector store dokumentumai alapjan keress relevans rekordokat.",
+        "Adj vissza JSON-t, extra szoveg nelkul.",
+        "Ha van customer/record id a dokumentumban, azt tedd a record_ids tombbe.",
+        "Ha csak cegnev szerepel, azt tedd a customer_names tombbe.",
+        "Schema: {\"record_ids\":[\"1\"],\"customer_names\":[\"Roli Foods\"],\"note\":\"...\"}",
+        "Ha nincs talalat, mindket tomb legyen ures."
       ].join("\n"),
       input: prompt,
       tools: [{
@@ -1476,14 +1507,20 @@ async function smartSegQueryRagSource(opts) {
   } catch (_e) {
     parsed = null;
   }
-  const ids = Array.isArray(parsed && parsed.record_ids)
+  const idsFromJson = Array.isArray(parsed && parsed.record_ids)
     ? parsed.record_ids.map(function(v) { return String(v || "").trim(); }).filter(Boolean)
     : smartSegExtractIdsFromText(outputText);
+  const namesFromJson = Array.isArray(parsed && parsed.customer_names)
+    ? parsed.customer_names.map(function(v) { return String(v || "").trim(); }).filter(Boolean)
+    : [];
+  const idsFromNames = await smartSegResolveCustomerIdsByNames(namesFromJson);
+  const ids = Array.from(new Set([].concat(idsFromJson, idsFromNames)));
 
   return {
     active: true,
-    matched_record_ids: Array.from(new Set(ids)),
-    matched_count: Array.from(new Set(ids)).length,
+    matched_record_ids: ids,
+    matched_count: ids.length,
+    matched_customer_names: namesFromJson,
     note: parsed && parsed.note ? String(parsed.note) : "RAG azonosito kinyeres kesz.",
     evidence_text: outputText
   };
