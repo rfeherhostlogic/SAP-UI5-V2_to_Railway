@@ -12,6 +12,7 @@ const bcrypt = require("bcryptjs");
 const { PDFParse } = require("pdf-parse");
 const PDFDocument = require("pdfkit");
 const { executeDummy4, SQL_PROMPTS, SUMMARY_PROMPTS } = require("./dummy4Service");
+const { parseSchemaHint, validateSelectSql } = require("./sqlValidator");
 
 const app = express();
 const PORT = Number(process.env.PORT || process.env.CHAT_PROXY_PORT || 4000);
@@ -1290,69 +1291,95 @@ function smartSegBuildSqlFilter(clause) {
   };
 }
 
+async function smartSegGenerateSqlWithOpenAI(prompt, schemaHint) {
+  const sPrompt = String(prompt || "").trim();
+  const sSchemaHint = String(schemaHint || "").trim();
+  const sRaw = await callOpenAiText([
+    {
+      role: "system",
+      content: [
+        "Te egy SQL segmentation query generator vagy SQLite adatbazishoz.",
+        "Kizarolag SELECT lekérdezést adhatsz vissza, extra szoveg nelkul.",
+        "Kotelezo szabalyok:",
+        "- Csak a schema hintben szereplo tablakat/oszlopokat hasznald.",
+        "- A query eredmenyeben legyen record_id alias (szegmentaciohoz).",
+        "- Segmentationnal, ha van Customer tabla, preferald a Customer alapot (c.CustomerId AS record_id).",
+        "- Joinolt tablakat is hasznalhatsz (pl. Customer + SalesOrder), ha a feltetel ezt igenyli.",
+        "- Csak olvasasi muvelet: SELECT.",
+        "- Kotelezo LIMIT 1000.",
+        "- SQLite szintaxis."
+      ].join("\n")
+    },
+    {
+      role: "user",
+      content: [
+        "Felhasznaloi segmentation feltetel:",
+        sPrompt,
+        "",
+        "Schema hint:",
+        sSchemaHint
+      ].join("\n")
+    }
+  ], 0);
+
+  return String(sRaw || "")
+    .replace(/```sql/gi, "")
+    .replace(/```/g, "")
+    .trim();
+}
+
 async function smartSegQuerySqlSource(opts) {
   const prompt = String(opts && opts.prompt ? opts.prompt : "").trim();
   if (!prompt) {
     return {
       active: false,
       interpreted_query: "",
+      generated_sql: "",
       matched_record_ids: [],
       matched_count: 0,
       rows_by_id: {}
     };
   }
 
-  const split = smartSegSplitQueryToClauses(prompt);
-  const parsedClauses = split.clauses.map(smartSegBuildSqlFilter);
-  const sqlParts = [];
-  const params = [];
-  parsedClauses.forEach(function(item, idx) {
-    if (idx > 0) {
-      sqlParts.push(split.operators[idx - 1] || "AND");
-    }
-    sqlParts.push("(" + item.sql + ")");
-    (item.params || []).forEach(function(p) { params.push(p); });
-  });
-  const whereSql = sqlParts.length ? (" WHERE " + sqlParts.join(" ")) : "";
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY hianyzik a Smart Segmentation SQL generalashoz.");
+  }
 
-  const baseSql = [
-    "SELECT",
-    "  c.CustomerId AS record_id,",
-    "  c.CustomerId,",
-    "  c.CustomerName,",
-    "  c.Country,",
-    "  c.Segment,",
-    "  COUNT(DISTINCT so.SalesOrderId) AS OrderCount,",
-    "  ROUND(COALESCE(SUM(so.NetAmount), 0), 2) AS TotalNetAmount,",
-    "  MAX(so.OrderDate) AS LastOrderDate,",
-    "  GROUP_CONCAT(DISTINCT so.Currency) AS Currencies",
-    "FROM Customer c",
-    "LEFT JOIN SalesOrder so ON so.CustomerId = c.CustomerId",
-    "GROUP BY c.CustomerId, c.CustomerName, c.Country, c.Segment"
-  ].join("\n");
+  const schemaTables = await loadSqlTableMetadata(DISCOVERY_DB_PATH);
+  const schemaHint = buildSchemaHintFromTables(schemaTables);
+  const generatedSql = await smartSegGenerateSqlWithOpenAI(prompt, schemaHint);
+  const validation = validateSelectSql(generatedSql, parseSchemaHint(schemaHint));
 
-  const finalSql = "SELECT * FROM (" + baseSql + ") base" + whereSql + " ORDER BY CustomerId LIMIT 1000";
+  if (!validation.ok) {
+    throw new Error("Smart Segmentation SQL validacios hiba: " + validation.errors.join(" | "));
+  }
+
+  const finalSql = validation.sanitizedSql;
   const db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
   try {
-    const rows = await sqliteAllParams(db, finalSql, params);
+    const rows = await sqliteAll(db, finalSql);
     const ids = [];
     const rowsById = {};
     rows.forEach(function(row) {
-      const id = String(row && row.record_id != null ? row.record_id : "").trim();
+      const id = String(
+        row && row.record_id != null ? row.record_id :
+        (row && row.CustomerId != null ? row.CustomerId : "")
+      ).trim();
       if (!id) {
         return;
       }
+      rowsById[id] = Object.assign({}, row, { record_id: id });
       ids.push(id);
-      rowsById[id] = Object.assign({}, row, {
-        record_id: id
-      });
     });
+    const uniqIds = Array.from(new Set(ids));
     return {
       active: true,
       prompt: prompt,
-      interpreted_query: parsedClauses.map(function(c) { return c.label; }).join(" " + ((split.operators[0] || "AND")) + " "),
-      matched_record_ids: Array.from(new Set(ids)),
-      matched_count: Array.from(new Set(ids)).length,
+      interpreted_query: prompt,
+      generated_sql: finalSql,
+      schema_hint: schemaHint,
+      matched_record_ids: uniqIds,
+      matched_count: uniqIds.length,
       rows_by_id: rowsById
     };
   } finally {
@@ -3543,6 +3570,7 @@ app.post("/api/jokers/smart-segmentation/run", async function(req, res) {
         active: !!sqlEnabled,
         prompt: sqlPrompt,
         interpreted_query: sqlResult.interpreted_query || "",
+        generated_sql: sqlResult.generated_sql || "",
         matched_count: Number(sqlResult.matched_count || 0),
         matched_record_ids: sqlResult.matched_record_ids || []
       },

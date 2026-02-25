@@ -454,6 +454,9 @@ sap.ui.define([
       if (oSql.interpreted_query) {
         aParts.push("SQL ertelmezes: " + oSql.interpreted_query);
       }
+      if (oSql.generated_sql) {
+        aParts.push("Generalt SQL:\n" + oSql.generated_sql);
+      }
       if (oRag.note) {
         aParts.push("RAG megjegyzes: " + oRag.note);
       }

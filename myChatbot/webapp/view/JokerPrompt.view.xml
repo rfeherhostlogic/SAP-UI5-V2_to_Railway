@@ -188,7 +188,10 @@
           </VBox>
         </Panel>
 
-        <Panel headerText="Chat / futasi naplo" class="sapUiSmallMarginBottom" visible="{= ${jokers>/smartSegChatMessages}.length > 0 }">
+        <Panel headerText="Futasi naplo" class="sapUiSmallMarginBottom" visible="{= ${jokers>/smartSegChatMessages}.length > 0 }">
+          <HBox justifyContent="SpaceBetween" class="sapUiTinyMarginBottom sapUiTinyMarginBegin sapUiTinyMarginEnd">
+            <ObjectStatus text="{= 'Bejegyzesek: ' + ${jokers>/smartSegChatMessages}.length }" state="Information"/>
+          </HBox>
           <List items="{jokers>/smartSegChatMessages}" showSeparators="Inner">
             <CustomListItem>
               <VBox>
