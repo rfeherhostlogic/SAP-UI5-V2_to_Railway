@@ -8,9 +8,17 @@
       this._applyTagFilter();
     },
 
+    onAfterRendering: function() {
+      this._applyTagFilter();
+    },
+
     onTagFilterChange: function(oEvent) {
       var sKey = String(oEvent.getSource().getSelectedKey() || "Összes");
-      this.getView().getModel("jokers").setProperty("/activeTag", sKey);
+      var oModel = this.getView().getModel("jokers") || this.getOwnerComponent().getModel("jokers");
+      if (!oModel) {
+        return;
+      }
+      oModel.setProperty("/activeTag", sKey);
       this._applyTagFilter();
     },
 
@@ -37,7 +45,10 @@
     },
 
     _applyTagFilter: function() {
-      var oModel = this.getView().getModel("jokers");
+      var oModel = this.getView().getModel("jokers") || this.getOwnerComponent().getModel("jokers");
+      if (!oModel) {
+        return;
+      }
       var aTiles = oModel.getProperty("/tiles") || [];
       var sActiveTag = String(oModel.getProperty("/activeTag") || "Összes");
       var aFiltered = aTiles.filter(function(oTile) {
