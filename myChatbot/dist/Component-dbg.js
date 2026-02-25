@@ -53,6 +53,8 @@ sap.ui.define([
 						id: "email-fix",
 						title: "Email javitas",
 						subtitle: "Stilus es nyelvhelyesseg",
+						primaryTag: "\u00c1ltal\u00e1nos",
+						tags: ["\u00c1ltal\u00e1nos"],
 						footer: "AI Joker 01",
 						description: "Megirt email szoveg stilisztikai es nyelvi javitasa.",
 						systemPrompt: "Javitsd a kovetkezo email szoveget professzionalis, udvarias es rovid stilusban. Tartsd meg az eredeti jelentest."
@@ -61,6 +63,8 @@ sap.ui.define([
 						id: "sensitive-translation",
 						title: "Erzekeny uzleti adat forditas",
 						subtitle: "Bizalmas tartalom",
+						primaryTag: "\u00c1ltal\u00e1nos",
+						tags: ["\u00c1ltal\u00e1nos"],
 						footer: "AI Joker 02",
 						description: "Bizalmas uzleti szoveg pontos forditasa.",
 						systemPrompt: "Forditsd le a kovetkezo uzleti szoveget pontosan es semleges, professzionalis stilusban. Ne adj hozza extra magyarazatot."
@@ -69,6 +73,8 @@ sap.ui.define([
 						id: "summary",
 						title: "Osszefoglalo",
 						subtitle: "Hosszu szoveg roviden",
+						primaryTag: "\u00c1ltal\u00e1nos",
+						tags: ["\u00c1ltal\u00e1nos"],
 						footer: "AI Joker 03",
 						description: "Hosszabb szoveg tomor, attekintheto osszefoglalasa.",
 						systemPrompt: "Keszits tomor, pontokba szedett osszefoglalot a kovetkezo szovegrol. Emeld ki a lenyegi dontesi informaciokat."
@@ -77,14 +83,18 @@ sap.ui.define([
 						id: "dummy-4",
 						title: "Riportok",
 						subtitle: "Natural nyelv -> SQL",
+						primaryTag: "\u00c1ltal\u00e1nos",
+						tags: ["\u00c1ltal\u00e1nos"],
 						footer: "AI Joker 04",
 						description: "Hasznalat: '...' = oszlop/mezo jeloles (nem kotelezo a pontos oszlopnev), \"...\" = konkret ertek. A rendszer SQL SELECT-et general es 1 mondatos osszegzest ad.",
 						systemPrompt: "Adj rovid valaszt a kovetkezo szovegre."
 					},
 					{
 						id: "dummy-5",
-						title: "Dokumentum összefoglaló",
+						title: "Dokumentum osszefoglalo",
 						subtitle: "PDF Q&A + osszegzes",
+						primaryTag: "\u00c1ltal\u00e1nos",
+						tags: ["\u00c1ltal\u00e1nos"],
 						footer: "AI Joker 05",
 						description: "PDF feltoltes, rovid osszegzes keszitese es kerdes-valasz a dokumentum alapjan.",
 						systemPrompt: "Csak a feltoltott PDF tartalma alapjan valaszolj."
@@ -92,7 +102,9 @@ sap.ui.define([
 					{
 						id: "dummy-6",
 						title: "RAG",
-						subtitle: "Generikus kérdések belső dokumentumokról",
+						subtitle: "Generikus kerdesek belso dokumentumokrol",
+						primaryTag: "\u00c1ltal\u00e1nos",
+						tags: ["\u00c1ltal\u00e1nos"],
 						footer: "AI Joker 06",
 						description: "Helyorzo csempe kesobbi funkciohoz.",
 						systemPrompt: "Adj rovid valaszt a kovetkezo szovegre."
@@ -101,19 +113,26 @@ sap.ui.define([
 						id: "dummy-7",
 						title: "Penzugyi osszehasonlitas (RAG)",
 						subtitle: "Kimutatasok osszevetese",
+						primaryTag: "\u00c1ltal\u00e1nos",
+						tags: ["\u00c1ltal\u00e1nos"],
 						footer: "AI Joker 07",
-						description: "Kizarolag a RAG-ban tarolt 2023 auditált riportokbol hasonlit ossze ket ceget. Ceg nev formatum: \"Ceg nev\" (pl. \"Roli Foods\").",
+						description: "Kizarolag a RAG-ban tarolt 2023 auditalt riportokbol hasonlit ossze ket ceget. Ceg nev formatum: \"Ceg nev\" (pl. \"Roli Foods\").",
 						systemPrompt: "RAG alapu penzugyi elemzes ket ceg kozott, csak dokumentumbizonyitekkal."
 					},
 					{
 						id: "dummy-8",
-						title: "Dummy 8",
-						subtitle: "Helyorzo",
+						title: "Smart Segmentation",
+						subtitle: "SQL + RAG szegmensek",
+						primaryTag: "Marketing",
+						tags: ["Marketing"],
 						footer: "AI Joker 08",
-						description: "Helyorzo csempe kesobbi funkciohoz.",
-						systemPrompt: "Adj rovid valaszt a kovetkezo szovegre."
+						description: "Szabadszavas szegmentacio SQL es RAG adatforrasok kombinaciojaval, AND/OR logikaval.",
+						systemPrompt: "Segits smart szegmenseket tervezni es futtatni."
 					}
 				],
+				filteredTiles: [],
+				availableTags: ["\u00d6sszes", "\u00c1ltal\u00e1nos", "Marketing"],
+				activeTag: "\u00d6sszes",
 				selectedJoker: null,
 				promptInput: "",
 				resultText: "",
@@ -132,7 +151,28 @@ sap.ui.define([
 				dummy7CompanyA: "",
 				dummy7CompanyB: "",
 				dummy7Focus: "",
-				dummy7Result: ""
+				dummy7Result: "",
+				smartSegSqlEnabled: true,
+				smartSegRagEnabled: false,
+				smartSegCombineMode: "AND",
+				smartSegSqlPrompt: "",
+				smartSegRagPrompt: "",
+				smartSegChatMessages: [],
+				smartSegBusy: false,
+				smartSegError: "",
+				smartSegSqlMeta: null,
+				smartSegRagMeta: null,
+				smartSegResultRows: [],
+				smartSegResultColumns: [],
+				smartSegDisplayRows: [],
+				smartSegSearch: "",
+				smartSegSortKey: "",
+				smartSegSortDir: "asc",
+				smartSegPage: 1,
+				smartSegPageSize: 20,
+				smartSegTotalCount: 0,
+				smartSegFilteredCount: 0,
+				smartSegSelectedRecordIds: []
 			}), "jokers");
 
 			// discovery model

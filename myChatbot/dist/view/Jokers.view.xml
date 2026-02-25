@@ -1,15 +1,24 @@
 ﻿<mvc:View
   xmlns:mvc="sap.ui.core.mvc"
   xmlns="sap.m"
+  xmlns:core="sap.ui.core"
   controllerName="sap.suite.ui.commons.demo.tutorial.controller.Jokers">
   <Page title="Jokerek" class="sapUiContentPadding jokerPage" showHeader="false">
     <VBox class="jokerShell" width="100%">
       <Title text="Jokerek" level="H2" class="sapUiTinyMarginBottom"/>
       <Text text="Valassz egy jokert. Csempe kattintasra megnyilik a prompt oldal." class="jokerIntro sapUiSmallMarginBottom"/>
+      <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginBottom">
+        <Label text="Tag szuro" class="sapUiTinyMarginEnd"/>
+        <Select width="14rem" selectedKey="{jokers>/activeTag}" change=".onTagFilterChange" items="{jokers>/availableTags}">
+          <items>
+            <core:Item key="{jokers>}" text="{jokers>}"/>
+          </items>
+        </Select>
+      </HBox>
 
-      <FlexBox items="{jokers>/tiles}" wrap="Wrap" class="jokerTileGrid">
+      <FlexBox items="{jokers>/filteredTiles}" wrap="Wrap" class="jokerTileGrid">
         <items>
-          <GenericTile class="jokerTile" header="{jokers>title}" subheader="{jokers>subtitle}" frameType="OneByOne" press=".onTilePress">
+          <GenericTile class="jokerTile" header="{jokers>title}" subheader="{= ${jokers>subtitle} + ' • ' + (${jokers>primaryTag} || 'Általános') }" frameType="OneByOne" press=".onTilePress">
             <tileContent>
               <TileContent footer="{jokers>footer}">
                 <content>

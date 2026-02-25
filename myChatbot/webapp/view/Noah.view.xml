@@ -20,7 +20,15 @@
                 <HBox width="100%" justifyContent="Start" visible="{= ${noah>role} !== 'user' }">
                   <Avatar initials="AI" displaySize="XS" class="chatAvatar noahAvatar"/>
                   <VBox class="chatBubble chatBubbleAi noahBubbleAi">
-                    <Text text="AI" class="chatBubbleMeta"/>
+                    <HBox justifyContent="SpaceBetween" alignItems="Center">
+                      <Text text="AI" class="chatBubbleMeta"/>
+                      <Button
+                        icon="sap-icon://copy"
+                        type="Transparent"
+                        tooltip="Copy to Clipboard CTRL + C"
+                        press=".onCopyNoahMessage"
+                        class="sapUiTinyMarginBegin"/>
+                    </HBox>
                     <Text text="{noah>content}" wrapping="true" width="100%"/>
                   </VBox>
                 </HBox>

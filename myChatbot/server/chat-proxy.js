@@ -19,6 +19,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const DUMMY7_MODEL = process.env.DUMMY7_MODEL || "gpt-4.1";
 const DUMMY7_VECTOR_STORE_ID = "vs_698f417bc0e481919720698508275ad3";
+const SMART_SEGMENT_VECTOR_STORE_ID = "vs_699ec6f7dc188191881c8d782ade2131";
 const APP_SESSION_SECRET = process.env.APP_SESSION_SECRET || "replace-this-in-production";
 const APP_SESSION_TTL_MS = Number(process.env.APP_SESSION_TTL_MS || (1000 * 60 * 60 * 12));
 const AUTH_COOKIE_NAME = "mychatbot_session";
@@ -1122,6 +1123,18 @@ function sqliteAll(db, sql) {
   });
 }
 
+function sqliteAllParams(db, sql, params) {
+  return new Promise(function(resolve, reject) {
+    db.all(sql, Array.isArray(params) ? params : [], function(err, rows) {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(rows || []);
+    });
+  });
+}
+
 function closeSqlite(db) {
   return new Promise(function(resolve, reject) {
     if (!db) {
@@ -1140,6 +1153,371 @@ function closeSqlite(db) {
 
 function escapeSqliteIdentifier(name) {
   return String(name || "").replace(/"/g, "\"\"");
+}
+
+function smartSegSplitQueryToClauses(promptText) {
+  const s = String(promptText || "").trim();
+  if (!s) {
+    return {
+      clauses: [],
+      operators: []
+    };
+  }
+
+  const tokens = s.split(/\s+(AND|OR|ÉS|ES|VAGY)\s+/i).filter(function(part) {
+    return part != null && String(part).trim() !== "";
+  });
+
+  const clauses = [];
+  const operators = [];
+  tokens.forEach(function(part, idx) {
+    const t = String(part || "").trim();
+    if (idx % 2 === 1) {
+      const op = /vagy|or/i.test(t) ? "OR" : "AND";
+      operators.push(op);
+    } else if (t) {
+      clauses.push(t);
+    }
+  });
+
+  if (clauses.length === 0 && s) {
+    clauses.push(s);
+  }
+
+  return {
+    clauses: clauses,
+    operators: operators
+  };
+}
+
+function smartSegParseComparison(raw) {
+  const s = String(raw || "").trim();
+  const patterns = [
+    { re: /(>=|<=|>|<|=)\s*(-?\d+(?:[.,]\d+)?)/, map: null },
+    { re: /\b(legalabb|min(?:imum)?|at least)\b\s*(-?\d+(?:[.,]\d+)?)/i, map: ">=" },
+    { re: /\b(legfeljebb|max(?:imum)?|at most)\b\s*(-?\d+(?:[.,]\d+)?)/i, map: "<=" },
+    { re: /\b(nagyobb mint|greater than|tobb mint)\b\s*(-?\d+(?:[.,]\d+)?)/i, map: ">" },
+    { re: /\b(kisebb mint|less than)\b\s*(-?\d+(?:[.,]\d+)?)/i, map: "<" }
+  ];
+
+  for (let i = 0; i < patterns.length; i += 1) {
+    const m = patterns[i].re.exec(s);
+    if (m) {
+      const op = patterns[i].map || m[1];
+      const numRaw = patterns[i].map ? m[2] : m[2];
+      const n = Number(String(numRaw || "").replace(",", "."));
+      if (Number.isFinite(n)) {
+        return { operator: op, value: n };
+      }
+    }
+  }
+  return null;
+}
+
+function smartSegExtractTextValue(clause) {
+  const quoted = String(clause || "").match(/"([^"]+)"|'([^']+)'/);
+  if (quoted) {
+    return String(quoted[1] || quoted[2] || "").trim();
+  }
+  const m = String(clause || "").match(/(?:=|:)\s*(.+)$/);
+  if (m) {
+    return String(m[1] || "").replace(/[()]/g, "").trim();
+  }
+  return String(clause || "").replace(/[()]/g, "").trim();
+}
+
+function smartSegBuildSqlFilter(clause) {
+  const s = String(clause || "").trim();
+  const lower = s.toLowerCase();
+  let field = "";
+  let mode = "";
+
+  if (/segment|szegmens/.test(lower)) {
+    field = "Segment";
+    mode = "text";
+  } else if (/country|orszag/.test(lower)) {
+    field = "Country";
+    mode = "text";
+  } else if (/customername|customer name|ugyfelnev|ugyfel nev|nev/.test(lower)) {
+    field = "CustomerName";
+    mode = "text";
+  } else if (/currency|deviza/.test(lower)) {
+    field = "Currencies";
+    mode = "text";
+  } else if (/koltes|forgalom|spend|revenue|netamount|net amount|netto/.test(lower)) {
+    field = "TotalNetAmount";
+    mode = "number";
+  } else if (/rendeles|order count|orders/.test(lower)) {
+    field = "OrderCount";
+    mode = "number";
+  } else if (/datum|date/.test(lower)) {
+    field = "LastOrderDate";
+    mode = "text";
+  } else {
+    return {
+      sql: "(lower(coalesce(CustomerName,'')) LIKE ? OR lower(coalesce(Country,'')) LIKE ? OR lower(coalesce(Segment,'')) LIKE ? OR lower(coalesce(Currencies,'')) LIKE ?)",
+      params: Array(4).fill("%" + lower.replace(/\s+/g, "%") + "%"),
+      label: "szabad szoveges keresés"
+    };
+  }
+
+  if (mode === "number") {
+    const parsed = smartSegParseComparison(s);
+    if (!parsed) {
+      return {
+        sql: field + " > ?",
+        params: [0],
+        label: field + " > 0 (alapertelmezett)"
+      };
+    }
+    return {
+      sql: field + " " + parsed.operator + " ?",
+      params: [parsed.value],
+      label: field + " " + parsed.operator + " " + parsed.value
+    };
+  }
+
+  const rawValue = smartSegExtractTextValue(s)
+    .replace(/\b(segment|szegmens|country|orszag|customername|customer name|ugyfelnev|ugyfel nev|nev|currency|deviza|datum|date)\b/gi, "")
+    .replace(/\b(is|eq|egyenlo|contains|tartalmazza)\b/gi, "")
+    .replace(/^[\s:=]+/, "")
+    .trim();
+  const value = (rawValue || s).toLowerCase();
+  return {
+    sql: "lower(coalesce(" + field + ",'')) LIKE ?",
+    params: ["%" + value.replace(/\s+/g, "%") + "%"],
+    label: field + " LIKE %" + value + "%"
+  };
+}
+
+async function smartSegQuerySqlSource(opts) {
+  const prompt = String(opts && opts.prompt ? opts.prompt : "").trim();
+  if (!prompt) {
+    return {
+      active: false,
+      interpreted_query: "",
+      matched_record_ids: [],
+      matched_count: 0,
+      rows_by_id: {}
+    };
+  }
+
+  const split = smartSegSplitQueryToClauses(prompt);
+  const parsedClauses = split.clauses.map(smartSegBuildSqlFilter);
+  const sqlParts = [];
+  const params = [];
+  parsedClauses.forEach(function(item, idx) {
+    if (idx > 0) {
+      sqlParts.push(split.operators[idx - 1] || "AND");
+    }
+    sqlParts.push("(" + item.sql + ")");
+    (item.params || []).forEach(function(p) { params.push(p); });
+  });
+  const whereSql = sqlParts.length ? (" WHERE " + sqlParts.join(" ")) : "";
+
+  const baseSql = [
+    "SELECT",
+    "  c.CustomerId AS record_id,",
+    "  c.CustomerId,",
+    "  c.CustomerName,",
+    "  c.Country,",
+    "  c.Segment,",
+    "  COUNT(DISTINCT so.SalesOrderId) AS OrderCount,",
+    "  ROUND(COALESCE(SUM(so.NetAmount), 0), 2) AS TotalNetAmount,",
+    "  MAX(so.OrderDate) AS LastOrderDate,",
+    "  GROUP_CONCAT(DISTINCT so.Currency) AS Currencies",
+    "FROM Customer c",
+    "LEFT JOIN SalesOrder so ON so.CustomerId = c.CustomerId",
+    "GROUP BY c.CustomerId, c.CustomerName, c.Country, c.Segment"
+  ].join("\n");
+
+  const finalSql = "SELECT * FROM (" + baseSql + ") base" + whereSql + " ORDER BY CustomerId LIMIT 1000";
+  const db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
+  try {
+    const rows = await sqliteAllParams(db, finalSql, params);
+    const ids = [];
+    const rowsById = {};
+    rows.forEach(function(row) {
+      const id = String(row && row.record_id != null ? row.record_id : "").trim();
+      if (!id) {
+        return;
+      }
+      ids.push(id);
+      rowsById[id] = Object.assign({}, row, {
+        record_id: id
+      });
+    });
+    return {
+      active: true,
+      prompt: prompt,
+      interpreted_query: parsedClauses.map(function(c) { return c.label; }).join(" " + ((split.operators[0] || "AND")) + " "),
+      matched_record_ids: Array.from(new Set(ids)),
+      matched_count: Array.from(new Set(ids)).length,
+      rows_by_id: rowsById
+    };
+  } finally {
+    await closeSqlite(db);
+  }
+}
+
+function smartSegExtractIdsFromText(text) {
+  const matches = String(text || "").match(/\b\d+\b/g) || [];
+  return Array.from(new Set(matches.map(function(item) { return String(item); })));
+}
+
+async function smartSegQueryRagSource(opts) {
+  const prompt = String(opts && opts.prompt ? opts.prompt : "").trim();
+  if (!prompt) {
+    return {
+      active: false,
+      matched_record_ids: [],
+      matched_count: 0,
+      note: "RAG kikapcsolva.",
+      evidence_text: ""
+    };
+  }
+
+  if (!OPENAI_API_KEY) {
+    return {
+      active: true,
+      matched_record_ids: [],
+      matched_count: 0,
+      note: "OPENAI_API_KEY hianyzik, RAG nem futtathato.",
+      evidence_text: ""
+    };
+  }
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + OPENAI_API_KEY
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      instructions: [
+        "Te egy smart segmentation RAG asszisztens vagy.",
+        "A SMART_SEGMENT vector store dokumentumai alapjan keress relevans rekord ID-kat.",
+        "Kizárólag numerikus customer/record id-kat adj vissza JSON formaban:",
+        "{\"record_ids\":[\"1001\",\"1002\"],\"note\":\"...\"}",
+        "Ha nincs talalat, record_ids legyen ures tomb."
+      ].join("\n"),
+      input: prompt,
+      tools: [{
+        type: "file_search",
+        vector_store_ids: [SMART_SEGMENT_VECTOR_STORE_ID]
+      }]
+    })
+  });
+
+  const raw = await response.text();
+  const json = parseOpenAiReply(raw);
+  if (!response.ok) {
+    return {
+      active: true,
+      matched_record_ids: [],
+      matched_count: 0,
+      note: "RAG OpenAI hiba",
+      evidence_text: raw
+    };
+  }
+
+  const outputText = extractResponsesOutputText(json) || "";
+  let parsed = null;
+  try {
+    parsed = JSON.parse(outputText);
+  } catch (_e) {
+    parsed = null;
+  }
+  const ids = Array.isArray(parsed && parsed.record_ids)
+    ? parsed.record_ids.map(function(v) { return String(v || "").trim(); }).filter(Boolean)
+    : smartSegExtractIdsFromText(outputText);
+
+  return {
+    active: true,
+    matched_record_ids: Array.from(new Set(ids)),
+    matched_count: Array.from(new Set(ids)).length,
+    note: parsed && parsed.note ? String(parsed.note) : "RAG azonosito kinyeres kesz.",
+    evidence_text: outputText
+  };
+}
+
+async function smartSegHydrateRowsByIds(ids) {
+  const uniqueIds = Array.from(new Set((ids || []).map(function(v) { return String(v || "").trim(); }).filter(Boolean)));
+  if (uniqueIds.length === 0) {
+    return {};
+  }
+
+  const placeholders = uniqueIds.map(function() { return "?"; }).join(",");
+  const sql = [
+    "SELECT",
+    "  c.CustomerId AS record_id,",
+    "  c.CustomerId, c.CustomerName, c.Country, c.Segment,",
+    "  COUNT(DISTINCT so.SalesOrderId) AS OrderCount,",
+    "  ROUND(COALESCE(SUM(so.NetAmount), 0), 2) AS TotalNetAmount,",
+    "  MAX(so.OrderDate) AS LastOrderDate,",
+    "  GROUP_CONCAT(DISTINCT so.Currency) AS Currencies",
+    "FROM Customer c",
+    "LEFT JOIN SalesOrder so ON so.CustomerId = c.CustomerId",
+    "WHERE c.CustomerId IN (" + placeholders + ")",
+    "GROUP BY c.CustomerId, c.CustomerName, c.Country, c.Segment"
+  ].join("\n");
+
+  const db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
+  try {
+    const rows = await sqliteAllParams(db, sql, uniqueIds);
+    const out = {};
+    rows.forEach(function(row) {
+      const id = String(row && row.record_id != null ? row.record_id : "").trim();
+      if (!id) {
+        return;
+      }
+      out[id] = Object.assign({}, row, { record_id: id });
+    });
+
+    uniqueIds.forEach(function(id) {
+      if (!out[id]) {
+        out[id] = {
+          record_id: id,
+          CustomerId: id,
+          CustomerName: "(RAG only találat)",
+          Country: "",
+          Segment: "",
+          OrderCount: 0,
+          TotalNetAmount: 0,
+          LastOrderDate: "",
+          Currencies: ""
+        };
+      }
+    });
+    return out;
+  } finally {
+    await closeSqlite(db);
+  }
+}
+
+function smartSegCombineIds(sqlIds, ragIds, operator) {
+  const a = new Set((sqlIds || []).map(String));
+  const b = new Set((ragIds || []).map(String));
+  const mode = String(operator || "AND").toUpperCase() === "OR" ? "OR" : "AND";
+  let out = [];
+
+  if (a.size > 0 && b.size > 0) {
+    if (mode === "AND") {
+      out = Array.from(a).filter(function(id) { return b.has(id); });
+    } else {
+      out = Array.from(new Set([].concat(Array.from(a), Array.from(b))));
+    }
+  } else if (a.size > 0) {
+    out = Array.from(a);
+  } else if (b.size > 0) {
+    out = Array.from(b);
+  }
+
+  return {
+    operator: mode,
+    final_record_ids: out
+  };
 }
 
 async function loadSqlTableMetadata(dbPath) {
@@ -3112,6 +3490,94 @@ app.post("/api/jokers/dummy7/compare", async function(req, res) {
       details: err && err.message ? err.message : String(err)
     });
   }
+});
+
+app.post("/api/jokers/smart-segmentation/run", async function(req, res) {
+  try {
+    const sqlEnabled = !!(req.body && req.body.sql_enabled);
+    const ragEnabled = !!(req.body && req.body.rag_enabled);
+    const combineMode = String(req.body && req.body.combine_mode ? req.body.combine_mode : "AND").toUpperCase() === "OR" ? "OR" : "AND";
+    const sqlPrompt = String(req.body && req.body.sql_prompt ? req.body.sql_prompt : "").trim();
+    const ragPrompt = String(req.body && req.body.rag_prompt ? req.body.rag_prompt : "").trim();
+
+    if (!sqlEnabled && !ragEnabled) {
+      res.status(400).json({ error: "Legalabb egy adatforras legyen aktiv." });
+      return;
+    }
+    if (sqlEnabled && !sqlPrompt) {
+      res.status(400).json({ error: "SQL szabadszavas feltetel kotelezo." });
+      return;
+    }
+    if (ragEnabled && !ragPrompt) {
+      res.status(400).json({ error: "RAG keresesi leiras kotelezo." });
+      return;
+    }
+
+    const sqlResult = sqlEnabled
+      ? await smartSegQuerySqlSource({ prompt: sqlPrompt })
+      : { active: false, matched_record_ids: [], matched_count: 0, rows_by_id: {}, interpreted_query: "" };
+    const ragResult = ragEnabled
+      ? await smartSegQueryRagSource({ prompt: ragPrompt })
+      : { active: false, matched_record_ids: [], matched_count: 0, note: "RAG kikapcsolva." };
+
+    const combined = smartSegCombineIds(sqlResult.matched_record_ids, ragResult.matched_record_ids, combineMode);
+    const hydratedFromDb = await smartSegHydrateRowsByIds(combined.final_record_ids);
+    const rowsById = Object.assign({}, hydratedFromDb, sqlResult.rows_by_id || {});
+    const finalRows = combined.final_record_ids.map(function(id) {
+      return rowsById[id] || { record_id: id, CustomerId: id };
+    });
+
+    const orderedColumns = [];
+    const seen = {};
+    finalRows.forEach(function(row) {
+      Object.keys(row || {}).forEach(function(k) {
+        if (!seen[k]) {
+          seen[k] = true;
+          orderedColumns.push(k);
+        }
+      });
+    });
+
+    res.json({
+      sql: {
+        active: !!sqlEnabled,
+        prompt: sqlPrompt,
+        interpreted_query: sqlResult.interpreted_query || "",
+        matched_count: Number(sqlResult.matched_count || 0),
+        matched_record_ids: sqlResult.matched_record_ids || []
+      },
+      rag: {
+        active: !!ragEnabled,
+        prompt: ragPrompt,
+        matched_count: Number(ragResult.matched_count || 0),
+        matched_record_ids: ragResult.matched_record_ids || [],
+        note: ragResult.note || ""
+      },
+      combine: {
+        operator: combined.operator,
+        final_count: combined.final_record_ids.length,
+        final_record_ids: combined.final_record_ids
+      },
+      result: {
+        total_count: finalRows.length,
+        columns: orderedColumns,
+        rows: finalRows
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Smart Segmentation hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/smart-segmentation/crm/send", function(_req, res) {
+  res.json({
+    ok: false,
+    future: true,
+    message: "Jövőbeli funkció."
+  });
 });
 
 app.get("/api/jokers/dummy4/chart/", function(req, res) {

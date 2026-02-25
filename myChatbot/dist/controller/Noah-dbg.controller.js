@@ -224,6 +224,31 @@ sap.ui.define([
       this._setState(STATE.IDLE, "Folyamat megszakitva.");
     },
 
+    onCopyNoahMessage: async function(oEvent) {
+      var oCtx = oEvent.getSource().getBindingContext("noah");
+      var oMsg = oCtx ? oCtx.getObject() : null;
+      var sText = String(oMsg && oMsg.content ? oMsg.content : "");
+      if (!sText) {
+        return;
+      }
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(sText);
+        } else {
+          this._copyTextFallback(sText);
+        }
+        MessageToast.show("AI valasz masolva.");
+      } catch (_e) {
+        try {
+          this._copyTextFallback(sText);
+          MessageToast.show("AI valasz masolva.");
+        } catch (_fallbackErr) {
+          MessageToast.show("Masolas nem sikerult.");
+        }
+      }
+    },
+
     _loadCardAndContinue: async function(oRoute, sOriginalMessage) {
       var oModel = this.getView().getModel("noah");
       this._setState(STATE.CARD_LOADING, "Kartya betoltese: " + (oRoute.ui_hint || oRoute.selected_card_id) + "...");
@@ -463,6 +488,18 @@ sap.ui.define([
         return file.name + " (" + file.type + ", " + file.size + " B)";
       }).join(", ");
       return sText + "\n\n[Csatolmanyok: " + sMeta + "]";
+    },
+
+    _copyTextFallback: function(sText) {
+      var oTextArea = document.createElement("textarea");
+      oTextArea.value = String(sText || "");
+      oTextArea.setAttribute("readonly", "readonly");
+      oTextArea.style.position = "fixed";
+      oTextArea.style.left = "-9999px";
+      document.body.appendChild(oTextArea);
+      oTextArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(oTextArea);
     },
 
     _appendMessage: function(sRole, sContent) {

@@ -172,6 +172,48 @@
     });
   }
 
+  function runSmartSegmentation(mPayload) {
+    return fetch("/api/jokers/smart-segmentation/run", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        sql_enabled: !!mPayload.sql_enabled,
+        rag_enabled: !!mPayload.rag_enabled,
+        combine_mode: mPayload.combine_mode || "AND",
+        sql_prompt: mPayload.sql_prompt || "",
+        rag_prompt: mPayload.rag_prompt || ""
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function sendSmartSegmentationToCrm(mPayload) {
+    return fetch("/api/jokers/smart-segmentation/crm/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        record_ids: mPayload.record_ids || []
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function runDiscovery() {
     return fetch("/api/discovery/run", {
       method: "POST",
@@ -417,6 +459,8 @@
     summarizeDummy5: summarizeDummy5,
     askDummy5: askDummy5,
     runDummy7Compare: runDummy7Compare,
+    runSmartSegmentation: runSmartSegmentation,
+    sendSmartSegmentationToCrm: sendSmartSegmentationToCrm,
     runDiscovery: runDiscovery,
     discoverySpecChatStart: discoverySpecChatStart,
     discoverySpecChatAnswer: discoverySpecChatAnswer,

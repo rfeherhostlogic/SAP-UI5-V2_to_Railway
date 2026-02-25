@@ -211,6 +211,129 @@ sap.ui.define([
       }
     },
 
+    onRunSmartSegmentation: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var bSql = !!oModel.getProperty("/smartSegSqlEnabled");
+      var bRag = !!oModel.getProperty("/smartSegRagEnabled");
+      var sSqlPrompt = String(oModel.getProperty("/smartSegSqlPrompt") || "").trim();
+      var sRagPrompt = String(oModel.getProperty("/smartSegRagPrompt") || "").trim();
+      var sCombineMode = String(oModel.getProperty("/smartSegCombineMode") || "AND").toUpperCase();
+
+      if (!bSql && !bRag) {
+        MessageToast.show("Kapcsolj be legalabb egy adatforrast.");
+        return;
+      }
+      if (bSql && !sSqlPrompt) {
+        MessageToast.show("Az SQL szabadszavas felteteleket add meg.");
+        return;
+      }
+      if (bRag && !sRagPrompt) {
+        MessageToast.show("A RAG keresesi leirast add meg.");
+        return;
+      }
+
+      oModel.setProperty("/smartSegBusy", true);
+      oModel.setProperty("/smartSegError", "");
+      this._smartSegAppendChat("user", [
+        bSql ? ("[SQL] " + sSqlPrompt) : "",
+        bRag ? ("[RAG] " + sRagPrompt) : "",
+        (bSql && bRag) ? ("[Kombinalas] " + sCombineMode) : ""
+      ].filter(Boolean).join("\n"));
+
+      try {
+        var oResp = await AiService.runSmartSegmentation({
+          sql_enabled: bSql,
+          rag_enabled: bRag,
+          combine_mode: sCombineMode,
+          sql_prompt: sSqlPrompt,
+          rag_prompt: sRagPrompt
+        });
+
+        oModel.setProperty("/smartSegSqlMeta", oResp.sql || null);
+        oModel.setProperty("/smartSegRagMeta", oResp.rag || null);
+        oModel.setProperty("/smartSegResultRows", (oResp.result && oResp.result.rows) || []);
+        oModel.setProperty("/smartSegResultColumns", (oResp.result && oResp.result.columns) || []);
+        oModel.setProperty("/smartSegTotalCount", Number(oResp.result && oResp.result.total_count || 0));
+        oModel.setProperty("/smartSegSelectedRecordIds", []);
+        oModel.setProperty("/smartSegPage", 1);
+        if (!oModel.getProperty("/smartSegSortKey")) {
+          oModel.setProperty("/smartSegSortKey", ((oResp.result && oResp.result.columns) || [])[0] || "");
+        }
+        this._applySmartSegClientView();
+        this._rebindSmartSegResultTable();
+
+        this._smartSegAppendChat("assistant", this._buildSmartSegSummaryText(oResp));
+      } catch (oError) {
+        var sMsg = oError && oError.message ? oError.message : "Smart Segmentation hiba.";
+        oModel.setProperty("/smartSegError", sMsg);
+        this._smartSegAppendChat("assistant", "Hiba: " + sMsg);
+        MessageToast.show(sMsg);
+      } finally {
+        oModel.setProperty("/smartSegBusy", false);
+      }
+    },
+
+    onSmartSegSearch: function() {
+      this._syncSmartSegSelectionsFromTable();
+      this._applySmartSegClientView();
+      this._rebindSmartSegResultTable();
+    },
+
+    onSmartSegSearchLive: function() {
+      this._syncSmartSegSelectionsFromTable();
+      this._applySmartSegClientView();
+      this._rebindSmartSegResultTable();
+    },
+
+    onSmartSegSortChange: function() {
+      this._syncSmartSegSelectionsFromTable();
+      this._applySmartSegClientView();
+      this._rebindSmartSegResultTable();
+    },
+
+    onSmartSegSortDirChange: function(oEvent) {
+      var sKey = String(oEvent.getParameter("item").getKey() || "asc");
+      this.getView().getModel("jokers").setProperty("/smartSegSortDir", sKey);
+      this._syncSmartSegSelectionsFromTable();
+      this._applySmartSegClientView();
+      this._rebindSmartSegResultTable();
+    },
+
+    onSmartSegPrevPage: function() {
+      var oModel = this.getView().getModel("jokers");
+      this._syncSmartSegSelectionsFromTable();
+      var iPage = Math.max(1, Number(oModel.getProperty("/smartSegPage") || 1) - 1);
+      oModel.setProperty("/smartSegPage", iPage);
+      this._applySmartSegClientView();
+      this._rebindSmartSegResultTable();
+    },
+
+    onSmartSegNextPage: function() {
+      var oModel = this.getView().getModel("jokers");
+      this._syncSmartSegSelectionsFromTable();
+      var iPage = Number(oModel.getProperty("/smartSegPage") || 1) + 1;
+      oModel.setProperty("/smartSegPage", iPage);
+      this._applySmartSegClientView();
+      this._rebindSmartSegResultTable();
+    },
+
+    onSmartSegSelectionChange: function() {
+      this._syncSmartSegSelectionsFromTable();
+    },
+
+    onSmartSegSendToCrm: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var aIds = oModel.getProperty("/smartSegSelectedRecordIds") || [];
+      try {
+        var oResp = await AiService.sendSmartSegmentationToCrm({
+          record_ids: aIds
+        });
+        MessageToast.show(oResp && oResp.message ? oResp.message : "Jövőbeli funkció.");
+      } catch (_e) {
+        MessageToast.show("Jövőbeli funkció.");
+      }
+    },
+
     onCancel: function() {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/promptInput", "");
@@ -222,9 +345,11 @@ sap.ui.define([
       oModel.setProperty("/dummy4ChartReady", false);
       this._resetDummy5State();
       this._resetDummy7State();
+      this._resetSmartSegState();
       this._resetDummy4Chart();
       this._resetDummy4LocalChart();
       this._rebindDummy4PreviewTable();
+      this._rebindSmartSegResultTable();
       this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: "jokers" });
     },
 
@@ -251,6 +376,9 @@ sap.ui.define([
           this._resetDummy5State();
         } else if (oSelected.id === "dummy-7") {
           this._resetDummy7State();
+        } else if (oSelected.id === "dummy-8") {
+          this._resetSmartSegState();
+          this._rebindSmartSegResultTable();
         }
       }
     },
@@ -275,6 +403,189 @@ sap.ui.define([
       oModel.setProperty("/dummy7CompanyB", "");
       oModel.setProperty("/dummy7Focus", "");
       oModel.setProperty("/dummy7Result", "");
+    },
+
+    _resetSmartSegState: function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/smartSegSqlEnabled", true);
+      oModel.setProperty("/smartSegRagEnabled", false);
+      oModel.setProperty("/smartSegCombineMode", "AND");
+      oModel.setProperty("/smartSegSqlPrompt", "");
+      oModel.setProperty("/smartSegRagPrompt", "");
+      oModel.setProperty("/smartSegChatMessages", []);
+      oModel.setProperty("/smartSegBusy", false);
+      oModel.setProperty("/smartSegError", "");
+      oModel.setProperty("/smartSegSqlMeta", null);
+      oModel.setProperty("/smartSegRagMeta", null);
+      oModel.setProperty("/smartSegResultRows", []);
+      oModel.setProperty("/smartSegResultColumns", []);
+      oModel.setProperty("/smartSegDisplayRows", []);
+      oModel.setProperty("/smartSegSearch", "");
+      oModel.setProperty("/smartSegSortKey", "");
+      oModel.setProperty("/smartSegSortDir", "asc");
+      oModel.setProperty("/smartSegPage", 1);
+      oModel.setProperty("/smartSegTotalCount", 0);
+      oModel.setProperty("/smartSegFilteredCount", 0);
+      oModel.setProperty("/smartSegSelectedRecordIds", []);
+    },
+
+    _smartSegAppendChat: function(sRole, sContent) {
+      var oModel = this.getView().getModel("jokers");
+      var aItems = oModel.getProperty("/smartSegChatMessages") || [];
+      aItems.push({
+        role: sRole,
+        content: String(sContent || "")
+      });
+      oModel.setProperty("/smartSegChatMessages", aItems.slice(-20));
+    },
+
+    _buildSmartSegSummaryText: function(oResp) {
+      var oSql = oResp && oResp.sql ? oResp.sql : {};
+      var oRag = oResp && oResp.rag ? oResp.rag : {};
+      var oCombine = oResp && oResp.combine ? oResp.combine : {};
+      var aParts = [];
+      if (oSql.active) {
+        aParts.push("SQL talalatok: " + Number(oSql.matched_count || 0));
+      }
+      if (oRag.active) {
+        aParts.push("RAG talalatok: " + Number(oRag.matched_count || 0));
+      }
+      aParts.push("Vegso talalatok (" + (oCombine.operator || "AND") + "): " + Number(oCombine.final_count || 0));
+      if (oSql.interpreted_query) {
+        aParts.push("SQL ertelmezes: " + oSql.interpreted_query);
+      }
+      if (oRag.note) {
+        aParts.push("RAG megjegyzes: " + oRag.note);
+      }
+      return aParts.join("\n");
+    },
+
+    _applySmartSegClientView: function() {
+      var oModel = this.getView().getModel("jokers");
+      var aRows = (oModel.getProperty("/smartSegResultRows") || []).slice();
+      var sSearch = String(oModel.getProperty("/smartSegSearch") || "").trim().toLowerCase();
+      var sSortKey = String(oModel.getProperty("/smartSegSortKey") || "").trim();
+      var sSortDir = String(oModel.getProperty("/smartSegSortDir") || "asc");
+      var iPageSize = Math.max(1, Number(oModel.getProperty("/smartSegPageSize") || 20));
+      var iPage = Math.max(1, Number(oModel.getProperty("/smartSegPage") || 1));
+
+      if (sSearch) {
+        aRows = aRows.filter(function(oRow) {
+          return Object.keys(oRow || {}).some(function(sKey) {
+            return String(oRow[sKey] == null ? "" : oRow[sKey]).toLowerCase().indexOf(sSearch) >= 0;
+          });
+        });
+      }
+
+      if (sSortKey) {
+        aRows.sort(function(a, b) {
+          var vA = a ? a[sSortKey] : null;
+          var vB = b ? b[sSortKey] : null;
+          var sA = String(vA == null ? "" : vA).toLowerCase();
+          var sB = String(vB == null ? "" : vB).toLowerCase();
+          if (sA === sB) {
+            return 0;
+          }
+          return sA < sB ? -1 : 1;
+        });
+        if (sSortDir === "desc") {
+          aRows.reverse();
+        }
+      }
+
+      var iMaxPage = Math.max(1, Math.ceil(aRows.length / iPageSize));
+      if (iPage > iMaxPage) {
+        iPage = iMaxPage;
+        oModel.setProperty("/smartSegPage", iPage);
+      }
+      var iStart = (iPage - 1) * iPageSize;
+      var aPageRows = aRows.slice(iStart, iStart + iPageSize);
+
+      oModel.setProperty("/smartSegFilteredCount", aRows.length);
+      oModel.setProperty("/smartSegDisplayRows", aPageRows);
+    },
+
+    _rebindSmartSegResultTable: function() {
+      var oTable = this.byId("smartSegResultTable");
+      var oModel = this.getView().getModel("jokers");
+      var aRows = oModel.getProperty("/smartSegDisplayRows") || [];
+      var aColumns = oModel.getProperty("/smartSegResultColumns") || [];
+
+      if (!oTable) {
+        return;
+      }
+      oTable.unbindItems();
+      oTable.removeAllColumns();
+      oTable.removeSelections(true);
+
+      if (!aColumns.length) {
+        return;
+      }
+
+      aColumns.forEach(function(sCol) {
+        oTable.addColumn(new Column({
+          header: new Text({ text: sCol })
+        }));
+      });
+
+      oTable.bindItems({
+        path: "jokers>/smartSegDisplayRows",
+        template: new ColumnListItem({
+          cells: aColumns.map(function(sCol) {
+            return new Text({
+              text: "{jokers>" + sCol + "}",
+              wrapping: true
+            });
+          })
+        }),
+        templateShareable: false
+      });
+      if (aRows.length > 0) {
+        setTimeout(this._restoreSmartSegSelectionsToTable.bind(this), 0);
+      }
+    },
+
+    _syncSmartSegSelectionsFromTable: function() {
+      var oTable = this.byId("smartSegResultTable");
+      var oModel = this.getView().getModel("jokers");
+      if (!oTable) {
+        return;
+      }
+
+      var aSelectedIds = oModel.getProperty("/smartSegSelectedRecordIds") || [];
+      var mSelected = {};
+      aSelectedIds.forEach(function(sId) { mSelected[String(sId)] = true; });
+
+      (oTable.getItems() || []).forEach(function(oItem) {
+        var oCtx = oItem.getBindingContext("jokers");
+        var oRow = oCtx ? oCtx.getObject() : null;
+        var sId = String(oRow && (oRow.record_id || oRow.CustomerId || "") || "");
+        if (!sId) {
+          return;
+        }
+        if (oItem.getSelected()) {
+          mSelected[sId] = true;
+        } else {
+          delete mSelected[sId];
+        }
+      });
+
+      oModel.setProperty("/smartSegSelectedRecordIds", Object.keys(mSelected));
+    },
+
+    _restoreSmartSegSelectionsToTable: function() {
+      var oTable = this.byId("smartSegResultTable");
+      var oModel = this.getView().getModel("jokers");
+      var aSelectedIds = oModel.getProperty("/smartSegSelectedRecordIds") || [];
+      var mSelected = {};
+      aSelectedIds.forEach(function(sId) { mSelected[String(sId)] = true; });
+
+      (oTable && oTable.getItems ? oTable.getItems() : []).forEach(function(oItem) {
+        var oCtx = oItem.getBindingContext("jokers");
+        var oRow = oCtx ? oCtx.getObject() : null;
+        var sId = String(oRow && (oRow.record_id || oRow.CustomerId || "") || "");
+        oItem.setSelected(!!mSelected[sId]);
+      });
     },
 
     _downloadDummy7Pdf: function(oBlob, sFileName) {
