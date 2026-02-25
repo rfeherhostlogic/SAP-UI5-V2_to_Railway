@@ -1579,7 +1579,7 @@ function spawnDiscoveryTrainingJob(jobId, session, specObject, yaml) {
   fs.writeFileSync(specJsonPath, JSON.stringify(specObject, null, 2), "utf8");
   fs.writeFileSync(specYamlPath, yaml, "utf8");
 
-  const pyExec = process.env.PYTHON_BIN || "python";
+  const pyExec = process.env.PYTHON_BIN || (process.platform === "win32" ? "python" : "python3");
   const child = spawn(pyExec, [
     DISCOVERY_TRAINING_PY,
     "--job-dir", jobDir,
@@ -1626,7 +1626,23 @@ function spawnDiscoveryTrainingJob(jobId, session, specObject, yaml) {
     }
   });
 
+  child.on("error", function(err) {
+    job.endedAt = Date.now();
+    job.child = null;
+    job.status = "error";
+    job.progress = 0;
+    job.message = "Python inditasi hiba: " + (err && err.message ? err.message : String(err));
+    console.error("[discovery:training] python spawn error", {
+      pyExec: pyExec,
+      script: DISCOVERY_TRAINING_PY,
+      error: err && err.message ? err.message : String(err)
+    });
+  });
+
   child.on("close", function(code) {
+    if (job.status === "error") {
+      return;
+    }
     job.endedAt = Date.now();
     job.child = null;
     if (Number(code) === 0) {
