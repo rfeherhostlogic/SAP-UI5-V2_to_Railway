@@ -137,108 +137,121 @@
       </VBox>
 
       <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-8' }" width="100%">
-        <Panel headerText="Smart Segmentation - adatforrasok" class="sapUiSmallMarginBottom">
-          <VBox class="sapUiSmallMargin">
-            <HBox alignItems="Center" wrap="Wrap">
-              <Switch state="{jokers>/smartSegSqlEnabled}" customTextOn="SQL" customTextOff="SQL" />
-              <VBox class="sapUiTinyMarginBegin sapUiSmallMarginEnd">
-                <Title level="H6" text="SQL adatbazis" />
-                <Text text="Joinolt Customer + SalesOrder olvasasi lekérdezéssel, SQL injection vedetten." wrapping="true"/>
+        <HBox wrap="Wrap" renderType="Bare" width="100%" justifyContent="SpaceBetween" alignItems="Start">
+          <VBox width="100%" class="sapUiTinyMarginEnd" layoutData="{= undefined }">
+            <layoutData>
+              <FlexItemData growFactor="2" baseSize="42rem"/>
+            </layoutData>
+
+            <Panel headerText="Smart Segmentation - adatforrasok" class="sapUiSmallMarginBottom">
+              <VBox class="sapUiSmallMargin">
+                <HBox alignItems="Center" wrap="Wrap">
+                  <Switch state="{jokers>/smartSegSqlEnabled}" customTextOn="SQL" customTextOff="SQL" />
+                  <VBox class="sapUiTinyMarginBegin sapUiSmallMarginEnd">
+                    <Title level="H6" text="SQL adatbazis" />
+                    <Text text="Joinolt Customer + SalesOrder olvasasi lekérdezéssel, SQL injection vedetten." wrapping="true"/>
+                  </VBox>
+                </HBox>
+                <TextArea
+                  value="{jokers>/smartSegSqlPrompt}"
+                  rows="3"
+                  growing="true"
+                  growingMaxLines="8"
+                  width="100%"
+                  editable="{jokers>/smartSegSqlEnabled}"
+                  placeholder="Pl.: Segment = Enterprise ES (Country = Germany VAGY Country = Austria) ES koltes > 5000"/>
+
+                <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginTop">
+                  <Switch state="{jokers>/smartSegRagEnabled}" customTextOn="RAG" customTextOff="RAG" />
+                  <VBox class="sapUiTinyMarginBegin sapUiSmallMarginEnd">
+                    <Title level="H6" text="RAG keresés (SMART_SEGMENT Vector Store)" />
+                    <Text text="Embedding alapu keresés a dokumentumokban, relevans rekord ID-k kinyerésével." wrapping="true"/>
+                  </VBox>
+                </HBox>
+                <TextArea
+                  value="{jokers>/smartSegRagPrompt}"
+                  rows="3"
+                  growing="true"
+                  growingMaxLines="8"
+                  width="100%"
+                  editable="{jokers>/smartSegRagEnabled}"
+                  placeholder="Pl.: Talald meg a dokumentumokban a premium / upsell kampanyra javasolt customer ID-kat"/>
+
+                <HBox alignItems="Center" class="sapUiSmallMarginTop" visible="{= ${jokers>/smartSegSqlEnabled} &amp;&amp; ${jokers>/smartSegRagEnabled} }">
+                  <Label text="Kombinalas" class="sapUiTinyMarginEnd"/>
+                  <SegmentedButton selectedKey="{jokers>/smartSegCombineMode}">
+                    <items>
+                      <SegmentedButtonItem key="AND" text="AND (metszet)"/>
+                      <SegmentedButtonItem key="OR" text="OR (unio)"/>
+                    </items>
+                  </SegmentedButton>
+                </HBox>
+
+                <HBox class="jokerPromptButtons sapUiSmallMarginTop" wrap="Wrap">
+                  <Button text="Smart Segment futtatasa" type="Emphasized" press=".onRunSmartSegmentation" busy="{jokers>/smartSegBusy}" enabled="{= ${jokers>/smartSegBusy} ? false : true }"/>
+                  <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/smartSegBusy} ? false : true }" class="sapUiTinyMarginBegin"/>
+                </HBox>
               </VBox>
-            </HBox>
-            <TextArea
-              value="{jokers>/smartSegSqlPrompt}"
-              rows="3"
-              growing="true"
-              growingMaxLines="8"
-              width="100%"
-              editable="{jokers>/smartSegSqlEnabled}"
-              placeholder="Pl.: Segment = Enterprise ES (Country = Germany VAGY Country = Austria) ES koltes > 5000"/>
+            </Panel>
 
-            <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginTop">
-              <Switch state="{jokers>/smartSegRagEnabled}" customTextOn="RAG" customTextOff="RAG" />
-              <VBox class="sapUiTinyMarginBegin sapUiSmallMarginEnd">
-                <Title level="H6" text="RAG keresés (SMART_SEGMENT Vector Store)" />
-                <Text text="Embedding alapu keresés a dokumentumokban, relevans rekord ID-k kinyerésével." wrapping="true"/>
+            <MessageStrip visible="{= ${jokers>/smartSegError} ? true : false }" text="{jokers>/smartSegError}" type="Error" showIcon="true" class="sapUiSmallMarginBottom"/>
+
+            <Panel headerText="Eredmeny tabla" visible="{= ${jokers>/smartSegResultRows}.length > 0 }">
+              <VBox class="sapUiSmallMargin">
+                <HBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap">
+                  <HBox wrap="Wrap" alignItems="Center">
+                    <ObjectStatus text="{= 'Talalatok: ' + ${jokers>/smartSegFilteredCount} + ' / ' + ${jokers>/smartSegTotalCount} }" state="Information" class="sapUiTinyMarginEnd"/>
+                    <ObjectStatus text="{= 'Kijelolve: ' + ${jokers>/smartSegSelectedRecordIds}.length }" state="Success"/>
+                  </HBox>
+                  <Button text="KÜLDÉS CRM-be" type="Emphasized" press=".onSmartSegSendToCrm"/>
+                </HBox>
+
+                <HBox wrap="Wrap" class="sapUiSmallMarginTop" alignItems="Center">
+                  <SearchField width="16rem" search=".onSmartSegSearch" liveChange=".onSmartSegSearchLive" value="{jokers>/smartSegSearch}" placeholder="Kereses a talalatokban"/>
+                  <Label text="Rendezes" class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
+                  <Select width="14rem" selectedKey="{jokers>/smartSegSortKey}" change=".onSmartSegSortChange" items="{jokers>/smartSegResultColumns}">
+                    <items>
+                      <core:Item key="{jokers>}" text="{jokers>}"/>
+                    </items>
+                  </Select>
+                  <SegmentedButton selectedKey="{jokers>/smartSegSortDir}" selectionChange=".onSmartSegSortDirChange" class="sapUiTinyMarginBegin">
+                    <items>
+                      <SegmentedButtonItem key="asc" text="Növő"/>
+                      <SegmentedButtonItem key="desc" text="Csökkenő"/>
+                    </items>
+                  </SegmentedButton>
+                </HBox>
+
+                <Table id="smartSegResultTable" mode="MultiSelect" selectionChange=".onSmartSegSelectionChange" inset="false" class="sapUiSmallMarginTop"/>
+
+                <HBox justifyContent="End" alignItems="Center" class="sapUiSmallMarginTop" wrap="Wrap">
+                  <Label text="{= 'Oldal: ' + ${jokers>/smartSegPage} }" class="sapUiTinyMarginEnd"/>
+                  <Button text="Előző" type="Transparent" press=".onSmartSegPrevPage"/>
+                  <Button text="Következő" type="Transparent" press=".onSmartSegNextPage" class="sapUiTinyMarginBegin"/>
+                </HBox>
               </VBox>
-            </HBox>
-            <TextArea
-              value="{jokers>/smartSegRagPrompt}"
-              rows="3"
-              growing="true"
-              growingMaxLines="8"
-              width="100%"
-              editable="{jokers>/smartSegRagEnabled}"
-              placeholder="Pl.: Talald meg a dokumentumokban a premium / upsell kampanyra javasolt customer ID-kat"/>
-
-            <HBox alignItems="Center" class="sapUiSmallMarginTop" visible="{= ${jokers>/smartSegSqlEnabled} &amp;&amp; ${jokers>/smartSegRagEnabled} }">
-              <Label text="Kombinalas" class="sapUiTinyMarginEnd"/>
-              <SegmentedButton selectedKey="{jokers>/smartSegCombineMode}">
-                <items>
-                  <SegmentedButtonItem key="AND" text="AND (metszet)"/>
-                  <SegmentedButtonItem key="OR" text="OR (unio)"/>
-                </items>
-              </SegmentedButton>
-            </HBox>
-
-            <HBox class="jokerPromptButtons sapUiSmallMarginTop" wrap="Wrap">
-              <Button text="Smart Segment futtatasa" type="Emphasized" press=".onRunSmartSegmentation" busy="{jokers>/smartSegBusy}" enabled="{= ${jokers>/smartSegBusy} ? false : true }"/>
-              <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/smartSegBusy} ? false : true }" class="sapUiTinyMarginBegin"/>
-            </HBox>
+            </Panel>
           </VBox>
-        </Panel>
 
-        <Panel headerText="Futasi naplo" class="sapUiSmallMarginBottom" visible="{= ${jokers>/smartSegChatMessages}.length > 0 }">
-          <HBox justifyContent="SpaceBetween" class="sapUiTinyMarginBottom sapUiTinyMarginBegin sapUiTinyMarginEnd">
-            <ObjectStatus text="{= 'Bejegyzesek: ' + ${jokers>/smartSegChatMessages}.length }" state="Information"/>
-          </HBox>
-          <List items="{jokers>/smartSegChatMessages}" showSeparators="Inner">
-            <CustomListItem>
-              <VBox>
-                <ObjectStatus text="{= ${jokers>role} === 'user' ? 'Felhasznalo' : 'Smart Segmentation' }" state="{= ${jokers>role} === 'user' ? 'Information' : 'Success' }"/>
-                <Text text="{jokers>content}" wrapping="true"/>
-              </VBox>
-            </CustomListItem>
-          </List>
-        </Panel>
-
-        <MessageStrip visible="{= ${jokers>/smartSegError} ? true : false }" text="{jokers>/smartSegError}" type="Error" showIcon="true" class="sapUiSmallMarginBottom"/>
-
-        <Panel headerText="Eredmeny tabla" visible="{= ${jokers>/smartSegResultRows}.length > 0 }">
-          <VBox class="sapUiSmallMargin">
-            <HBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap">
-              <HBox wrap="Wrap" alignItems="Center">
-                <ObjectStatus text="{= 'Talalatok: ' + ${jokers>/smartSegFilteredCount} + ' / ' + ${jokers>/smartSegTotalCount} }" state="Information" class="sapUiTinyMarginEnd"/>
-                <ObjectStatus text="{= 'Kijelolve: ' + ${jokers>/smartSegSelectedRecordIds}.length }" state="Success"/>
+          <VBox width="100%">
+            <layoutData>
+              <FlexItemData growFactor="1" baseSize="22rem"/>
+            </layoutData>
+            <Panel headerText="Futasi naplo" class="sapUiSmallMarginBottom" visible="{= ${jokers>/smartSegChatMessages}.length > 0 }">
+              <HBox justifyContent="SpaceBetween" class="sapUiTinyMarginBottom sapUiTinyMarginBegin sapUiTinyMarginEnd">
+                <ObjectStatus text="{= 'Bejegyzesek: ' + ${jokers>/smartSegChatMessages}.length }" state="Information"/>
               </HBox>
-              <Button text="KÜLDÉS CRM-be" type="Emphasized" press=".onSmartSegSendToCrm"/>
-            </HBox>
-
-            <HBox wrap="Wrap" class="sapUiSmallMarginTop" alignItems="Center">
-              <SearchField width="16rem" search=".onSmartSegSearch" liveChange=".onSmartSegSearchLive" value="{jokers>/smartSegSearch}" placeholder="Kereses a talalatokban"/>
-              <Label text="Rendezes" class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
-              <Select width="14rem" selectedKey="{jokers>/smartSegSortKey}" change=".onSmartSegSortChange" items="{jokers>/smartSegResultColumns}">
-                <items>
-                  <core:Item key="{jokers>}" text="{jokers>}"/>
-                </items>
-              </Select>
-              <SegmentedButton selectedKey="{jokers>/smartSegSortDir}" selectionChange=".onSmartSegSortDirChange" class="sapUiTinyMarginBegin">
-                <items>
-                  <SegmentedButtonItem key="asc" text="Növő"/>
-                  <SegmentedButtonItem key="desc" text="Csökkenő"/>
-                </items>
-              </SegmentedButton>
-            </HBox>
-
-            <Table id="smartSegResultTable" mode="MultiSelect" selectionChange=".onSmartSegSelectionChange" inset="false" class="sapUiSmallMarginTop"/>
-
-            <HBox justifyContent="End" alignItems="Center" class="sapUiSmallMarginTop" wrap="Wrap">
-              <Label text="{= 'Oldal: ' + ${jokers>/smartSegPage} }" class="sapUiTinyMarginEnd"/>
-              <Button text="Előző" type="Transparent" press=".onSmartSegPrevPage"/>
-              <Button text="Következő" type="Transparent" press=".onSmartSegNextPage" class="sapUiTinyMarginBegin"/>
-            </HBox>
+              <List items="{jokers>/smartSegChatMessages}" showSeparators="Inner">
+                <CustomListItem>
+                  <VBox>
+                    <ObjectStatus text="{= ${jokers>role} === 'user' ? 'Felhasznalo' : 'Smart Segmentation' }" state="{= ${jokers>role} === 'user' ? 'Information' : 'Success' }"/>
+                    <Text text="{jokers>content}" wrapping="true"/>
+                  </VBox>
+                </CustomListItem>
+              </List>
+            </Panel>
           </VBox>
-        </Panel>
+        </HBox>
       </VBox>
 
       <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' }" width="100%">
