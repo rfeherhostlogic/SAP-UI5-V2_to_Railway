@@ -37,6 +37,12 @@
         oJokersModel.setProperty("/dummy4GeneratedSql", "");
         oJokersModel.setProperty("/dummy4Summary", "");
         oJokersModel.setProperty("/dummy4Rows", []);
+      } else if (oJoker.id === "dummy-9") {
+        oJokersModel.setProperty("/dummy9Question", "");
+        oJokersModel.setProperty("/dummy9ResultText", "");
+        oJokersModel.setProperty("/dummy9Error", "");
+        oJokersModel.setProperty("/dummy9Rows", []);
+        oJokersModel.setProperty("/dummy9ChartReady", false);
       }
 
       this.getOwnerComponent().getRouter().navTo("jokerPrompt", {

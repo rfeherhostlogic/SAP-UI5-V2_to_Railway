@@ -128,6 +128,16 @@ sap.ui.define([
 						footer: "AI Joker 08",
 						description: "Szabadszavas szegmentacio SQL es RAG adatforrasok kombinaciojaval, AND/OR logikaval.",
 						systemPrompt: "Segits smart szegmenseket tervezni es futtatni."
+					},
+					{
+						id: "dummy-9",
+						title: "CSV Riport Asszisztens",
+						subtitle: "CSV Q&A + preview",
+						primaryTag: "\u00c1ltal\u00e1nos",
+						tags: ["\u00c1ltal\u00e1nos"],
+						footer: "AI Joker 09",
+						description: "A csatolt CSV allomanyok kerdes-alapu attekintese szoveges osszegzessel, tablazatos es diagram preview-val.",
+						systemPrompt: "A csatolt CSV adatok alapjan valaszolj rovid, riport-szeru stilusban."
 					}
 				],
 				filteredTiles: [],
@@ -143,6 +153,12 @@ sap.ui.define([
 				dummy4Summary: "",
 				dummy4Rows: [],
 				dummy4ChartReady: false,
+				dummy9Question: "",
+				dummy9SchemaHint: "Customer: CustomerId, CustomerName, Country, Segment\nSalesOrder: SalesOrderId, CustomerId, OrderDate, NetAmount, Currency",
+				dummy9ResultText: "",
+				dummy9Error: "",
+				dummy9Rows: [],
+				dummy9ChartReady: false,
 				dummy5DocToken: "",
 				dummy5FileName: "",
 				dummy5Summary: "",

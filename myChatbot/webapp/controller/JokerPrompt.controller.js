@@ -197,12 +197,53 @@ sap.ui.define([
       }
     },
 
+    onDummy9QuestionSubmit: async function() {
+      await this.onRunDummy9();
+    },
+
+    onRunDummy9: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var sQuestion = (oModel.getProperty("/dummy9Question") || "").trim();
+      var sSchemaHint = (oModel.getProperty("/dummy9SchemaHint") || "").trim();
+
+      if (!sQuestion) {
+        MessageToast.show("A kerdes mezot toltsd ki.");
+        return;
+      }
+
+      oModel.setProperty("/generating", true);
+      oModel.setProperty("/dummy9ResultText", "");
+      oModel.setProperty("/dummy9Error", "");
+      oModel.setProperty("/dummy9Rows", []);
+      oModel.setProperty("/dummy9ChartReady", false);
+      this._resetDummy9LocalChart();
+      this._rebindDummy9PreviewTable();
+
+      try {
+        var oResult = await AiService.runDummy4({
+          question: sQuestion,
+          schemaHint: sSchemaHint || oModel.getProperty("/dummy4SchemaHint") || ""
+        });
+
+        oModel.setProperty("/dummy9ResultText", oResult.summary || "A feldolgozas sikeresen lefutott.");
+        oModel.setProperty("/dummy9Rows", oResult.rows || []);
+        this._rebindDummy9PreviewTable();
+        this._renderDummy9LocalChart(oResult.rows || []);
+      } catch (oError) {
+        oModel.setProperty("/dummy9Error", "A CSV riport elkeszitese most nem sikerult. Probald meg ujra egy pontosabb kerdessel.");
+        MessageToast.show(oError && oError.message ? oError.message : "Dummy9 hiba tortent.");
+      } finally {
+        oModel.setProperty("/generating", false);
+      }
+    },
+
     onRefreshDummy4SchemaHint: async function() {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/generating", true);
       try {
         var oResp = await AiService.getDummy4SchemaHint();
         oModel.setProperty("/dummy4SchemaHint", oResp && oResp.schemaHint ? oResp.schemaHint : "");
+        oModel.setProperty("/dummy9SchemaHint", oResp && oResp.schemaHint ? oResp.schemaHint : "");
         MessageToast.show("Schema hint frissitve.");
       } catch (oError) {
         MessageToast.show(oError && oError.message ? oError.message : "Schema hint frissitesi hiba.");
@@ -343,12 +384,14 @@ sap.ui.define([
       oModel.setProperty("/dummy4Summary", "");
       oModel.setProperty("/dummy4Rows", []);
       oModel.setProperty("/dummy4ChartReady", false);
+      this._resetDummy9State();
       this._resetDummy5State();
       this._resetDummy7State();
       this._resetSmartSegState();
       this._resetDummy4Chart();
       this._resetDummy4LocalChart();
       this._rebindDummy4PreviewTable();
+      this._rebindDummy9PreviewTable();
       this._rebindSmartSegResultTable();
       this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: "jokers" });
     },
@@ -372,6 +415,9 @@ sap.ui.define([
           this._resetDummy4Chart();
           this._resetDummy4LocalChart();
           this._rebindDummy4PreviewTable();
+        } else if (oSelected.id === "dummy-9") {
+          this._resetDummy9State();
+          this._rebindDummy9PreviewTable();
         } else if (oSelected.id === "dummy-5") {
           this._resetDummy5State();
         } else if (oSelected.id === "dummy-7") {
@@ -381,6 +427,17 @@ sap.ui.define([
           this._rebindSmartSegResultTable();
         }
       }
+    },
+
+    _resetDummy9State: function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy9SchemaHint", oModel.getProperty("/dummy4SchemaHint") || oModel.getProperty("/dummy9SchemaHint") || "");
+      oModel.setProperty("/dummy9Question", "");
+      oModel.setProperty("/dummy9ResultText", "");
+      oModel.setProperty("/dummy9Error", "");
+      oModel.setProperty("/dummy9Rows", []);
+      oModel.setProperty("/dummy9ChartReady", false);
+      this._resetDummy9LocalChart();
     },
 
     _resetDummy5State: function() {
@@ -681,6 +738,85 @@ sap.ui.define([
       oHost.removeAllItems();
     },
 
+    _renderDummy9LocalChart: function(aRows) {
+      var oModel = this.getView().getModel("jokers");
+      var oHost = this.byId("dummy9LocalChartHost");
+      var aColumns = this._extractDummy4Columns(aRows);
+      var aNumericCols = this._findNumericColumns(aRows, aColumns);
+      var sMeasure = aNumericCols[0] || "";
+      var sDimension = aColumns.find(function(sCol) {
+        return sCol !== sMeasure;
+      }) || aColumns[0];
+
+      this._resetDummy9LocalChart();
+      oModel.setProperty("/dummy9ChartReady", false);
+
+      if (!oHost || !sDimension || !sMeasure) {
+        return;
+      }
+
+      var aChartRows = (aRows || []).map(function(oRow) {
+        var oCopy = Object.assign({}, oRow || {});
+        oCopy[sMeasure] = this._toNumberOrNull(oCopy[sMeasure]);
+        return oCopy;
+      }.bind(this));
+
+      var oDataset = new FlattenedDataset({
+        dimensions: [
+          new DimensionDefinition({
+            name: sDimension,
+            value: "{" + sDimension + "}"
+          })
+        ],
+        measures: [
+          new MeasureDefinition({
+            name: sMeasure,
+            value: "{" + sMeasure + "}"
+          })
+        ],
+        data: {
+          path: "/rows"
+        }
+      });
+
+      var oViz = new VizFrame({
+        width: "100%",
+        height: "320px",
+        vizType: "column",
+        dataset: oDataset
+      });
+
+      oViz.setModel(new JSONModel({ rows: aChartRows }));
+      oViz.addFeed(new FeedItem({
+        uid: "categoryAxis",
+        type: "Dimension",
+        values: [sDimension]
+      }));
+      oViz.addFeed(new FeedItem({
+        uid: "valueAxis",
+        type: "Measure",
+        values: [sMeasure]
+      }));
+      oViz.setVizProperties({
+        title: { visible: false },
+        legend: { visible: false },
+        plotArea: {
+          dataLabel: { visible: true }
+        }
+      });
+
+      oHost.addItem(oViz);
+      oModel.setProperty("/dummy9ChartReady", true);
+    },
+
+    _resetDummy9LocalChart: function() {
+      var oHost = this.byId("dummy9LocalChartHost");
+      if (!oHost) {
+        return;
+      }
+      oHost.removeAllItems();
+    },
+
     _findNumericColumns: function(aRows, aColumns) {
       return (aColumns || []).filter(function(sCol) {
         var bSeen = false;
@@ -752,6 +888,47 @@ sap.ui.define([
 
       oTable.bindItems({
         path: "jokers>/dummy4Rows",
+        template: oTemplate,
+        templateShareable: false
+      });
+    },
+
+    _rebindDummy9PreviewTable: function() {
+      var oTable = this.byId("dummy9PreviewTable");
+      var oModel = this.getView().getModel("jokers");
+      var aRows = oModel.getProperty("/dummy9Rows") || [];
+      var aColumns = this._extractDummy4Columns(aRows);
+
+      if (!oTable) {
+        return;
+      }
+
+      oTable.unbindItems();
+      oTable.removeAllColumns();
+
+      if (aColumns.length === 0) {
+        return;
+      }
+
+      aColumns.forEach(function(sColName) {
+        oTable.addColumn(new Column({
+          header: new Text({ text: sColName })
+        }));
+      });
+
+      var aCells = aColumns.map(function(sColName) {
+        return new Text({
+          text: "{jokers>" + sColName + "}",
+          wrapping: true
+        });
+      });
+
+      var oTemplate = new ColumnListItem({
+        cells: aCells
+      });
+
+      oTable.bindItems({
+        path: "jokers>/dummy9Rows",
         template: oTemplate,
         templateShareable: false
       });

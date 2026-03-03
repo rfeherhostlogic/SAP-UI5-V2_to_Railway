@@ -254,7 +254,90 @@
         </HBox>
       </VBox>
 
-      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' }" width="100%">
+      <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-9' }" width="100%" class="dummy9Shell">
+        <Panel headerText="Kerdes bevitel" class="dummy9Panel">
+          <VBox class="sapUiSmallMargin">
+            <Text text="Tegy fel szabadszavas kerdest a csatolt CSV adatokrol. Enter vagy a Kerdez gomb inditja a lekerdezest." wrapping="true" class="sapUiTinyMarginBottom"/>
+            <HBox wrap="Wrap" alignItems="Start" class="dummy9QuestionRow">
+              <Input
+                value="{jokers>/dummy9Question}"
+                width="100%"
+                placeholder="Pl.: Melyik ugyfelnek volt a legnagyobb netto forgalma?"
+                submit=".onDummy9QuestionSubmit">
+                <layoutData>
+                  <FlexItemData growFactor="1" baseSize="28rem"/>
+                </layoutData>
+              </Input>
+              <Button
+                text="Kerdez"
+                type="Emphasized"
+                press=".onRunDummy9"
+                enabled="{= ${jokers>/generating} ? false : true }"
+                class="sapUiTinyMarginBegin"/>
+              <Button
+                text="Cancel"
+                type="Reject"
+                press=".onCancel"
+                enabled="{= ${jokers>/generating} ? false : true }"
+                class="sapUiTinyMarginBegin"/>
+            </HBox>
+
+            <HBox alignItems="Center" visible="{jokers>/generating}" class="sapUiSmallMarginTop">
+              <BusyIndicator size="1rem"/>
+              <Text text="Feldolgozas..." class="sapUiTinyMarginBegin"/>
+            </HBox>
+
+            <HBox alignItems="Center" visible="{= !${jokers>/generating} &amp;&amp; !${jokers>/dummy9Error} &amp;&amp; !${jokers>/dummy9ResultText} }" class="sapUiSmallMarginTop">
+              <ObjectStatus text="Varakozik kerdesre" state="Information"/>
+            </HBox>
+
+            <HBox alignItems="Center" visible="{= !${jokers>/generating} &amp;&amp; ${jokers>/dummy9ResultText} ? true : false }" class="sapUiSmallMarginTop">
+              <ObjectStatus text="Riport elkeszult" state="Success"/>
+            </HBox>
+
+            <MessageStrip
+              text="{jokers>/dummy9Error}"
+              visible="{= ${jokers>/dummy9Error} ? true : false }"
+              type="Error"
+              showIcon="true"
+              class="sapUiSmallMarginTop"/>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Szoveges eredmeny" class="sapUiMediumMarginTop dummy9Panel">
+          <VBox class="sapUiSmallMargin">
+            <Text
+              text="{= ${jokers>/dummy9ResultText} ? ${jokers>/dummy9ResultText} : 'Itt jelenik meg a rovid, termeszetes nyelvu osszegzes.' }"
+              wrapping="true"
+              class="dummy9ResultText"/>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Adat preview" class="sapUiMediumMarginTop dummy9Panel">
+          <VBox class="sapUiSmallMargin">
+            <Title text="Tablazatos preview" level="H5" class="sapUiTinyMarginBottom"/>
+            <Table
+              id="dummy9PreviewTable"
+              growing="true"
+              growingThreshold="50"
+              inset="false"
+              visible="{= ${jokers>/dummy9Rows}.length > 0 }"/>
+            <Text
+              text="Nincs preview adat a tablazatos nezethez."
+              visible="{= ${jokers>/dummy9Rows}.length === 0 }"
+              class="sapUiTinyMarginTop"/>
+
+            <Title text="Chart preview" level="H5" class="sapUiMediumMarginTop sapUiTinyMarginBottom"/>
+            <VBox id="dummy9LocalChartHost" visible="{jokers>/dummy9ChartReady}"/>
+            <Text
+              text="Nincs megjelenitheto chart adat."
+              visible="{= ${jokers>/dummy9ChartReady} ? false : true }"
+              class="sapUiTinyMarginTop"/>
+          </VBox>
+        </Panel>
+      </VBox>
+
+      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' }" width="100%">
         <TextArea value="{jokers>/promptInput}" rows="10" growing="true" growingMaxLines="16" width="100%" placeholder="Ide ird a feldolgozando szoveget..."/>
 
         <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">
