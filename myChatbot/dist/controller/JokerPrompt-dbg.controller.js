@@ -31,7 +31,12 @@ sap.ui.define([
 
   return Controller.extend("sap.suite.ui.commons.demo.tutorial.controller.JokerPrompt", {
     onInit: function() {
+      this._dummy9DropZoneBound = false;
       this.getOwnerComponent().getRouter().getRoute("jokerPrompt").attachPatternMatched(this._onRouteMatched, this);
+    },
+
+    onAfterRendering: function() {
+      this._bindDummy9DropZoneEvents();
     },
 
     onGenerate: async function() {
@@ -201,13 +206,42 @@ sap.ui.define([
       await this.onRunDummy9();
     },
 
+    onDummy9FileChange: function(oEvent) {
+      var aFiles = oEvent && oEvent.getParameter ? oEvent.getParameter("files") : [];
+      this._appendDummy9Files(aFiles || []);
+    },
+
+    onRemoveDummy9File: function(oEvent) {
+      var oCtx = oEvent && oEvent.getSource ? oEvent.getSource().getBindingContext("jokers") : null;
+      if (!oCtx) {
+        return;
+      }
+
+      var oModel = this.getView().getModel("jokers");
+      var sPath = oCtx.getPath();
+      var aFiles = oModel.getProperty("/dummy9Files") || [];
+      var iIndex = parseInt(String(sPath).split("/").pop(), 10);
+
+      if (!isFinite(iIndex) || iIndex < 0 || iIndex >= aFiles.length) {
+        return;
+      }
+
+      aFiles.splice(iIndex, 1);
+      oModel.setProperty("/dummy9Files", aFiles);
+    },
+
     onRunDummy9: async function() {
       var oModel = this.getView().getModel("jokers");
       var sQuestion = (oModel.getProperty("/dummy9Question") || "").trim();
-      var sSchemaHint = (oModel.getProperty("/dummy9SchemaHint") || "").trim();
+      var aFiles = oModel.getProperty("/dummy9Files") || [];
 
       if (!sQuestion) {
         MessageToast.show("A kerdes mezot toltsd ki.");
+        return;
+      }
+
+      if (aFiles.length === 0) {
+        MessageToast.show("Tolts fel legalabb egy CSV fajlt.");
         return;
       }
 
@@ -216,17 +250,21 @@ sap.ui.define([
       oModel.setProperty("/dummy9Error", "");
       oModel.setProperty("/dummy9Rows", []);
       oModel.setProperty("/dummy9ChartReady", false);
+      oModel.setProperty("/dummy9SelectedSource", "");
+      oModel.setProperty("/dummy9MatchedFiles", []);
       this._resetDummy9LocalChart();
       this._rebindDummy9PreviewTable();
 
       try {
-        var oResult = await AiService.runDummy4({
+        var oResult = await AiService.runDummy9({
           question: sQuestion,
-          schemaHint: sSchemaHint || oModel.getProperty("/dummy4SchemaHint") || ""
+          files: aFiles
         });
 
         oModel.setProperty("/dummy9ResultText", oResult.summary || "A feldolgozas sikeresen lefutott.");
         oModel.setProperty("/dummy9Rows", oResult.rows || []);
+        oModel.setProperty("/dummy9SelectedSource", oResult.selectedSource || "");
+        oModel.setProperty("/dummy9MatchedFiles", oResult.matchedFiles || []);
         this._rebindDummy9PreviewTable();
         this._renderDummy9LocalChart(oResult.rows || []);
       } catch (oError) {
@@ -432,12 +470,82 @@ sap.ui.define([
     _resetDummy9State: function() {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/dummy9SchemaHint", oModel.getProperty("/dummy4SchemaHint") || oModel.getProperty("/dummy9SchemaHint") || "");
+      oModel.setProperty("/dummy9Files", []);
       oModel.setProperty("/dummy9Question", "");
       oModel.setProperty("/dummy9ResultText", "");
       oModel.setProperty("/dummy9Error", "");
       oModel.setProperty("/dummy9Rows", []);
       oModel.setProperty("/dummy9ChartReady", false);
+      oModel.setProperty("/dummy9SelectedSource", "");
+      oModel.setProperty("/dummy9MatchedFiles", []);
       this._resetDummy9LocalChart();
+
+      var oFileUploader = this.byId("dummy9FileUploader");
+      if (oFileUploader && oFileUploader.clear) {
+        oFileUploader.clear();
+      }
+    },
+
+    _bindDummy9DropZoneEvents: function() {
+      if (this._dummy9DropZoneBound) {
+        return;
+      }
+
+      var oDropZone = this.byId("dummy9DropZone");
+      if (!oDropZone || !oDropZone.getDomRef()) {
+        return;
+      }
+
+      var dom = oDropZone.getDomRef();
+      var that = this;
+
+      dom.addEventListener("dragover", function(ev) {
+        ev.preventDefault();
+        dom.classList.add("dummy9DropZoneActive");
+      });
+
+      dom.addEventListener("dragleave", function() {
+        dom.classList.remove("dummy9DropZoneActive");
+      });
+
+      dom.addEventListener("drop", function(ev) {
+        ev.preventDefault();
+        dom.classList.remove("dummy9DropZoneActive");
+        var files = ev.dataTransfer && ev.dataTransfer.files ? ev.dataTransfer.files : [];
+        that._appendDummy9Files(files);
+      });
+
+      this._dummy9DropZoneBound = true;
+    },
+
+    _appendDummy9Files: function(aFilesLike) {
+      var oModel = this.getView().getModel("jokers");
+      var aCurrent = oModel.getProperty("/dummy9Files") || [];
+      var aFiles = Array.prototype.slice.call(aFilesLike || []);
+      var mSeen = {};
+      var iAdded = 0;
+
+      aCurrent.forEach(function(oFile) {
+        mSeen[(oFile.name || "") + "|" + Number(oFile.size || 0) + "|" + (oFile.type || "")] = true;
+      });
+
+      aFiles.forEach(function(oFile) {
+        var sType = String(oFile.type || "");
+        var sName = String(oFile.name || "");
+        var bLooksLikeCsv = sType.indexOf("csv") >= 0 || /\.csv$/i.test(sName);
+        var sKey = sName + "|" + Number(oFile.size || 0) + "|" + sType;
+        if (!bLooksLikeCsv || mSeen[sKey]) {
+          return;
+        }
+        mSeen[sKey] = true;
+        aCurrent.push(oFile);
+        iAdded += 1;
+      });
+
+      oModel.setProperty("/dummy9Files", aCurrent);
+      if (iAdded > 0) {
+        MessageToast.show(iAdded + " CSV fajl hozzaadva.");
+      }
     },
 
     _resetDummy5State: function() {

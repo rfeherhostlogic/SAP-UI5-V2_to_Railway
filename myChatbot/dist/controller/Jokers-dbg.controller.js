@@ -38,11 +38,14 @@
         oJokersModel.setProperty("/dummy4Summary", "");
         oJokersModel.setProperty("/dummy4Rows", []);
       } else if (oJoker.id === "dummy-9") {
+        oJokersModel.setProperty("/dummy9Files", []);
         oJokersModel.setProperty("/dummy9Question", "");
         oJokersModel.setProperty("/dummy9ResultText", "");
         oJokersModel.setProperty("/dummy9Error", "");
         oJokersModel.setProperty("/dummy9Rows", []);
         oJokersModel.setProperty("/dummy9ChartReady", false);
+        oJokersModel.setProperty("/dummy9SelectedSource", "");
+        oJokersModel.setProperty("/dummy9MatchedFiles", []);
       }
 
       this.getOwnerComponent().getRouter().navTo("jokerPrompt", {

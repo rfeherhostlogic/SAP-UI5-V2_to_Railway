@@ -257,7 +257,42 @@
       <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-9' }" width="100%" class="dummy9Shell">
         <Panel headerText="Kerdes bevitel" class="dummy9Panel">
           <VBox class="sapUiSmallMargin">
-            <Text text="Tegy fel szabadszavas kerdest a csatolt CSV adatokrol. Enter vagy a Kerdez gomb inditja a lekerdezest." wrapping="true" class="sapUiTinyMarginBottom"/>
+            <VBox id="dummy9DropZone" class="dummy9DropZone sapUiTinyMarginBottom">
+              <Text text="Browse or drop multiple files"/>
+              <Text text="Tobb CSV fajlt is feltolthetsz, a rendszer egyutt kezeli oket." class="sapUiTinyMarginTop"/>
+            </VBox>
+
+            <unif:FileUploader
+              id="dummy9FileUploader"
+              width="100%"
+              sameFilenameAllowed="true"
+              multiple="true"
+              uploadOnChange="false"
+              fileType="csv"
+              buttonText="CSV fajlok kivalasztasa"
+              change=".onDummy9FileChange"/>
+
+            <List items="{jokers>/dummy9Files}" visible="{= ${jokers>/dummy9Files}.length > 0 }" class="sapUiTinyMarginTop">
+              <CustomListItem>
+                <HBox justifyContent="SpaceBetween" alignItems="Center">
+                  <Text text="{= ${jokers>name} + ' (' + (${jokers>type} || 'text/csv') + ', ' + ${jokers>size} + ' B)' }" wrapping="false"/>
+                  <Button icon="sap-icon://decline" type="Transparent" press=".onRemoveDummy9File"/>
+                </HBox>
+              </CustomListItem>
+            </List>
+
+            <ObjectStatus
+              text="{= ${jokers>/dummy9SelectedSource} ? 'Fo preview forras: ' + ${jokers>/dummy9SelectedSource} : (${jokers>/dummy9Files}.length > 0 ? 'A feltoltott CSV-k keszen allnak.' : 'Nincs feltoltott CSV.') }"
+              state="{= ${jokers>/dummy9SelectedSource} ? 'Success' : 'Information' }"
+              class="sapUiSmallMarginTop"/>
+
+            <Text
+              text="{= ${jokers>/dummy9MatchedFiles}.length > 0 ? 'Erintett fajlok: ' + ${jokers>/dummy9MatchedFiles}.join(', ') : '' }"
+              visible="{= ${jokers>/dummy9MatchedFiles}.length > 0 }"
+              wrapping="true"
+              class="sapUiTinyMarginTop"/>
+
+            <Text text="Tegy fel szabadszavas kerdest a csatolt CSV adatokrol. Enter vagy a Kerdez gomb inditja a lekerdezest." wrapping="true" class="sapUiSmallMarginTop sapUiTinyMarginBottom"/>
             <HBox wrap="Wrap" alignItems="Start" class="dummy9QuestionRow">
               <Input
                 value="{jokers>/dummy9Question}"

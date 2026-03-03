@@ -75,6 +75,26 @@
     });
   }
 
+  function runDummy9(mPayload) {
+    var oFormData = new FormData();
+    oFormData.append("question", mPayload.question || "");
+    (mPayload.files || []).forEach(function(oFile) {
+      oFormData.append("files", oFile);
+    });
+
+    return fetch("/api/jokers/dummy9/run", {
+      method: "POST",
+      body: oFormData
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function getDummy4SchemaHint() {
     return fetch("/api/jokers/dummy4/schema-hint", {
       method: "GET"
@@ -454,6 +474,7 @@
   return {
     generate: generate,
     runDummy4: runDummy4,
+    runDummy9: runDummy9,
     getDummy4SchemaHint: getDummy4SchemaHint,
     uploadDummy5Pdf: uploadDummy5Pdf,
     summarizeDummy5: summarizeDummy5,

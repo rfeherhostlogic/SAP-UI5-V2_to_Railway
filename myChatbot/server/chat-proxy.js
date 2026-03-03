@@ -33,6 +33,9 @@ const DISCOVERY_DB_PATH = path.resolve(
 const DISCOVERY_TRAINING_PY = path.resolve(
   process.env.DISCOVERY_TRAINING_PY || path.join(__dirname, "ml_train_runner.py")
 );
+const DUMMY9_RUNNER_PY = path.resolve(
+  process.env.DUMMY9_RUNNER_PY || path.join(__dirname, "dummy9_csv_runner.py")
+);
 const DISCOVERY_JOBS_DIR = path.resolve(
   process.env.DISCOVERY_JOBS_DIR || path.join(__dirname, "jobs")
 );
@@ -47,6 +50,13 @@ const oDummy5Upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024
+  }
+});
+const oDummy9Upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    files: 12
   }
 });
 
@@ -770,6 +780,186 @@ async function callOpenAiText(messages, temperature) {
     json.choices[0].message.content;
 
   return String(text || "").trim();
+}
+
+function sanitizeUploadFileName(fileName, fallbackPrefix, index) {
+  const raw = String(fileName || "").trim();
+  const cleaned = raw.replace(/[^a-zA-Z0-9._-]+/g, "_");
+  if (cleaned) {
+    return index + "_" + cleaned;
+  }
+  return String(fallbackPrefix || "upload") + "_" + index + ".csv";
+}
+
+function tokenizeDummy9(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter(function(token) {
+      return token.length >= 2;
+    });
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function runDummy9CsvRunner(files) {
+  return new Promise(function(resolve, reject) {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "dummy9-"));
+    const outputPath = path.join(tempDir, "analysis.json");
+    const inputPaths = [];
+
+    try {
+      (files || []).forEach(function(file, index) {
+        const safeName = sanitizeUploadFileName(file && file.originalname, "dummy9", index);
+        const filePath = path.join(tempDir, safeName);
+        fs.writeFileSync(filePath, file && file.buffer ? file.buffer : Buffer.from(""), "utf8");
+        inputPaths.push(filePath);
+      });
+    } catch (writeErr) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      reject(writeErr);
+      return;
+    }
+
+    const pyExec = process.env.PYTHON_BIN || (process.platform === "win32" ? "python" : "python3");
+    const child = spawn(pyExec, [DUMMY9_RUNNER_PY, "--output", outputPath].concat(inputPaths));
+    let stderr = "";
+
+    child.stderr.on("data", function(chunk) {
+      stderr += String(chunk || "");
+    });
+
+    child.on("error", function(err) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      reject(err);
+    });
+
+    child.on("close", function(code) {
+      try {
+        if (Number(code) !== 0) {
+          throw new Error(stderr.trim() || ("Dummy9 CSV runner hiba (exit code: " + code + ")"));
+        }
+
+        const raw = fs.readFileSync(outputPath, "utf8");
+        const parsed = parseOpenAiReply(raw);
+        resolve(parsed || {});
+      } catch (err) {
+        reject(err);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+  });
+}
+
+function scoreDummy9File(file, questionTokens) {
+  const columns = Array.isArray(file && file.columns) ? file.columns : [];
+  const sampleRows = Array.isArray(file && file.sample_rows) ? file.sample_rows : [];
+  const haystack = [
+    file && file.name ? file.name : "",
+    columns.join(" "),
+    sampleRows.slice(0, 15).map(function(row) {
+      return Object.keys(row || {}).map(function(key) {
+        return String(row[key] == null ? "" : row[key]);
+      }).join(" ");
+    }).join(" ")
+  ].join(" ").toLowerCase();
+
+  let score = 0;
+  questionTokens.forEach(function(token) {
+    const re = new RegExp("\\b" + escapeRegExp(token) + "\\b", "i");
+    if (re.test(haystack)) {
+      score += 4;
+    } else if (haystack.indexOf(token) >= 0) {
+      score += 2;
+    }
+  });
+
+  if (!score) {
+    score = Number(file && file.row_count ? Math.min(Number(file.row_count), 50) : 0) / 50;
+  }
+
+  return score;
+}
+
+function selectDummy9Rows(file, questionTokens) {
+  const rows = Array.isArray(file && file.sample_rows) ? file.sample_rows : [];
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const filtered = rows.filter(function(row) {
+    const joined = Object.keys(row || {}).map(function(key) {
+      return String(row[key] == null ? "" : row[key]).toLowerCase();
+    }).join(" ");
+    return questionTokens.some(function(token) {
+      return joined.indexOf(token) >= 0;
+    });
+  });
+
+  return (filtered.length > 0 ? filtered : rows).slice(0, 20);
+}
+
+function buildDummy9FallbackSummary(question, rankedFiles, previewRows) {
+  const top = rankedFiles[0] && rankedFiles[0].file ? rankedFiles[0].file : null;
+  if (!top) {
+    return "Nem talaltam feldolgozhato CSV adatot a megadott kerdeshez.";
+  }
+
+  const fileCount = rankedFiles.length;
+  const rowCount = Number(top.row_count || 0);
+  const previewCount = previewRows.length;
+  return [
+    "A kerdeshez a legrelevansabb CSV: " + top.name + ".",
+    "A rendszer " + fileCount + " fajlt vizsgalt, ebben a forrasban " + rowCount + " sort talalt.",
+    previewCount > 0 ? ("A preview " + previewCount + " mintasort mutat a gyors attekinteshez.") : "Ebbol a forrasbol nem volt megjelenitheto preview sor.",
+    question ? ("Kerdes: " + question) : ""
+  ].filter(Boolean).join(" ");
+}
+
+async function buildDummy9Summary(question, analysis, rankedFiles, previewRows) {
+  if (!OPENAI_API_KEY) {
+    return buildDummy9FallbackSummary(question, rankedFiles, previewRows);
+  }
+
+  const compactFiles = rankedFiles.slice(0, 4).map(function(item) {
+    const file = item.file || {};
+    return {
+      name: file.name || "",
+      row_count: Number(file.row_count || 0),
+      columns: Array.isArray(file.columns) ? file.columns.slice(0, 20) : [],
+      sample_rows: Array.isArray(file.sample_rows) ? file.sample_rows.slice(0, 8) : []
+    };
+  });
+
+  try {
+    return await callOpenAiText([
+      {
+        role: "system",
+        content: [
+          "Te egy CSV riport asszisztens vagy.",
+          "Csak a megadott CSV mintak alapjan valaszolj.",
+          "Legy tomor, termeszetes nyelvu, es ne emlits technikai reszleteket."
+        ].join("\n")
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          question: question,
+          total_files: Number(analysis && analysis.file_count ? analysis.file_count : compactFiles.length),
+          ranked_files: compactFiles,
+          preview_rows: previewRows
+        }, null, 2)
+      }
+    ], 0.2);
+  } catch (_err) {
+    return buildDummy9FallbackSummary(question, rankedFiles, previewRows);
+  }
 }
 
 function getNoahCardById(cardId) {
@@ -3283,6 +3473,70 @@ app.post("/api/discovery/run", async function(_req, res) {
   } catch (err) {
     res.status(500).json({
       error: "Discovery feldolgozasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/dummy9/run", oDummy9Upload.array("files", 12), async function(req, res) {
+  try {
+    const question = String(req.body && req.body.question ? req.body.question : "").trim();
+    const files = Array.isArray(req.files) ? req.files : [];
+
+    if (!question) {
+      res.status(400).json({ error: "A kerdes kotelezo." });
+      return;
+    }
+
+    if (files.length === 0) {
+      res.status(400).json({ error: "Legalabb egy CSV fajl kotelezo." });
+      return;
+    }
+
+    const invalid = files.find(function(file) {
+      const mime = String(file && file.mimetype ? file.mimetype : "").toLowerCase();
+      const name = String(file && file.originalname ? file.originalname : "").toLowerCase();
+      return mime.indexOf("csv") < 0 && !name.endsWith(".csv");
+    });
+    if (invalid) {
+      res.status(400).json({ error: "Csak CSV fajlok tamogatottak." });
+      return;
+    }
+
+    const analysis = await runDummy9CsvRunner(files);
+    const allFiles = Array.isArray(analysis && analysis.files) ? analysis.files : [];
+
+    if (allFiles.length === 0) {
+      res.status(400).json({ error: "A feltoltott fajlok nem tartalmaztak feldolgozhato CSV adatot." });
+      return;
+    }
+
+    const questionTokens = tokenizeDummy9(question);
+    const rankedFiles = allFiles.map(function(file) {
+      return {
+        file: file,
+        score: scoreDummy9File(file, questionTokens)
+      };
+    }).sort(function(a, b) {
+      return b.score - a.score;
+    });
+
+    const topFile = rankedFiles[0].file;
+    const previewRows = selectDummy9Rows(topFile, questionTokens);
+    const summary = await buildDummy9Summary(question, analysis, rankedFiles, previewRows);
+
+    res.json({
+      summary: summary,
+      rows: previewRows,
+      selectedSource: topFile && topFile.name ? topFile.name : "",
+      matchedFiles: rankedFiles.slice(0, Math.min(3, rankedFiles.length)).map(function(item) {
+        return item && item.file && item.file.name ? item.file.name : "";
+      }).filter(Boolean),
+      fileCount: Number(analysis && analysis.file_count ? analysis.file_count : allFiles.length)
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Dummy9 feldolgozasi hiba",
       details: err && err.message ? err.message : String(err)
     });
   }
