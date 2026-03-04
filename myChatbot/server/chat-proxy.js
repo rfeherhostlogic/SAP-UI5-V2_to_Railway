@@ -338,10 +338,6 @@ const NOAH_CARDS = [
 
 app.use(express.json({ limit: "1mb" }));
 
-function sha256(value) {
-  return crypto.createHash("sha256").update(String(value || ""), "utf8").digest("hex");
-}
-
 function loadAuthUsersFromEnv() {
   const raw = String(process.env.APP_USERS_JSON || "[]").trim();
   let parsed = [];
@@ -444,38 +440,101 @@ function cleanupAuthSessions() {
   });
 }
 
+function signAuthPayloadBase64(payloadBase64) {
+  return crypto.createHmac("sha256", APP_SESSION_SECRET).update(String(payloadBase64 || ""), "utf8").digest("base64url");
+}
+
+function createSignedAuthToken(user, nowTs) {
+  const now = Number.isFinite(nowTs) ? nowTs : Date.now();
+  const payload = {
+    username: String(user && user.username ? user.username : "").trim(),
+    displayName: String(user && (user.displayName || user.username) ? (user.displayName || user.username) : "").trim(),
+    iat: now,
+    exp: now + APP_SESSION_TTL_MS
+  };
+  const payloadBase64 = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const signature = signAuthPayloadBase64(payloadBase64);
+  return payloadBase64 + "." + signature;
+}
+
+function readSignedAuthToken(token) {
+  const raw = String(token || "").trim();
+  if (!raw || raw.indexOf(".") <= 0) {
+    return null;
+  }
+
+  const parts = raw.split(".");
+  if (parts.length !== 2) {
+    return null;
+  }
+
+  const payloadBase64 = String(parts[0] || "").trim();
+  const signature = String(parts[1] || "").trim();
+  if (!payloadBase64 || !signature) {
+    return null;
+  }
+
+  const expectedSignature = signAuthPayloadBase64(payloadBase64);
+  const sigBuf = Buffer.from(signature, "utf8");
+  const expectedBuf = Buffer.from(expectedSignature, "utf8");
+  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+    return null;
+  }
+
+  let parsed = null;
+  try {
+    const payloadJson = Buffer.from(payloadBase64, "base64url").toString("utf8");
+    parsed = JSON.parse(payloadJson);
+  } catch (_err) {
+    return null;
+  }
+
+  const username = String(parsed && parsed.username ? parsed.username : "").trim();
+  const displayName = String(parsed && (parsed.displayName || parsed.username) ? (parsed.displayName || parsed.username) : "").trim();
+  const exp = Number(parsed && parsed.exp ? parsed.exp : 0);
+  const iat = Number(parsed && parsed.iat ? parsed.iat : 0);
+  if (!username || !Number.isFinite(exp) || exp <= Date.now()) {
+    return null;
+  }
+
+  return {
+    token: raw,
+    username: username,
+    displayName: displayName || username,
+    createdAt: Number.isFinite(iat) ? iat : 0,
+    expiresAt: exp
+  };
+}
+
 function createAuthSession(user) {
-  cleanupAuthSessions();
-  const rawToken = crypto.randomBytes(32).toString("hex");
-  const token = sha256(APP_SESSION_SECRET + ":" + rawToken);
-  const now = Date.now();
-  oAuthSessions.set(token, {
-    token: token,
-    username: user.username,
-    displayName: user.displayName || user.username,
-    createdAt: now,
-    expiresAt: now + APP_SESSION_TTL_MS
-  });
+  const token = createSignedAuthToken(user, Date.now());
   return token;
 }
 
 function getAuthSession(req) {
-  cleanupAuthSessions();
   const cookies = parseCookies(req);
   const token = String(cookies[AUTH_COOKIE_NAME] || "").trim();
   if (!token) {
     return null;
   }
-  const session = oAuthSessions.get(token);
-  if (!session) {
+
+  const statelessSession = readSignedAuthToken(token);
+  if (statelessSession) {
+    return statelessSession;
+  }
+
+  // Legacy in-memory fallback for older tokens during local dev sessions.
+  cleanupAuthSessions();
+  const legacySession = oAuthSessions.get(token);
+  if (!legacySession) {
     return null;
   }
-  if (session.expiresAt <= Date.now()) {
+  if (legacySession.expiresAt <= Date.now()) {
     oAuthSessions.delete(token);
     return null;
   }
-  session.expiresAt = Date.now() + APP_SESSION_TTL_MS;
-  return session;
+  legacySession.expiresAt = Date.now() + APP_SESSION_TTL_MS;
+  return legacySession;
 }
 
 function requireAuth(req, res, next) {
