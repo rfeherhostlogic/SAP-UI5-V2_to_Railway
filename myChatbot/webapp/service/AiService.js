@@ -502,6 +502,31 @@
     });
   }
 
+  function noahAgentPlan(mPayload, oSignal) {
+    return fetch("/api/noah/agent/plan", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      signal: oSignal || undefined,
+      body: JSON.stringify({
+        user_message: mPayload.user_message || "",
+        attachments: mPayload.attachments || [],
+        history: mPayload.history || [],
+        feedback: mPayload.feedback || "",
+        current_plan: mPayload.current_plan || null,
+        excluded_card_ids: mPayload.excluded_card_ids || []
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function noahChat(mPayload, oSignal) {
     return fetch("/api/noah/chat", {
       method: "POST",
@@ -550,6 +575,7 @@
     noahPrefillCard: noahPrefillCard,
     noahGetCardConfig: noahGetCardConfig,
     noahRunCard: noahRunCard,
+    noahAgentPlan: noahAgentPlan,
     noahChat: noahChat
   };
 });

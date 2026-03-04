@@ -1297,6 +1297,281 @@ async function inferNoahFieldPrefill(card, userMessage, attachments) {
   };
 }
 
+function normalizeNoahAgentPlan(raw) {
+  const out = {
+    summary: "",
+    reasoning: "",
+    steps: []
+  };
+
+  if (!raw || typeof raw !== "object") {
+    return out;
+  }
+
+  out.summary = String(raw.summary || "").trim();
+  out.reasoning = String(raw.reasoning || "").trim();
+  out.steps = (Array.isArray(raw.steps) ? raw.steps : []).map(function(step, index) {
+    const cardId = String(step && step.card_id ? step.card_id : "").trim();
+    const card = getNoahCardById(cardId);
+    if (!card) {
+      return null;
+    }
+    return {
+      order: index + 1,
+      card_id: card.id,
+      rationale: String(step && step.rationale ? step.rationale : "").trim(),
+      inputs_to_use: Array.isArray(step && step.inputs_to_use)
+        ? step.inputs_to_use.map(function(item) { return String(item || "").trim(); }).filter(Boolean).slice(0, 6)
+        : []
+    };
+  }).filter(Boolean).slice(0, 4);
+
+  return out;
+}
+
+function buildNoahAgentFallbackPlan(userMessage, attachments, excludedCardIds) {
+  const excluded = new Set((excludedCardIds || []).map(function(item) { return String(item || "").trim(); }));
+  const text = String(userMessage || "").toLowerCase();
+  const steps = [];
+
+  function addStep(cardId, rationale, inputsToUse) {
+    if (!cardId || excluded.has(cardId) || steps.some(function(step) { return step.card_id === cardId; })) {
+      return;
+    }
+    steps.push({
+      card_id: cardId,
+      rationale: rationale,
+      inputs_to_use: inputsToUse || []
+    });
+  }
+
+  if (text.indexOf("osszehasonlit") >= 0 || text.indexOf("ceg") >= 0) {
+    addStep("dummy-7", "Penzugyi osszehasonlitas ket ceg kozott.", ["user_message", "attachments"]);
+  } else if (text.indexOf("szegmen") >= 0 || text.indexOf("kampany") >= 0) {
+    addStep("dummy-8", "Marketing szegmens es erintett rekordok kinyerese.", ["user_message"]);
+  } else if (text.indexOf("pdf") >= 0 || (attachments || []).some(function(file) {
+    return String(file && file.type ? file.type : "").toLowerCase().indexOf("pdf") >= 0;
+  })) {
+    addStep("dummy-5", "PDF tartalom alapjan osszegzes vagy kerdes-valasz.", ["attachments", "user_message"]);
+  } else if (text.indexOf("sql") >= 0 || text.indexOf("riport") >= 0 || text.indexOf("kimutatas") >= 0 || text.indexOf("melyik") >= 0) {
+    addStep("dummy-4", "Riport kerdesbol SQL es adat preview generalasa.", ["user_message", "schema_hint"]);
+  } else if (text.indexOf("fordit") >= 0) {
+    addStep("sensitive-translation", "Szoveg forditasa a kert nyelvre.", ["user_message"]);
+  } else if (text.indexOf("email") >= 0) {
+    addStep("email-fix", "Uzleti email professzionalis atfogalmazasa.", ["user_message"]);
+  } else {
+    addStep("summary", "A feladat lenyegenek tomor osszegzese.", ["user_message"]);
+  }
+
+  if (steps.length === 0) {
+    addStep("summary", "Altalanos osszegzes mint biztonsagos alaplepes.", ["user_message"]);
+  }
+
+  return {
+    summary: "Az agent a feladatot " + steps.length + " Noah Joker lepessel oldana meg.",
+    reasoning: steps.map(function(step, index) {
+      const card = getNoahCardById(step.card_id);
+      return (index + 1) + ". " + (card ? card.name : step.card_id) + ": " + step.rationale;
+    }).join("\n"),
+    steps: steps
+  };
+}
+
+function extractNoahAgentExcludedIds(feedback, currentPlan) {
+  const text = String(feedback || "").toLowerCase();
+  const steps = currentPlan && Array.isArray(currentPlan.steps) ? currentPlan.steps : [];
+  return steps.filter(function(step) {
+    const card = getNoahCardById(step && step.card_id);
+    if (!card) {
+      return false;
+    }
+    const id = String(card.id || "").toLowerCase();
+    const name = String(card.name || "").toLowerCase();
+    return text.indexOf(id) >= 0 || text.indexOf(name) >= 0;
+  }).map(function(step) {
+    return String(step.card_id || "");
+  });
+}
+
+async function enrichNoahAgentPlan(plan, userMessage, attachments) {
+  const baseSteps = Array.isArray(plan && plan.steps) ? plan.steps : [];
+  const enrichedSteps = [];
+
+  for (let i = 0; i < baseSteps.length; i += 1) {
+    const step = baseSteps[i];
+    const card = getNoahCardById(step.card_id);
+    if (!card) {
+      continue;
+    }
+
+    const dynamicDefaults = await getNoahDynamicDefaultFieldValues(card.id);
+    const prefill = OPENAI_API_KEY
+      ? await inferNoahFieldPrefill(card, userMessage, attachments)
+      : { field_values: {} };
+    const mergedFieldValues = Object.assign({}, dynamicDefaults || {}, prefill && prefill.field_values ? prefill.field_values : {});
+
+    const missingRequiredFields = (card.fields || []).filter(function(field) {
+      if (!field.required) {
+        return false;
+      }
+      const value = mergedFieldValues[String(field.field_id || "")];
+      return !String(value == null ? "" : value).trim();
+    }).map(function(field) {
+      return {
+        field_id: String(field.field_id || ""),
+        label: String(field.label || field.field_id || "")
+      };
+    });
+
+    const plannedInputs = (card.fields || []).map(function(field) {
+      const fieldId = String(field.field_id || "");
+      const value = mergedFieldValues[fieldId];
+      return {
+        field_id: fieldId,
+        label: String(field.label || fieldId),
+        value_preview: String(value == null ? "" : value).slice(0, 160),
+        source: value == null || String(value).trim() === ""
+          ? "user clarification needed"
+          : (Object.prototype.hasOwnProperty.call(dynamicDefaults || {}, fieldId) ? "existing state/default" : "inferred from context")
+      };
+    });
+
+    enrichedSteps.push({
+      order: step.order || (i + 1),
+      card_id: card.id,
+      card_name: card.name,
+      rationale: String(step.rationale || ""),
+      inputs_to_use: Array.isArray(step.inputs_to_use) ? step.inputs_to_use : [],
+      planned_inputs: plannedInputs,
+      prefill_values: mergedFieldValues,
+      missing_required_fields: missingRequiredFields,
+      missing_required_labels: missingRequiredFields.map(function(item) {
+        return item.label;
+      }).join(", ")
+    });
+  }
+
+  return {
+    summary: String(plan && plan.summary ? plan.summary : ""),
+    reasoning: String(plan && plan.reasoning ? plan.reasoning : ""),
+    steps: enrichedSteps,
+    can_run: enrichedSteps.every(function(step) {
+      return (step.missing_required_fields || []).length === 0;
+    })
+  };
+}
+
+async function buildNoahAgentPlan(userMessage, attachments, history, feedback, currentPlan, excludedCardIds) {
+  const publicCards = NOAH_CARDS.map(toPublicNoahCard);
+  const excluded = Array.from(new Set((excludedCardIds || []).map(function(item) {
+    return String(item || "").trim();
+  }).filter(Boolean)));
+  let normalizedPlan;
+
+  if (OPENAI_API_KEY) {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + OPENAI_API_KEY
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "noah_agent_plan",
+            schema: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                summary: { type: "string" },
+                reasoning: { type: "string" },
+                steps: {
+                  type: "array",
+                  minItems: 1,
+                  maxItems: 4,
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      card_id: { type: "string" },
+                      rationale: { type: "string" },
+                      inputs_to_use: {
+                        type: "array",
+                        items: { type: "string" }
+                      }
+                    },
+                    required: ["card_id", "rationale", "inputs_to_use"]
+                  }
+                }
+              },
+              required: ["summary", "reasoning", "steps"]
+            }
+          }
+        },
+        messages: [
+          {
+            role: "system",
+            content: [
+              "Te Noah Agent planner vagy.",
+              "A feladatod: legfeljebb 4 Noah Joker kartya sorrendet tervezz a felhasznaloi problema megoldasara.",
+              "Csak a megadott card_id-k kozul valaszthatsz.",
+              "Az excluded_card_ids listaban szereplo kartyakat tilos hasznalni.",
+              "Ha a user feedback modositast ker, ahhoz igazitsd a tervet.",
+              "A reasoning legyen rovid, lepesenkenti terv.",
+              "A summary 1-2 mondatos legyen."
+            ].join("\n")
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              user_message: String(userMessage || ""),
+              attachments: Array.isArray(attachments) ? attachments : [],
+              history: Array.isArray(history) ? history.slice(-8) : [],
+              feedback: String(feedback || ""),
+              current_plan: currentPlan || null,
+              excluded_card_ids: excluded,
+              available_cards: publicCards
+            }, null, 2)
+          }
+        ]
+      })
+    });
+
+    const raw = await response.text();
+    const json = parseOpenAiReply(raw);
+    if (!response.ok) {
+      throw new Error("OpenAI hiba: " + (json ? JSON.stringify(json) : raw));
+    }
+
+    const content =
+      json &&
+      json.choices &&
+      json.choices[0] &&
+      json.choices[0].message &&
+      json.choices[0].message.content;
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(String(content || "{}"));
+    } catch (_err) {
+      parsed = null;
+    }
+
+    normalizedPlan = normalizeNoahAgentPlan(parsed);
+  } else {
+    normalizedPlan = normalizeNoahAgentPlan(buildNoahAgentFallbackPlan(userMessage, attachments, excluded));
+  }
+
+  if (!normalizedPlan.steps || normalizedPlan.steps.length === 0) {
+    normalizedPlan = normalizeNoahAgentPlan(buildNoahAgentFallbackPlan(userMessage, attachments, excluded));
+  }
+
+  return enrichNoahAgentPlan(normalizedPlan, userMessage, attachments);
+}
+
 function openSqliteReadOnly(dbPath) {
   return new Promise(function(resolve, reject) {
     const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, function(err) {
@@ -3089,6 +3364,36 @@ app.get("/api/jokers/dummy4/schema-hint", async function(_req, res) {
   } catch (err) {
     res.status(500).json({
       error: "Dummy4 schema hint lekeresi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/noah/agent/plan", async function(req, res) {
+  try {
+    const userMessage = String(req.body && req.body.user_message ? req.body.user_message : "").trim();
+    const attachments = normalizeAttachmentList(req.body && req.body.attachments);
+    const history = Array.isArray(req.body && req.body.history) ? req.body.history : [];
+    const feedback = String(req.body && req.body.feedback ? req.body.feedback : "").trim();
+    const currentPlan = req.body && req.body.current_plan ? req.body.current_plan : null;
+    const requestExcluded = Array.isArray(req.body && req.body.excluded_card_ids) ? req.body.excluded_card_ids : [];
+    const excludedFromFeedback = extractNoahAgentExcludedIds(feedback, currentPlan);
+    const excludedCardIds = Array.from(new Set(requestExcluded.concat(excludedFromFeedback).map(function(item) {
+      return String(item || "").trim();
+    }).filter(Boolean)));
+
+    if (!userMessage && !feedback) {
+      res.status(400).json({ error: "user_message vagy feedback kotelezo." });
+      return;
+    }
+
+    const plan = await buildNoahAgentPlan(userMessage || feedback, attachments, history, feedback, currentPlan, excludedCardIds);
+    res.json(Object.assign({}, plan, {
+      excluded_card_ids: excludedCardIds
+    }));
+  } catch (err) {
+    res.status(500).json({
+      error: "Noah agent planning hiba",
       details: err && err.message ? err.message : String(err)
     });
   }

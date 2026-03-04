@@ -8,7 +8,13 @@
     <HBox class="noahShell" renderType="Bare" wrap="Wrap">
       <VBox class="noahMain">
         <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiTinyMarginBottom">
-          <Title text="Noah" level="H2"/>
+          <VBox>
+            <Title text="Noah" level="H2"/>
+            <HBox alignItems="Center" class="sapUiTinyMarginTop">
+              <Label text="Noah Agent" class="sapUiTinyMarginEnd"/>
+              <Switch state="{noah>/agentEnabled}" change=".onNoahAgentToggle" customTextOn="ON" customTextOff="OFF"/>
+            </HBox>
+          </VBox>
           <ObjectStatus text="{= 'Allapot: ' + ${noah>/state} }" state="Information"/>
         </HBox>
         <Text text="{noah>/statusText}" visible="{= ${noah>/statusText} ? true : false }" class="sapUiTinyMarginBottom"/>
@@ -80,7 +86,7 @@
               width="16rem"
               selectedKey="{noah>/manualSelectedCardId}"
               change=".onManualCardSelectChange"
-              enabled="{= ${noah>/state} !== 'ROUTING' &amp;&amp; ${noah>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah>/state} !== 'CHATTING' }"
+              enabled="{= !${noah>/agentEnabled} &amp;&amp; ${noah>/state} !== 'ROUTING' &amp;&amp; ${noah>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah>/state} !== 'CHATTING' }"
               items="{noah>/manualCardOptions}">
               <core:Item key="{noah>id}" text="{noah>name}"/>
             </Select>
@@ -170,7 +176,7 @@
           </Panel>
         </Panel>
 
-        <Panel headerText="Router naplo" class="noahRouterPanel">
+        <Panel headerText="Router naplo" class="noahRouterPanel" visible="{= !${noah>/agentEnabled} }">
           <HBox justifyContent="SpaceBetween" class="sapUiTinyMarginBottom">
             <ObjectStatus text="{= 'Osszes dontes: ' + ${noah>/routerLog}.length }" state="Information"/>
           </HBox>
@@ -188,6 +194,61 @@
               </VBox>
             </CustomListItem>
           </List>
+        </Panel>
+
+        <Panel headerText="Agent mode" class="noahRouterPanel" visible="{noah>/agentEnabled}">
+          <VBox>
+            <ObjectStatus
+              text="{= ${noah>/agentApprovalPending} ? 'Terv jovahagyasra var' : (${noah>/agentBusy} ? 'Reasoning folyamatban' : 'Varakozik problemara') }"
+              state="{= ${noah>/agentApprovalPending} ? 'Warning' : (${noah>/agentBusy} ? 'Information' : 'Success') }"
+              class="sapUiTinyMarginBottom"/>
+
+            <Text
+              text="{= ${noah>/agentPlan/summary} ? ${noah>/agentPlan/summary} : 'Agent modban a jobb oldali panelen jelenik meg a problemamegoldasi terv.' }"
+              wrapping="true"
+              class="sapUiTinyMarginBottom"/>
+
+            <Panel headerText="Reasoning / terv" expandable="true" expanded="true" class="sapUiTinyMarginBottom" visible="{= ${noah>/agentPlan} ? true : false }">
+              <Text text="{noah>/agentPlan/reasoning}" wrapping="true"/>
+            </Panel>
+
+            <List items="{noah>/agentPlan/steps}" visible="{= ${noah>/agentPlan} ? true : false }" showSeparators="Inner" class="noahAgentList">
+              <CustomListItem class="noahRouterItem">
+                <VBox>
+                  <HBox justifyContent="SpaceBetween" alignItems="Center">
+                    <Title level="H6" text="{= ${noah>order} + '. ' + ${noah>card_name} }"/>
+                    <ObjectStatus
+                      text="{= ${noah>missing_required_fields}.length > 0 ? 'Input hianyzik' : 'Keszen all' }"
+                      state="{= ${noah>missing_required_fields}.length > 0 ? 'Warning' : 'Success' }"/>
+                  </HBox>
+                  <Text text="{noah>rationale}" wrapping="true" class="sapUiTinyMarginBottom"/>
+                  <Label text="Input mapping" class="sapUiTinyMarginBottom"/>
+                  <List items="{noah>planned_inputs}" showSeparators="None">
+                    <CustomListItem>
+                      <VBox>
+                        <Text text="{= ${noah>label} + ' [' + ${noah>source} + ']' }" wrapping="true"/>
+                        <Text text="{= ${noah>value_preview} ? ${noah>value_preview} : 'Nincs elotoltott ertek' }" wrapping="true" class="noahRouterTimestamp"/>
+                      </VBox>
+                    </CustomListItem>
+                  </List>
+                  <Text
+                    text="{= ${noah>missing_required_fields}.length > 0 ? 'Hianyzik: ' + ${noah>missing_required_labels} : '' }"
+                    visible="{= ${noah>missing_required_fields}.length > 0 }"
+                    wrapping="true"
+                    class="sapUiTinyMarginTop"/>
+                </VBox>
+              </CustomListItem>
+            </List>
+
+            <Button
+              text="Elfogadom es inditom"
+              type="Emphasized"
+              press=".onApproveAgentPlan"
+              class="sapUiSmallMarginTop"
+              visible="{= ${noah>/agentPlan} ? true : false }"
+              busy="{noah>/agentBusy}"
+              enabled="{= ${noah>/agentApprovalPending} &amp;&amp; ${noah>/agentPlan/can_run} &amp;&amp; !${noah>/agentBusy} }"/>
+          </VBox>
         </Panel>
 
         <MessageStrip

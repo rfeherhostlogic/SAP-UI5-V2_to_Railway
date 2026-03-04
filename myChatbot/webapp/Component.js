@@ -235,6 +235,12 @@ sap.ui.define([
 				state: "IDLE",
 				statusText: "",
 				error: "",
+				agentEnabled: false,
+				agentBusy: false,
+				agentPlan: null,
+				agentConstraints: [],
+				agentApprovalPending: false,
+				agentProblemStatement: "",
 				draftMessage: "",
 				messages: [{
 					role: "assistant",

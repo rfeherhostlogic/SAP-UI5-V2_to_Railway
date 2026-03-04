@@ -21,7 +21,6 @@
         <tnt:item>
           <tnt:NavigationList>
             <tnt:NavigationListItem text="Noah" key="noah" icon="sap-icon://customer-view"/>
-            <tnt:NavigationListItem text="Chat" key="chat" icon="sap-icon://discussion-2"/>
             <tnt:NavigationListItem text="Jokerek" key="jokers" icon="sap-icon://favorite"/>
             <tnt:NavigationListItem text="Felfedezés" key="discovery" icon="sap-icon://search"/>
           </tnt:NavigationList>
@@ -35,7 +34,6 @@
     </tnt:sideContent>
     <tnt:mainContents>
       <NavContainer id="mainNav">
-        <mvc:XMLView id="chatView" viewName="sap.suite.ui.commons.demo.tutorial.view.Chat"/>
         <mvc:XMLView id="reportsView" viewName="sap.suite.ui.commons.demo.tutorial.view.Reports"/>
         <mvc:XMLView id="jokersView" viewName="sap.suite.ui.commons.demo.tutorial.view.Jokers"/>
         <mvc:XMLView id="discoveryView" viewName="sap.suite.ui.commons.demo.tutorial.view.Discovery"/>

@@ -37,12 +37,13 @@ sap.ui.define([
       var aAttachments = this._getAttachmentsPayload();
       var oPending = oModel.getProperty("/pendingConfirmation");
       var sManualCardId = String(oModel.getProperty("/manualSelectedCardId") || "").trim();
+      var bAgentEnabled = !!oModel.getProperty("/agentEnabled");
 
       if (!sMessage && aAttachments.length === 0 && !sManualCardId) {
         return;
       }
 
-      if (oPending) {
+      if (oPending && !bAgentEnabled) {
         var sLower = sMessage.toLowerCase();
         if (sLower === "igen" || sLower === "ok" || sLower === "futtasd") {
           oModel.setProperty("/draftMessage", "");
@@ -59,6 +60,19 @@ sap.ui.define([
       this._appendMessage("user", this._buildUserMessageWithAttachments(sMessage, aAttachments));
       oModel.setProperty("/draftMessage", "");
       oModel.setProperty("/error", "");
+
+      if (bAgentEnabled) {
+        try {
+          await this._planAgentFlow(sMessage, !!oModel.getProperty("/agentApprovalPending"));
+        } catch (oAgentError) {
+          if (oAgentError && oAgentError.name === "AbortError") {
+            this._setState(STATE.IDLE, "Folyamat megszakitva.");
+            return;
+          }
+          this._setError(oAgentError);
+        }
+        return;
+      }
 
       if (sManualCardId) {
         try {
@@ -99,6 +113,76 @@ sap.ui.define([
         this._setError(oError);
       } finally {
         this._activeAbortController = null;
+      }
+    },
+
+    onNoahAgentToggle: function(oEvent) {
+      var oModel = this.getView().getModel("noah");
+      var bState = !!(oEvent && oEvent.getParameter ? oEvent.getParameter("state") : false);
+      oModel.setProperty("/agentEnabled", bState);
+      this._resetAgentPlan();
+      this._setState(STATE.IDLE, bState ? "Agent mode aktiv. Eloszor tervet keszitek." : "Automatikus router mod.");
+    },
+
+    onApproveAgentPlan: async function() {
+      var oModel = this.getView().getModel("noah");
+      var oPlan = oModel.getProperty("/agentPlan");
+      var aSteps = oPlan && Array.isArray(oPlan.steps) ? oPlan.steps : [];
+      var aAttachments = this._getAttachmentsPayload();
+      var aOutputs = [];
+
+      if (!oPlan || aSteps.length === 0) {
+        return;
+      }
+
+      if (!oPlan.can_run) {
+        this._appendMessage("assistant", "A tervhez meg hianyzik nehany input. Adj meg plusz reszleteket, es ujratervezem.");
+        this._setState(STATE.CARD_INPUT_REQUIRED, "Agent input kiegeszitest var.");
+        return;
+      }
+
+      oModel.setProperty("/agentBusy", true);
+      oModel.setProperty("/agentApprovalPending", false);
+
+      try {
+        for (var i = 0; i < aSteps.length; i += 1) {
+          var oStep = aSteps[i];
+          var sExecutionMessage = this._buildAgentExecutionMessage(oStep, aOutputs);
+          await this._loadCardById(oStep.card_id);
+          this._applyPrefillValuesToRuntimeFields(oStep.prefill_values || {});
+
+          var aMissing = this._validateRequiredFields();
+          if (aMissing.length > 0) {
+            this._appendMessage("assistant", "Az agent nem tudott tovabblepni. Hianyzik: " + aMissing.join(", "));
+            this._setState(STATE.CARD_INPUT_REQUIRED, "Agent input kiegeszitest var.");
+            return;
+          }
+
+          var oResp = await this._runCardWithFieldValues(
+            oStep.card_id,
+            sExecutionMessage,
+            this._collectCardFieldValues(),
+            aAttachments,
+            true
+          );
+
+          aOutputs.push({
+            card_id: oStep.card_id,
+            card_name: oResp && oResp.card_name ? oResp.card_name : oStep.card_name,
+            result: oResp && oResp.result ? oResp.result : ""
+          });
+        }
+
+        this._clearComposerAfterRun();
+        this._setState(STATE.IDLE, "Agent terv lefutott.");
+      } catch (oError) {
+        if (oError && oError.name === "AbortError") {
+          this._setState(STATE.IDLE, "Agent futas megszakitva.");
+          return;
+        }
+        this._setError(oError);
+      } finally {
+        oModel.setProperty("/agentBusy", false);
       }
     },
 
@@ -299,9 +383,7 @@ sap.ui.define([
     },
 
     _runCard: async function(sCardId, sMessage) {
-      var oModel = this.getView().getModel("noah");
       var aAttachments = this._getAttachmentsPayload();
-      var mFieldValues = this._collectCardFieldValues();
       var aMissing = this._validateRequiredFields();
 
       if (aMissing.length > 0) {
@@ -309,30 +391,20 @@ sap.ui.define([
         return;
       }
 
-      this._setState(STATE.RUNNING_CARD, "Kartya futtatasa folyamatban...");
-      oModel.setProperty("/error", "");
-
       try {
-        this._activeAbortController = new AbortController();
-        var oResp = await AiService.noahRunCard({
-          card_id: sCardId,
-          user_message: sMessage || "",
-          field_values: mFieldValues,
-          attachments: aAttachments
-        }, this._activeAbortController.signal);
-
-        this._applyCardSpecificPayload(sCardId, oResp && oResp.payload ? oResp.payload : null);
-        this._appendMessage("assistant", "[" + (oResp.card_name || sCardId) + "]\n" + (oResp.result || "Nincs valasz."));
-        this._clearComposerAfterRun();
-        this._setState(STATE.IDLE, "Kartya lefutott.");
+        await this._runCardWithFieldValues(
+          sCardId,
+          sMessage,
+          this._collectCardFieldValues(),
+          aAttachments,
+          false
+        );
       } catch (oError) {
         if (oError && oError.name === "AbortError") {
           this._setState(STATE.IDLE, "Kartya futtatasa megszakitva.");
           return;
         }
         this._setError(oError);
-      } finally {
-        this._activeAbortController = null;
       }
     },
 
@@ -355,6 +427,105 @@ sap.ui.define([
         }
         this._setError(oError);
       }
+    },
+
+    _planAgentFlow: async function(sMessage, bIsFeedback) {
+      var oModel = this.getView().getModel("noah");
+      var sProblem = String(oModel.getProperty("/agentProblemStatement") || "").trim();
+      var oCurrentPlan = oModel.getProperty("/agentPlan");
+      var aConstraints = oModel.getProperty("/agentConstraints") || [];
+      var aExcluded = (oCurrentPlan && Array.isArray(oCurrentPlan.excluded_card_ids) ? oCurrentPlan.excluded_card_ids : []).concat(aConstraints);
+
+      if (!bIsFeedback || !sProblem) {
+        sProblem = sMessage;
+        oModel.setProperty("/agentProblemStatement", sProblem);
+        aExcluded = [];
+        oModel.setProperty("/agentConstraints", []);
+      }
+
+      oModel.setProperty("/agentBusy", true);
+      oModel.setProperty("/agentApprovalPending", false);
+      this._setState(STATE.ROUTING, bIsFeedback ? "Agent terv ujratervezese..." : "Agent reasoning folyamatban...");
+
+      try {
+        this._activeAbortController = new AbortController();
+        var oPlan = await AiService.noahAgentPlan({
+          user_message: sProblem,
+          attachments: this._getAttachmentsPayload(),
+          history: this._getHistoryPayload(),
+          feedback: bIsFeedback ? sMessage : "",
+          current_plan: oCurrentPlan,
+          excluded_card_ids: aExcluded
+        }, this._activeAbortController.signal);
+
+        oModel.setProperty("/agentPlan", oPlan || null);
+        oModel.setProperty("/agentConstraints", oPlan && oPlan.excluded_card_ids ? oPlan.excluded_card_ids : []);
+        oModel.setProperty("/agentApprovalPending", oPlan && oPlan.steps && oPlan.steps.length > 0);
+
+        if (oPlan && oPlan.can_run) {
+          this._appendMessage("assistant", "Elkeszult az agent terv. Ellenorizd a jobb oldali panelen, majd nyomd meg az \"Elfogadom es inditom\" gombot.");
+          this._setState(STATE.CARD_INPUT_REQUIRED, "Agent terv jovahagyasra var.");
+        } else {
+          this._appendMessage("assistant", "Az agent terv elkeszult, de meg hianyzik nehany input. Irj pontositast, es ujratervezem.");
+          this._setState(STATE.CARD_INPUT_REQUIRED, "Agent input kiegeszitest var.");
+        }
+      } finally {
+        oModel.setProperty("/agentBusy", false);
+        this._activeAbortController = null;
+      }
+    },
+
+    _buildAgentExecutionMessage: function(oStep, aOutputs) {
+      var oModel = this.getView().getModel("noah");
+      var sProblem = String(oModel.getProperty("/agentProblemStatement") || "").trim();
+      var sOutputSummary = (aOutputs || []).map(function(item) {
+        return "[" + (item.card_name || item.card_id || "step") + "] " + (item.result || "");
+      }).join("\n\n");
+
+      return [
+        "Eredeti problema:",
+        sProblem || "(nincs)",
+        "",
+        "Aktualis lepesterv:",
+        (oStep && oStep.rationale) ? oStep.rationale : "",
+        "",
+        sOutputSummary ? ("Korabbi lepesek outputja:\n" + sOutputSummary) : ""
+      ].filter(Boolean).join("\n");
+    },
+
+    _runCardWithFieldValues: async function(sCardId, sMessage, mFieldValues, aAttachments, bPreserveComposer) {
+      var oModel = this.getView().getModel("noah");
+      this._setState(STATE.RUNNING_CARD, "Kartya futtatasa folyamatban...");
+      oModel.setProperty("/error", "");
+
+      try {
+        this._activeAbortController = new AbortController();
+        var oResp = await AiService.noahRunCard({
+          card_id: sCardId,
+          user_message: sMessage || "",
+          field_values: mFieldValues || {},
+          attachments: aAttachments || []
+        }, this._activeAbortController.signal);
+
+        this._applyCardSpecificPayload(sCardId, oResp && oResp.payload ? oResp.payload : null);
+        this._appendMessage("assistant", "[" + (oResp.card_name || sCardId) + "]\n" + (oResp.result || "Nincs valasz."));
+        if (!bPreserveComposer) {
+          this._clearComposerAfterRun();
+        }
+        this._setState(STATE.IDLE, "Kartya lefutott.");
+        return oResp;
+      } finally {
+        this._activeAbortController = null;
+      }
+    },
+
+    _resetAgentPlan: function() {
+      var oModel = this.getView().getModel("noah");
+      oModel.setProperty("/agentPlan", null);
+      oModel.setProperty("/agentConstraints", []);
+      oModel.setProperty("/agentApprovalPending", false);
+      oModel.setProperty("/agentBusy", false);
+      oModel.setProperty("/agentProblemStatement", "");
     },
 
     _bindDropZoneEvents: function() {
