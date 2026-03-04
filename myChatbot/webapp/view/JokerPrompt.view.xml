@@ -372,7 +372,68 @@
         </Panel>
       </VBox>
 
-      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' }" width="100%">
+      <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-10' }" width="100%">
+        <Panel headerText="Lemorzsolodo ugyfelek azonositasa (RFM + K-Means)">
+          <VBox class="sapUiSmallMargin">
+            <Text text="A futtatas a Customer + SalesOrder adatokbol RFM modelt keszit, majd K-Means alapu szegmentaciot ad." wrapping="true"/>
+            <HBox class="sapUiSmallMarginTop" wrap="Wrap">
+              <Button text="Futtatas most" type="Emphasized" press=".onRunDummy10" busy="{jokers>/generating}" enabled="{= ${jokers>/generating} ? false : true }"/>
+            </HBox>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Idozites" class="sapUiSmallMarginTop">
+          <VBox class="sapUiSmallMargin">
+            <HBox alignItems="Center" wrap="Wrap">
+              <Label text="Idozites" class="sapUiTinyMarginEnd"/>
+              <Switch state="{jokers>/dummy10ScheduleEnabled}" customTextOn="ON" customTextOff="OFF"/>
+            </HBox>
+
+            <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginTop">
+              <Label text="Gyakorisag" class="sapUiTinyMarginEnd"/>
+              <Select width="10rem" selectedKey="{jokers>/dummy10ScheduleFrequency}" enabled="{jokers>/dummy10ScheduleEnabled}">
+                <items>
+                  <core:Item key="immediate" text="Azonnali"/>
+                  <core:Item key="daily" text="Napi"/>
+                  <core:Item key="weekly" text="Heti"/>
+                </items>
+              </Select>
+            </HBox>
+
+            <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy10ScheduleFrequency} === 'weekly' }">
+              <Label text="Het napja (0=Vas)" class="sapUiTinyMarginEnd"/>
+              <Input width="8rem" value="{jokers>/dummy10ScheduleWeeklyDay}" enabled="{jokers>/dummy10ScheduleEnabled}"/>
+            </HBox>
+
+            <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy10ScheduleFrequency} !== 'immediate' }">
+              <Label text="Ido (HH:MM)" class="sapUiTinyMarginEnd"/>
+              <Input width="8rem" value="{jokers>/dummy10ScheduleTime}" enabled="{jokers>/dummy10ScheduleEnabled}" placeholder="09:00"/>
+            </HBox>
+
+            <Button text="Idozites mentese" type="Transparent" press=".onSaveDummy10Schedule" class="sapUiSmallMarginTop" enabled="{jokers>/dummy10ScheduleEnabled}"/>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Riport" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy10Summary} ? true : false }">
+          <VBox class="sapUiSmallMargin">
+            <Text text="{jokers>/dummy10Summary}" wrapping="true"/>
+            <List items="{jokers>/dummy10SegmentItems}" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy10SegmentItems}.length > 0 }">
+              <CustomListItem>
+                <HBox justifyContent="SpaceBetween" width="100%">
+                  <Text text="{= ${jokers>segment} }"/>
+                  <ObjectStatus text="{= ${jokers>count} }" state="Information"/>
+                </HBox>
+              </CustomListItem>
+            </List>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Adat preview (ugyfel + RFM + szegmens)" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy10Rows}.length > 0 }">
+          <Table id="dummy10PreviewTable" growing="true" growingThreshold="200" inset="false"/>
+        </Panel>
+      </VBox>
+
+      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' }" width="100%">
         <TextArea value="{jokers>/promptInput}" rows="10" growing="true" growingMaxLines="16" width="100%" placeholder="Ide ird a feldolgozando szoveget..."/>
 
         <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">

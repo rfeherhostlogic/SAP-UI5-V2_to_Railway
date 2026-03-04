@@ -5,16 +5,90 @@
   <Page title="Pajzs" class="sapUiContentPadding" showHeader="false">
     <VBox width="100%">
       <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiTinyMarginBottom">
-        <Title text="Elérhető adatbázis táblák" level="H3"/>
-        <Button text="Frissítés" icon="sap-icon://refresh" press=".onRefreshPreview" enabled="{= !${reports>/busy} }"/>
+        <Title text="Pajzs" level="H2"/>
+        <Button text="Frissites" icon="sap-icon://refresh" press=".onRefreshShieldData"/>
       </HBox>
-      <Text text="Táblánként maximum 10 sor jelenik meg." class="sapUiSmallMarginBottom"/>
-      <HBox alignItems="Center" visible="{reports>/busy}" class="sapUiSmallMarginBottom">
-        <BusyIndicator size="1rem"/>
-        <Text text="Betöltés..." class="sapUiTinyMarginBegin"/>
-      </HBox>
-      <MessageStrip text="{reports>/error}" visible="{= ${reports>/error} ? true : false }" type="Error" showIcon="true" class="sapUiSmallMarginBottom"/>
-      <VBox id="dbPreviewHost" width="100%"/>
+
+      <IconTabBar selectedKey="{reports>/selectedTab}">
+        <items>
+          <IconTabFilter key="db" text="DB Preview" icon="sap-icon://database">
+            <VBox width="100%">
+              <Text text="Tablankent maximum 10 sor jelenik meg." class="sapUiSmallMarginBottom"/>
+              <HBox alignItems="Center" visible="{reports>/busy}" class="sapUiSmallMarginBottom">
+                <BusyIndicator size="1rem"/>
+                <Text text="Betoltes..." class="sapUiTinyMarginBegin"/>
+              </HBox>
+              <MessageStrip text="{reports>/error}" visible="{= ${reports>/error} ? true : false }" type="Error" showIcon="true" class="sapUiSmallMarginBottom"/>
+              <VBox id="dbPreviewHost" width="100%"/>
+            </VBox>
+          </IconTabFilter>
+
+          <IconTabFilter key="webhooks" text="Webhookok" icon="sap-icon://chain-link">
+            <VBox width="100%">
+              <Panel headerText="Webhook CRUD" class="sapUiSmallMarginBottom">
+                <VBox class="sapUiSmallMargin">
+                  <Label text="Csatorna"/>
+                  <Input value="{reports>/webhookChannel}" placeholder="Pl. Teams, Slack, Custom"/>
+                  <Label text="Link (URL)" class="sapUiSmallMarginTop"/>
+                  <Input value="{reports>/webhookUrl}" placeholder="https://..."/>
+                  <HBox class="sapUiSmallMarginTop" wrap="Wrap">
+                    <Button text="{= ${reports>/webhookEditId} > 0 ? 'Mentés' : 'Létrehozás' }" type="Emphasized" press=".onSaveWebhook"/>
+                    <Button text="Mégsem" type="Transparent" class="sapUiTinyMarginBegin" press=".onCancelWebhookEdit" visible="{= ${reports>/webhookEditId} > 0 }"/>
+                  </HBox>
+                </VBox>
+              </Panel>
+
+              <Table items="{reports>/webhooks}" inset="false">
+                <columns>
+                  <Column><Text text="Csatorna"/></Column>
+                  <Column><Text text="Link (URL)"/></Column>
+                  <Column width="12rem"><Text text="Művelet"/></Column>
+                </columns>
+                <items>
+                  <ColumnListItem>
+                    <cells>
+                      <Text text="{reports>Channel}" wrapping="true"/>
+                      <Text text="{reports>Url}" wrapping="true"/>
+                      <HBox wrap="Wrap">
+                        <Button text="Szerkeszt" type="Transparent" press=".onEditWebhook"/>
+                        <Button text="Torles" type="Reject" press=".onDeleteWebhook" class="sapUiTinyMarginBegin"/>
+                      </HBox>
+                    </cells>
+                  </ColumnListItem>
+                </items>
+              </Table>
+            </VBox>
+          </IconTabFilter>
+
+          <IconTabFilter key="schedules" text="Idozitesek" icon="sap-icon://appointment-2">
+            <VBox width="100%">
+              <Text text="Itt listazodnak a beallitott idozitesek. Az uj Joker kartyan tudsz idozitest letrehozni." class="sapUiSmallMarginBottom"/>
+              <Table items="{reports>/schedules}" inset="false">
+                <columns>
+                  <Column><Text text="Joker"/></Column>
+                  <Column><Text text="Gyakorisag"/></Column>
+                  <Column><Text text="Het nap"/></Column>
+                  <Column><Text text="Ido"/></Column>
+                  <Column><Text text="Utolso futas"/></Column>
+                  <Column width="8rem"><Text text="Művelet"/></Column>
+                </columns>
+                <items>
+                  <ColumnListItem>
+                    <cells>
+                      <Text text="{reports>JokerId}"/>
+                      <Text text="{reports>Frequency}"/>
+                      <Text text="{= ${reports>WeeklyDay} == null ? '-' : ${reports>WeeklyDay} }"/>
+                      <Text text="{= ${reports>TimeHHMM} ? ${reports>TimeHHMM} : '-' }"/>
+                      <Text text="{= ${reports>LastRunAt} ? ${reports>LastRunAt} : '-' }" wrapping="true"/>
+                      <Button text="Torles" type="Reject" press=".onDeleteSchedule"/>
+                    </cells>
+                  </ColumnListItem>
+                </items>
+              </Table>
+            </VBox>
+          </IconTabFilter>
+        </items>
+      </IconTabBar>
     </VBox>
   </Page>
 </mvc:View>

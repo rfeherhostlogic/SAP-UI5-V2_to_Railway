@@ -138,6 +138,16 @@ sap.ui.define([
 						footer: "AI Joker 09",
 						description: "A csatolt CSV allomanyok kerdes-alapu attekintese szoveges osszegzessel, tablazatos es diagram preview-val.",
 						systemPrompt: "A csatolt CSV adatok alapjan valaszolj rovid, riport-szeru stilusban."
+					},
+					{
+						id: "dummy-10",
+						title: "Lemorzsolodo ugyfelek azonositasa",
+						subtitle: "RFM + K-Means szegmentacio",
+						primaryTag: "\u00c1ltal\u00e1nos",
+						tags: ["\u00c1ltal\u00e1nos"],
+						footer: "AI Joker 10",
+						description: "Vasarlasi adatokbol RFM modellt es K-Means alapu ugyfelszegmenseket keszit (Champions, Loyal, At Risk, Lost).",
+						systemPrompt: "Adj rovid osszegzest az RFM szegmentaciorol."
 					}
 				],
 				filteredTiles: [],
@@ -162,6 +172,14 @@ sap.ui.define([
 				dummy9ChartReady: false,
 				dummy9SelectedSource: "",
 				dummy9MatchedFiles: [],
+				dummy10Summary: "",
+				dummy10Rows: [],
+				dummy10SegmentItems: [],
+				dummy10ScheduleEnabled: false,
+				dummy10ScheduleId: 0,
+				dummy10ScheduleFrequency: "immediate",
+				dummy10ScheduleWeeklyDay: 1,
+				dummy10ScheduleTime: "09:00",
 				dummy5DocToken: "",
 				dummy5FileName: "",
 				dummy5Summary: "",

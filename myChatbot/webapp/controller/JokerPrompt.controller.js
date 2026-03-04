@@ -275,6 +275,74 @@ sap.ui.define([
       }
     },
 
+    onRunDummy10: async function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/generating", true);
+      oModel.setProperty("/dummy10Summary", "");
+      oModel.setProperty("/dummy10Rows", []);
+      oModel.setProperty("/dummy10SegmentItems", []);
+
+      try {
+        var oResp = await AiService.runDummy10();
+        var oCounts = oResp && oResp.segment_counts ? oResp.segment_counts : {};
+        var aItems = Object.keys(oCounts).sort().map(function(key) {
+          return {
+            segment: key,
+            count: Number(oCounts[key] || 0)
+          };
+        });
+        oModel.setProperty("/dummy10Summary", String(oResp && oResp.summary ? oResp.summary : ""));
+        oModel.setProperty("/dummy10Rows", Array.isArray(oResp && oResp.rows) ? oResp.rows : []);
+        oModel.setProperty("/dummy10SegmentItems", aItems);
+        this._rebindDummy10PreviewTable();
+      } catch (oError) {
+        MessageToast.show(oError && oError.message ? oError.message : "Dummy10 hiba tortent.");
+      } finally {
+        oModel.setProperty("/generating", false);
+      }
+    },
+
+    onSaveDummy10Schedule: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var bEnabled = !!oModel.getProperty("/dummy10ScheduleEnabled");
+      var sFrequency = String(oModel.getProperty("/dummy10ScheduleFrequency") || "immediate");
+      var iWeeklyDay = Number(oModel.getProperty("/dummy10ScheduleWeeklyDay") || 1);
+      var sTime = String(oModel.getProperty("/dummy10ScheduleTime") || "").trim();
+      var iScheduleId = Number(oModel.getProperty("/dummy10ScheduleId") || 0);
+
+      if (!bEnabled) {
+        MessageToast.show("Kapcsold be az Idozites kapcsolot a menteshez.");
+        return;
+      }
+
+      if ((sFrequency === "daily" || sFrequency === "weekly") && !/^\d{1,2}:\d{2}$/.test(sTime)) {
+        MessageToast.show("Adj meg ervenyes idot, pl. 09:30.");
+        return;
+      }
+
+      var oPayload = {
+        jokerId: "dummy-10",
+        enabled: true,
+        frequency: sFrequency,
+        weeklyDay: sFrequency === "weekly" ? iWeeklyDay : null,
+        timeHHMM: (sFrequency === "daily" || sFrequency === "weekly") ? sTime : null,
+        config: {}
+      };
+
+      try {
+        var oResp;
+        if (iScheduleId > 0) {
+          oResp = await AiService.reportsUpdateSchedule(Object.assign({ id: iScheduleId }, oPayload));
+        } else {
+          oResp = await AiService.reportsCreateSchedule(oPayload);
+        }
+        oModel.setProperty("/dummy10ScheduleId", Number(oResp && oResp.item && oResp.item.ScheduleId ? oResp.item.ScheduleId : iScheduleId));
+        MessageToast.show("Idozites mentve.");
+      } catch (oError) {
+        MessageToast.show(oError && oError.message ? oError.message : "Idozites mentesi hiba.");
+      }
+    },
+
     onRefreshDummy4SchemaHint: async function() {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/generating", true);
@@ -423,6 +491,7 @@ sap.ui.define([
       oModel.setProperty("/dummy4Rows", []);
       oModel.setProperty("/dummy4ChartReady", false);
       this._resetDummy9State();
+      this._resetDummy10State();
       this._resetDummy5State();
       this._resetDummy7State();
       this._resetSmartSegState();
@@ -430,6 +499,7 @@ sap.ui.define([
       this._resetDummy4LocalChart();
       this._rebindDummy4PreviewTable();
       this._rebindDummy9PreviewTable();
+      this._rebindDummy10PreviewTable();
       this._rebindSmartSegResultTable();
       this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: "jokers" });
     },
@@ -456,6 +526,10 @@ sap.ui.define([
         } else if (oSelected.id === "dummy-9") {
           this._resetDummy9State();
           this._rebindDummy9PreviewTable();
+        } else if (oSelected.id === "dummy-10") {
+          this._resetDummy10State();
+          this._rebindDummy10PreviewTable();
+          this._loadDummy10Schedule();
         } else if (oSelected.id === "dummy-5") {
           this._resetDummy5State();
         } else if (oSelected.id === "dummy-7") {
@@ -483,6 +557,37 @@ sap.ui.define([
       var oFileUploader = this.byId("dummy9FileUploader");
       if (oFileUploader && oFileUploader.clear) {
         oFileUploader.clear();
+      }
+    },
+
+    _resetDummy10State: function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy10Summary", "");
+      oModel.setProperty("/dummy10Rows", []);
+      oModel.setProperty("/dummy10SegmentItems", []);
+      this._rebindDummy10PreviewTable();
+    },
+
+    _loadDummy10Schedule: async function() {
+      var oModel = this.getView().getModel("jokers");
+      try {
+        var oResp = await AiService.reportsListSchedules();
+        var aItems = Array.isArray(oResp && oResp.items) ? oResp.items : [];
+        var oSchedule = aItems.find(function(item) {
+          return String(item && item.JokerId ? item.JokerId : "") === "dummy-10";
+        });
+        if (!oSchedule) {
+          oModel.setProperty("/dummy10ScheduleId", 0);
+          oModel.setProperty("/dummy10ScheduleEnabled", false);
+          return;
+        }
+        oModel.setProperty("/dummy10ScheduleId", Number(oSchedule.ScheduleId || 0));
+        oModel.setProperty("/dummy10ScheduleEnabled", Number(oSchedule.Enabled || 0) === 1);
+        oModel.setProperty("/dummy10ScheduleFrequency", String(oSchedule.Frequency || "immediate"));
+        oModel.setProperty("/dummy10ScheduleWeeklyDay", Number(oSchedule.WeeklyDay != null ? oSchedule.WeeklyDay : 1));
+        oModel.setProperty("/dummy10ScheduleTime", String(oSchedule.TimeHHMM || "09:00"));
+      } catch (_e) {
+        // schedule lekeres hiba eseten maradnak a default ertekek
       }
     },
 
@@ -1038,6 +1143,45 @@ sap.ui.define([
       oTable.bindItems({
         path: "jokers>/dummy9Rows",
         template: oTemplate,
+        templateShareable: false
+      });
+    },
+
+    _rebindDummy10PreviewTable: function() {
+      var oTable = this.byId("dummy10PreviewTable");
+      var oModel = this.getView().getModel("jokers");
+      var aRows = oModel.getProperty("/dummy10Rows") || [];
+      var aColumns = this._extractDummy4Columns(aRows);
+
+      if (!oTable) {
+        return;
+      }
+
+      oTable.unbindItems();
+      oTable.removeAllColumns();
+
+      if (aColumns.length === 0) {
+        return;
+      }
+
+      aColumns.forEach(function(sColName) {
+        oTable.addColumn(new Column({
+          header: new Text({ text: sColName })
+        }));
+      });
+
+      var aCells = aColumns.map(function(sColName) {
+        return new Text({
+          text: "{jokers>" + sColName + "}",
+          wrapping: true
+        });
+      });
+
+      oTable.bindItems({
+        path: "jokers>/dummy10Rows",
+        template: new ColumnListItem({
+          cells: aCells
+        }),
         templateShareable: false
       });
     },

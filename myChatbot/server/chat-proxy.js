@@ -36,15 +36,20 @@ const DISCOVERY_TRAINING_PY = path.resolve(
 const DUMMY9_RUNNER_PY = path.resolve(
   process.env.DUMMY9_RUNNER_PY || path.join(__dirname, "dummy9_csv_runner.py")
 );
+const DUMMY10_RUNNER_PY = path.resolve(
+  process.env.DUMMY10_RUNNER_PY || path.join(__dirname, "dummy10_rfm_runner.py")
+);
 const DISCOVERY_JOBS_DIR = path.resolve(
   process.env.DISCOVERY_JOBS_DIR || path.join(__dirname, "jobs")
 );
+const SHIELD_SCHEDULER_INTERVAL_MS = Number(process.env.SHIELD_SCHEDULER_INTERVAL_MS || 30 * 1000);
 
 let oDummy4ChartCache = null;
 const oDummy5Docs = new Map();
 const oDiscoverySpecSessions = new Map();
 const oDiscoveryJobs = new Map();
 const oAuthSessions = new Map();
+let oShieldSchedulerTimer = null;
 const AUTH_USERS = loadAuthUsersFromEnv();
 const oDummy5Upload = multer({
   storage: multer.memoryStorage(),
@@ -307,6 +312,25 @@ const NOAH_CARDS = [
         required: true,
         placeholder: "Ird le mit csinaljon a kartya",
         validation: { minLength: 5 }
+      }
+    ]
+  },
+  {
+    id: "dummy-10",
+    name: "Lemorzsolodo ugyfelek azonositas",
+    description: "RFM + K-Means alapu ugyfelszegmentacio lemorzsolodasi kockazattal.",
+    prompt_template: [
+      "Feladat: keszits RFM alapu ugyfelszegmentacios riportot.",
+      "Fokusz: {{focus_text}}"
+    ].join("\n"),
+    fields: [
+      {
+        field_id: "focus_text",
+        label: "Fokusz",
+        type: "text",
+        required: false,
+        placeholder: "Pl. At Risk ugyfelek valtozasa",
+        validation: { maxLength: 120 }
       }
     ]
   }
@@ -1584,6 +1608,18 @@ function openSqliteReadOnly(dbPath) {
   });
 }
 
+function openSqliteReadWrite(dbPath) {
+  return new Promise(function(resolve, reject) {
+    const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE, function(err) {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(db);
+    });
+  });
+}
+
 function sqliteAll(db, sql) {
   return new Promise(function(resolve, reject) {
     db.all(sql, [], function(err, rows) {
@@ -1592,6 +1628,33 @@ function sqliteAll(db, sql) {
         return;
       }
       resolve(rows || []);
+    });
+  });
+}
+
+function sqliteGet(db, sql, params) {
+  return new Promise(function(resolve, reject) {
+    db.get(sql, Array.isArray(params) ? params : [], function(err, row) {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(row || null);
+    });
+  });
+}
+
+function sqliteRun(db, sql, params) {
+  return new Promise(function(resolve, reject) {
+    db.run(sql, Array.isArray(params) ? params : [], function(err) {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve({
+        changes: Number(this && this.changes ? this.changes : 0),
+        lastID: Number(this && this.lastID ? this.lastID : 0)
+      });
     });
   });
 }
@@ -2204,6 +2267,395 @@ function buildSchemaHintFromTables(tables) {
   }).filter(Boolean);
 
   return rows.join("\n");
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+async function ensureShieldTables() {
+  const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+  try {
+    await sqliteRun(db, [
+      "CREATE TABLE IF NOT EXISTS ShieldWebhook (",
+      "  WebhookId INTEGER PRIMARY KEY AUTOINCREMENT,",
+      "  Channel TEXT NOT NULL,",
+      "  Url TEXT NOT NULL,",
+      "  CreatedAt TEXT NOT NULL",
+      ")"
+    ].join("\n"));
+    await sqliteRun(db, [
+      "CREATE TABLE IF NOT EXISTS ShieldSchedule (",
+      "  ScheduleId INTEGER PRIMARY KEY AUTOINCREMENT,",
+      "  JokerId TEXT NOT NULL,",
+      "  Enabled INTEGER NOT NULL DEFAULT 1,",
+      "  Frequency TEXT NOT NULL,",
+      "  WeeklyDay INTEGER,",
+      "  TimeHHMM TEXT,",
+      "  ImmediateOnce INTEGER NOT NULL DEFAULT 0,",
+      "  ConfigJson TEXT NOT NULL DEFAULT '{}',",
+      "  LastRunAt TEXT,",
+      "  CreatedAt TEXT NOT NULL,",
+      "  UpdatedAt TEXT NOT NULL",
+      ")"
+    ].join("\n"));
+    await sqliteRun(db, [
+      "CREATE TABLE IF NOT EXISTS ShieldScheduleRun (",
+      "  RunId INTEGER PRIMARY KEY AUTOINCREMENT,",
+      "  ScheduleId INTEGER NOT NULL,",
+      "  RunAt TEXT NOT NULL,",
+      "  SummaryText TEXT NOT NULL,",
+      "  PayloadJson TEXT NOT NULL,",
+      "  FOREIGN KEY (ScheduleId) REFERENCES ShieldSchedule(ScheduleId)",
+      ")"
+    ].join("\n"));
+    await sqliteRun(db, [
+      "CREATE TABLE IF NOT EXISTS ShieldRfmLastSegment (",
+      "  ScheduleId INTEGER NOT NULL,",
+      "  CustomerId INTEGER NOT NULL,",
+      "  Segment TEXT NOT NULL,",
+      "  PRIMARY KEY (ScheduleId, CustomerId),",
+      "  FOREIGN KEY (ScheduleId) REFERENCES ShieldSchedule(ScheduleId)",
+      ")"
+    ].join("\n"));
+  } finally {
+    await closeSqlite(db);
+  }
+}
+
+function seededRandomFactory(seedValue) {
+  let seed = Number(seedValue || 1) % 2147483647;
+  if (seed <= 0) {
+    seed += 2147483646;
+  }
+  return function() {
+    seed = seed * 16807 % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+}
+
+async function ensureSeedData() {
+  const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+  try {
+    const customerCountRow = await sqliteGet(db, "SELECT COUNT(*) AS cnt FROM Customer");
+    const salesCountRow = await sqliteGet(db, "SELECT COUNT(*) AS cnt FROM SalesOrder");
+    let customerCount = Number(customerCountRow && customerCountRow.cnt ? customerCountRow.cnt : 0);
+    let salesCount = Number(salesCountRow && salesCountRow.cnt ? salesCountRow.cnt : 0);
+
+    const minCustomers = 150;
+    const minSales = 200;
+    if (customerCount >= minCustomers && salesCount >= minSales) {
+      return;
+    }
+
+    const maxCustomerRow = await sqliteGet(db, "SELECT MAX(CustomerId) AS mx FROM Customer");
+    const maxSalesRow = await sqliteGet(db, "SELECT MAX(SalesOrderId) AS mx FROM SalesOrder");
+    let nextCustomerId = Number(maxCustomerRow && maxCustomerRow.mx ? maxCustomerRow.mx : 0) + 1;
+    let nextSalesId = Number(maxSalesRow && maxSalesRow.mx ? maxSalesRow.mx : 1000) + 1;
+
+    const rnd = seededRandomFactory(4242);
+    const countries = ["HU", "DE", "AT", "ES", "IT", "FR", "NL", "PL", "CZ", "RO"];
+    const segments = ["SMB", "Midmarket", "Enterprise"];
+    const syllA = ["Nova", "Delta", "Prime", "Atlas", "Vertex", "Polar", "Astra", "Lumen", "Core", "Orbit"];
+    const syllB = ["Foods", "Retail", "Logistics", "Systems", "Trade", "Supply", "Digital", "Partners", "Works", "Labs"];
+
+    while (customerCount < minCustomers) {
+      const name = syllA[Math.floor(rnd() * syllA.length)] + " " + syllB[Math.floor(rnd() * syllB.length)] + " " + nextCustomerId;
+      const country = countries[Math.floor(rnd() * countries.length)];
+      const segment = segments[Math.floor(rnd() * segments.length)];
+      await sqliteRun(db, "INSERT INTO Customer (CustomerId, CustomerName, Country, Segment) VALUES (?, ?, ?, ?)", [
+        nextCustomerId,
+        name,
+        country,
+        segment
+      ]);
+      nextCustomerId += 1;
+      customerCount += 1;
+    }
+
+    const allCustomers = await sqliteAll(db, "SELECT CustomerId, Segment FROM Customer ORDER BY CustomerId");
+    const baseDate = new Date();
+    while (salesCount < minSales) {
+      const customer = allCustomers[Math.floor(rnd() * allCustomers.length)];
+      const daysAgo = Math.floor(rnd() * 360);
+      const date = new Date(baseDate.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+      const isoDate = date.toISOString().slice(0, 10);
+      const segment = String(customer && customer.Segment ? customer.Segment : "SMB");
+      const baseAmount = segment === "Enterprise" ? 5200 : (segment === "Midmarket" ? 2100 : 650);
+      const variability = 0.65 + rnd() * 0.9;
+      const amount = Math.round((baseAmount * variability) * 100) / 100;
+      await sqliteRun(db, "INSERT INTO SalesOrder (SalesOrderId, CustomerId, OrderDate, NetAmount, Currency) VALUES (?, ?, ?, ?, ?)", [
+        nextSalesId,
+        Number(customer && customer.CustomerId ? customer.CustomerId : 1),
+        isoDate,
+        amount,
+        "EUR"
+      ]);
+      nextSalesId += 1;
+      salesCount += 1;
+    }
+  } finally {
+    await closeSqlite(db);
+  }
+}
+
+function runDummy10RfmPython() {
+  return new Promise(function(resolve, reject) {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "dummy10-"));
+    const outputPath = path.join(tempDir, "rfm.json");
+    const pyExec = process.env.PYTHON_BIN || (process.platform === "win32" ? "python" : "python3");
+    const child = spawn(pyExec, [
+      DUMMY10_RUNNER_PY,
+      "--db-path",
+      DISCOVERY_DB_PATH,
+      "--output",
+      outputPath
+    ]);
+    let stderr = "";
+
+    child.stderr.on("data", function(chunk) {
+      stderr += String(chunk || "");
+    });
+    child.on("error", function(err) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      reject(err);
+    });
+    child.on("close", function(code) {
+      try {
+        if (Number(code) !== 0) {
+          throw new Error(stderr.trim() || ("dummy10 python hiba (exit: " + code + ")"));
+        }
+        const raw = fs.readFileSync(outputPath, "utf8");
+        const parsed = parseOpenAiReply(raw) || {};
+        resolve(parsed);
+      } catch (err) {
+        reject(err);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+  });
+}
+
+function buildRfmSummaryText(rfmResult) {
+  const segmentCounts = rfmResult && rfmResult.segment_counts ? rfmResult.segment_counts : {};
+  const parts = Object.keys(segmentCounts).sort().map(function(key) {
+    return key + ": " + Number(segmentCounts[key] || 0);
+  });
+  return "RFM szegmentacio lefutott. " + (parts.length > 0 ? parts.join(", ") : "Nincs szegmens adat.");
+}
+
+async function computeRfmTransitions(scheduleId, rows) {
+  const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+  try {
+    const previousRows = await sqliteAll(db, "SELECT CustomerId, Segment FROM ShieldRfmLastSegment WHERE ScheduleId = ?", [scheduleId]);
+    const prevMap = {};
+    previousRows.forEach(function(item) {
+      prevMap[String(item.CustomerId)] = String(item.Segment || "");
+    });
+
+    const nextMap = {};
+    const transitions = {};
+    (rows || []).forEach(function(row) {
+      const customerId = String(row && row.CustomerId != null ? row.CustomerId : "");
+      const nextSegment = String(row && row.Segment ? row.Segment : "");
+      if (!customerId || !nextSegment) {
+        return;
+      }
+      const prevSegment = prevMap[customerId] || "";
+      nextMap[customerId] = nextSegment;
+      if (prevSegment && prevSegment !== nextSegment) {
+        transitions[nextSegment] = Number(transitions[nextSegment] || 0) + 1;
+      }
+    });
+
+    await sqliteRun(db, "DELETE FROM ShieldRfmLastSegment WHERE ScheduleId = ?", [scheduleId]);
+    const customerIds = Object.keys(nextMap);
+    for (let i = 0; i < customerIds.length; i += 1) {
+      const cid = customerIds[i];
+      await sqliteRun(db, "INSERT INTO ShieldRfmLastSegment (ScheduleId, CustomerId, Segment) VALUES (?, ?, ?)", [
+        scheduleId,
+        Number(cid),
+        nextMap[cid]
+      ]);
+    }
+
+    return transitions;
+  } finally {
+    await closeSqlite(db);
+  }
+}
+
+function buildTransitionLines(transitions) {
+  return Object.keys(transitions || {}).sort().map(function(segment) {
+    return Number(transitions[segment] || 0) + " ugyfel " + segment + " lett";
+  });
+}
+
+async function sendShieldWebhookMessages(summaryText) {
+  const db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
+  let webhooks = [];
+  try {
+    webhooks = await sqliteAll(db, "SELECT WebhookId, Channel, Url FROM ShieldWebhook ORDER BY WebhookId ASC");
+  } finally {
+    await closeSqlite(db);
+  }
+
+  for (let i = 0; i < webhooks.length; i += 1) {
+    const item = webhooks[i];
+    const url = String(item && item.Url ? item.Url : "").trim();
+    if (!url) {
+      continue;
+    }
+    try {
+      await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8"
+        },
+        body: String(summaryText || "")
+      });
+    } catch (_err) {
+      // webhook hibak nem allithatjak meg a scheduler tobbbi kuldeset
+    }
+  }
+}
+
+function parseHHMM(value) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || "").trim());
+  if (!match) {
+    return null;
+  }
+  const hh = Number(match[1]);
+  const mm = Number(match[2]);
+  if (!Number.isInteger(hh) || !Number.isInteger(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) {
+    return null;
+  }
+  return { hh: hh, mm: mm };
+}
+
+function isShieldScheduleDue(schedule, now) {
+  const enabled = Number(schedule && schedule.Enabled ? schedule.Enabled : 0) === 1;
+  if (!enabled) {
+    return false;
+  }
+
+  const frequency = String(schedule && schedule.Frequency ? schedule.Frequency : "").toLowerCase();
+  const immediateOnce = Number(schedule && schedule.ImmediateOnce ? schedule.ImmediateOnce : 0) === 1;
+  const lastRunAt = schedule && schedule.LastRunAt ? new Date(schedule.LastRunAt) : null;
+
+  if (frequency === "immediate") {
+    return !immediateOnce;
+  }
+
+  const parsed = parseHHMM(schedule && schedule.TimeHHMM ? schedule.TimeHHMM : "");
+  if (!parsed) {
+    return false;
+  }
+
+  const candidate = new Date(now);
+  candidate.setHours(parsed.hh, parsed.mm, 0, 0);
+  if (now < candidate) {
+    return false;
+  }
+  if (lastRunAt && lastRunAt >= candidate) {
+    return false;
+  }
+
+  if (frequency === "daily") {
+    return true;
+  }
+
+  if (frequency === "weekly") {
+    const weeklyDay = Number(schedule && schedule.WeeklyDay != null ? schedule.WeeklyDay : -1);
+    return weeklyDay === now.getDay();
+  }
+
+  return false;
+}
+
+async function executeDummy10AndPersistRun(scheduleId, scheduleConfig) {
+  const result = await runDummy10RfmPython();
+  const rows = Array.isArray(result && result.rows) ? result.rows : [];
+  const transitions = await computeRfmTransitions(scheduleId, rows);
+  const transitionLines = buildTransitionLines(transitions);
+  const summaryText = [buildRfmSummaryText(result)].concat(transitionLines).join("\n");
+  const payload = {
+    summary: buildRfmSummaryText(result),
+    transitions: transitions,
+    rows: rows.slice(0, 200),
+    segment_counts: result && result.segment_counts ? result.segment_counts : {},
+    config: scheduleConfig || {}
+  };
+
+  const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+  try {
+    await sqliteRun(db, "INSERT INTO ShieldScheduleRun (ScheduleId, RunAt, SummaryText, PayloadJson) VALUES (?, ?, ?, ?)", [
+      scheduleId,
+      nowIso(),
+      summaryText,
+      JSON.stringify(payload)
+    ]);
+  } finally {
+    await closeSqlite(db);
+  }
+
+  await sendShieldWebhookMessages(summaryText);
+
+  return {
+    summaryText: summaryText,
+    transitions: transitions,
+    rows: rows,
+    segment_counts: result && result.segment_counts ? result.segment_counts : {}
+  };
+}
+
+async function runDueShieldSchedulesOnce() {
+  const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+  let schedules = [];
+  try {
+    schedules = await sqliteAll(db, "SELECT * FROM ShieldSchedule WHERE Enabled = 1 ORDER BY ScheduleId ASC");
+  } finally {
+    await closeSqlite(db);
+  }
+
+  const now = new Date();
+  for (let i = 0; i < schedules.length; i += 1) {
+    const schedule = schedules[i];
+    if (String(schedule.JokerId || "") !== "dummy-10") {
+      continue;
+    }
+    if (!isShieldScheduleDue(schedule, now)) {
+      continue;
+    }
+
+    const config = parseOpenAiReply(String(schedule.ConfigJson || "{}")) || {};
+    try {
+      await executeDummy10AndPersistRun(Number(schedule.ScheduleId), config);
+      const dbWrite = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+      try {
+        await sqliteRun(dbWrite, "UPDATE ShieldSchedule SET LastRunAt = ?, ImmediateOnce = ?, UpdatedAt = ? WHERE ScheduleId = ?", [
+          nowIso(),
+          String(schedule.Frequency || "").toLowerCase() === "immediate" ? 1 : Number(schedule.ImmediateOnce || 0),
+          nowIso(),
+          Number(schedule.ScheduleId)
+        ]);
+      } finally {
+        await closeSqlite(dbWrite);
+      }
+    } catch (_err) {
+      // scheduler hiba izolaltan kezelve
+    }
+  }
+}
+
+function startShieldScheduler() {
+  if (oShieldSchedulerTimer) {
+    clearInterval(oShieldSchedulerTimer);
+  }
+  oShieldSchedulerTimer = setInterval(function() {
+    runDueShieldSchedulesOnce().catch(function() {});
+  }, Math.max(10 * 1000, SHIELD_SCHEDULER_INTERVAL_MS));
 }
 
 function parseDiscoveryCsvHeader(buffer, fileName) {
@@ -3354,6 +3806,249 @@ app.get("/api/reports/db-preview", async function(req, res) {
   }
 });
 
+app.get("/api/reports/webhooks", async function(_req, res) {
+  try {
+    const db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
+    let rows = [];
+    try {
+      rows = await sqliteAll(db, "SELECT WebhookId, Channel, Url, CreatedAt FROM ShieldWebhook ORDER BY WebhookId ASC");
+    } finally {
+      await closeSqlite(db);
+    }
+    res.json({ items: rows });
+  } catch (err) {
+    res.status(500).json({ error: "Webhook lekeresi hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+app.post("/api/reports/webhooks", async function(req, res) {
+  try {
+    const channel = String(req.body && req.body.channel ? req.body.channel : "").trim();
+    const url = String(req.body && req.body.url ? req.body.url : "").trim();
+    if (!channel || !url) {
+      res.status(400).json({ error: "channel es url kotelezo." });
+      return;
+    }
+    const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+    let row = null;
+    try {
+      const ins = await sqliteRun(db, "INSERT INTO ShieldWebhook (Channel, Url, CreatedAt) VALUES (?, ?, ?)", [
+        channel,
+        url,
+        nowIso()
+      ]);
+      row = await sqliteGet(db, "SELECT WebhookId, Channel, Url, CreatedAt FROM ShieldWebhook WHERE WebhookId = ?", [ins.lastID]);
+    } finally {
+      await closeSqlite(db);
+    }
+    res.json({ item: row });
+  } catch (err) {
+    res.status(500).json({ error: "Webhook letrehozas hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+app.put("/api/reports/webhooks/:id", async function(req, res) {
+  try {
+    const webhookId = Number(req.params.id || 0);
+    const channel = String(req.body && req.body.channel ? req.body.channel : "").trim();
+    const url = String(req.body && req.body.url ? req.body.url : "").trim();
+    if (!webhookId || !channel || !url) {
+      res.status(400).json({ error: "ervenytelen webhook adat." });
+      return;
+    }
+    const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+    let row = null;
+    try {
+      await sqliteRun(db, "UPDATE ShieldWebhook SET Channel = ?, Url = ? WHERE WebhookId = ?", [channel, url, webhookId]);
+      row = await sqliteGet(db, "SELECT WebhookId, Channel, Url, CreatedAt FROM ShieldWebhook WHERE WebhookId = ?", [webhookId]);
+    } finally {
+      await closeSqlite(db);
+    }
+    if (!row) {
+      res.status(404).json({ error: "Webhook nem talalhato." });
+      return;
+    }
+    res.json({ item: row });
+  } catch (err) {
+    res.status(500).json({ error: "Webhook modositas hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+app.delete("/api/reports/webhooks/:id", async function(req, res) {
+  try {
+    const webhookId = Number(req.params.id || 0);
+    if (!webhookId) {
+      res.status(400).json({ error: "ervenytelen webhook id." });
+      return;
+    }
+    const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+    try {
+      await sqliteRun(db, "DELETE FROM ShieldWebhook WHERE WebhookId = ?", [webhookId]);
+    } finally {
+      await closeSqlite(db);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Webhook torlesi hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+app.get("/api/reports/schedules", async function(_req, res) {
+  try {
+    const db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
+    let rows = [];
+    try {
+      rows = await sqliteAll(db, "SELECT * FROM ShieldSchedule ORDER BY ScheduleId DESC");
+    } finally {
+      await closeSqlite(db);
+    }
+    res.json({ items: rows });
+  } catch (err) {
+    res.status(500).json({ error: "Idozites lekeresi hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+app.post("/api/reports/schedules", async function(req, res) {
+  try {
+    const jokerId = String(req.body && req.body.jokerId ? req.body.jokerId : "").trim();
+    const frequency = String(req.body && req.body.frequency ? req.body.frequency : "").trim().toLowerCase();
+    const weeklyDay = req.body && req.body.weeklyDay != null ? Number(req.body.weeklyDay) : null;
+    const timeHHMM = String(req.body && req.body.timeHHMM ? req.body.timeHHMM : "").trim();
+    const enabled = req.body && req.body.enabled != null ? Number(req.body.enabled ? 1 : 0) : 1;
+    const configJson = JSON.stringify(req.body && req.body.config ? req.body.config : {});
+
+    if (!jokerId || ["immediate", "daily", "weekly"].indexOf(frequency) < 0) {
+      res.status(400).json({ error: "ervenytelen schedule adat." });
+      return;
+    }
+    if (frequency !== "immediate" && !parseHHMM(timeHHMM)) {
+      res.status(400).json({ error: "timeHHMM kotelezo daily/weekly modban." });
+      return;
+    }
+    if (frequency === "weekly" && !(weeklyDay >= 0 && weeklyDay <= 6)) {
+      res.status(400).json({ error: "weeklyDay 0-6 kell legyen." });
+      return;
+    }
+
+    const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+    let row = null;
+    try {
+      const ins = await sqliteRun(db, [
+        "INSERT INTO ShieldSchedule (JokerId, Enabled, Frequency, WeeklyDay, TimeHHMM, ImmediateOnce, ConfigJson, LastRunAt, CreatedAt, UpdatedAt)",
+        "VALUES (?, ?, ?, ?, ?, 0, ?, NULL, ?, ?)"
+      ].join("\n"), [
+        jokerId,
+        enabled,
+        frequency,
+        frequency === "weekly" ? weeklyDay : null,
+        (frequency === "daily" || frequency === "weekly") ? timeHHMM : null,
+        configJson,
+        nowIso(),
+        nowIso()
+      ]);
+      row = await sqliteGet(db, "SELECT * FROM ShieldSchedule WHERE ScheduleId = ?", [ins.lastID]);
+    } finally {
+      await closeSqlite(db);
+    }
+    res.json({ item: row });
+  } catch (err) {
+    res.status(500).json({ error: "Idozites letrehozas hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+app.put("/api/reports/schedules/:id", async function(req, res) {
+  try {
+    const scheduleId = Number(req.params.id || 0);
+    if (!scheduleId) {
+      res.status(400).json({ error: "ervenytelen schedule id." });
+      return;
+    }
+    const frequency = String(req.body && req.body.frequency ? req.body.frequency : "").trim().toLowerCase();
+    const weeklyDay = req.body && req.body.weeklyDay != null ? Number(req.body.weeklyDay) : null;
+    const timeHHMM = String(req.body && req.body.timeHHMM ? req.body.timeHHMM : "").trim();
+    const enabled = req.body && req.body.enabled != null ? Number(req.body.enabled ? 1 : 0) : 1;
+    const configJson = JSON.stringify(req.body && req.body.config ? req.body.config : {});
+
+    if (["immediate", "daily", "weekly"].indexOf(frequency) < 0) {
+      res.status(400).json({ error: "ervenytelen frequency." });
+      return;
+    }
+    if (frequency !== "immediate" && !parseHHMM(timeHHMM)) {
+      res.status(400).json({ error: "timeHHMM kotelezo daily/weekly modban." });
+      return;
+    }
+    if (frequency === "weekly" && !(weeklyDay >= 0 && weeklyDay <= 6)) {
+      res.status(400).json({ error: "weeklyDay 0-6 kell legyen." });
+      return;
+    }
+
+    const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+    let row = null;
+    try {
+      await sqliteRun(db, [
+        "UPDATE ShieldSchedule",
+        "SET Enabled = ?, Frequency = ?, WeeklyDay = ?, TimeHHMM = ?, ConfigJson = ?, UpdatedAt = ?, ImmediateOnce = CASE WHEN ? = 'immediate' THEN 0 ELSE ImmediateOnce END",
+        "WHERE ScheduleId = ?"
+      ].join("\n"), [
+        enabled,
+        frequency,
+        frequency === "weekly" ? weeklyDay : null,
+        (frequency === "daily" || frequency === "weekly") ? timeHHMM : null,
+        configJson,
+        nowIso(),
+        frequency,
+        scheduleId
+      ]);
+      row = await sqliteGet(db, "SELECT * FROM ShieldSchedule WHERE ScheduleId = ?", [scheduleId]);
+    } finally {
+      await closeSqlite(db);
+    }
+    if (!row) {
+      res.status(404).json({ error: "Idozites nem talalhato." });
+      return;
+    }
+    res.json({ item: row });
+  } catch (err) {
+    res.status(500).json({ error: "Idozites modositas hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+app.delete("/api/reports/schedules/:id", async function(req, res) {
+  try {
+    const scheduleId = Number(req.params.id || 0);
+    if (!scheduleId) {
+      res.status(400).json({ error: "ervenytelen schedule id." });
+      return;
+    }
+    const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+    try {
+      await sqliteRun(db, "DELETE FROM ShieldRfmLastSegment WHERE ScheduleId = ?", [scheduleId]);
+      await sqliteRun(db, "DELETE FROM ShieldScheduleRun WHERE ScheduleId = ?", [scheduleId]);
+      await sqliteRun(db, "DELETE FROM ShieldSchedule WHERE ScheduleId = ?", [scheduleId]);
+    } finally {
+      await closeSqlite(db);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Idozites torlesi hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+app.post("/api/jokers/dummy10/run", async function(_req, res) {
+  try {
+    await ensureSeedData();
+    const rfm = await runDummy10RfmPython();
+    const summary = buildRfmSummaryText(rfm);
+    res.json({
+      summary: summary,
+      rows: Array.isArray(rfm && rfm.rows) ? rfm.rows.slice(0, 200) : [],
+      segment_counts: rfm && rfm.segment_counts ? rfm.segment_counts : {}
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Dummy10 feldolgozasi hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
 app.get("/api/jokers/dummy4/schema-hint", async function(_req, res) {
   try {
     const tables = await loadSqlTableMetadata(DISCOVERY_DB_PATH);
@@ -3569,6 +4264,25 @@ app.post("/api/noah/run-card", async function(req, res) {
           generatedSql: d4.generatedSql || "",
           summary: d4.summary || "",
           rows: d4.rows || []
+        },
+        used_fields: fieldValues,
+        attachments: attachments
+      });
+      return;
+    }
+
+    if (card.id === "dummy-10") {
+      await ensureSeedData();
+      const rfm = await runDummy10RfmPython();
+      const summary = buildRfmSummaryText(rfm);
+      res.json({
+        card_id: card.id,
+        card_name: card.name,
+        result: summary,
+        payload: {
+          summary: summary,
+          rows: Array.isArray(rfm && rfm.rows) ? rfm.rows.slice(0, 200) : [],
+          segment_counts: rfm && rfm.segment_counts ? rfm.segment_counts : {}
         },
         used_fields: fieldValues,
         attachments: attachments
@@ -4668,8 +5382,21 @@ app.get("*", function(req, res) {
   res.sendFile(path.join(UI_STATIC_DIR, "index.html"));
 });
 
-app.listen(PORT, function() {
-  console.log("Chat proxy elindult: http://127.0.0.1:" + PORT);
-  console.log("UI static dir:", UI_STATIC_DIR);
-});
+async function bootstrapServer() {
+  try {
+    await ensureShieldTables();
+    await ensureSeedData();
+    await runDueShieldSchedulesOnce();
+    startShieldScheduler();
+  } catch (err) {
+    console.error("[bootstrap] inicializalasi hiba:", err && err.message ? err.message : String(err));
+  }
+
+  app.listen(PORT, function() {
+    console.log("Chat proxy elindult: http://127.0.0.1:" + PORT);
+    console.log("UI static dir:", UI_STATIC_DIR);
+  });
+}
+
+bootstrapServer();
 

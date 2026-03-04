@@ -95,6 +95,23 @@
     });
   }
 
+  function runDummy10() {
+    return fetch("/api/jokers/dummy10/run", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({})
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function getDummy4SchemaHint() {
     return fetch("/api/jokers/dummy4/schema-hint", {
       method: "GET"
@@ -241,6 +258,124 @@
         "Content-Type": "application/json"
       },
       body: JSON.stringify({})
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function reportsListWebhooks() {
+    return fetch("/api/reports/webhooks", {
+      method: "GET"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function reportsCreateWebhook(mPayload) {
+    return fetch("/api/reports/webhooks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        channel: mPayload.channel || "",
+        url: mPayload.url || ""
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function reportsUpdateWebhook(mPayload) {
+    return fetch("/api/reports/webhooks/" + encodeURIComponent(mPayload.id), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        channel: mPayload.channel || "",
+        url: mPayload.url || ""
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function reportsDeleteWebhook(mPayload) {
+    return fetch("/api/reports/webhooks/" + encodeURIComponent(mPayload.id), {
+      method: "DELETE"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function reportsListSchedules() {
+    return fetch("/api/reports/schedules", {
+      method: "GET"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function reportsCreateSchedule(mPayload) {
+    return fetch("/api/reports/schedules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(mPayload || {})
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function reportsUpdateSchedule(mPayload) {
+    return fetch("/api/reports/schedules/" + encodeURIComponent(mPayload.id), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(mPayload || {})
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function reportsDeleteSchedule(mPayload) {
+    return fetch("/api/reports/schedules/" + encodeURIComponent(mPayload.id), {
+      method: "DELETE"
     }).then(function(oResponse) {
       if (!oResponse.ok) {
         return oResponse.text().then(function(sError) {
@@ -553,6 +688,7 @@
     generate: generate,
     runDummy4: runDummy4,
     runDummy9: runDummy9,
+    runDummy10: runDummy10,
     getDummy4SchemaHint: getDummy4SchemaHint,
     uploadDummy5Pdf: uploadDummy5Pdf,
     summarizeDummy5: summarizeDummy5,
@@ -561,6 +697,14 @@
     runSmartSegmentation: runSmartSegmentation,
     sendSmartSegmentationToCrm: sendSmartSegmentationToCrm,
     runDiscovery: runDiscovery,
+    reportsListWebhooks: reportsListWebhooks,
+    reportsCreateWebhook: reportsCreateWebhook,
+    reportsUpdateWebhook: reportsUpdateWebhook,
+    reportsDeleteWebhook: reportsDeleteWebhook,
+    reportsListSchedules: reportsListSchedules,
+    reportsCreateSchedule: reportsCreateSchedule,
+    reportsUpdateSchedule: reportsUpdateSchedule,
+    reportsDeleteSchedule: reportsDeleteSchedule,
     discoveryGetSchema: discoveryGetSchema,
     discoveryBusinessChat: discoveryBusinessChat,
     discoveryBusinessUploadCsv: discoveryBusinessUploadCsv,

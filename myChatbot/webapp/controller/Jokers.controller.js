@@ -46,6 +46,10 @@
         oJokersModel.setProperty("/dummy9ChartReady", false);
         oJokersModel.setProperty("/dummy9SelectedSource", "");
         oJokersModel.setProperty("/dummy9MatchedFiles", []);
+      } else if (oJoker.id === "dummy-10") {
+        oJokersModel.setProperty("/dummy10Summary", "");
+        oJokersModel.setProperty("/dummy10Rows", []);
+        oJokersModel.setProperty("/dummy10SegmentItems", []);
       }
 
       this.getOwnerComponent().getRouter().navTo("jokerPrompt", {
