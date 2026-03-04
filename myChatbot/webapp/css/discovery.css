@@ -30,6 +30,17 @@
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
 }
 
+.discoverySelectorGrid {
+  gap: 1rem;
+}
+
+.discoverySelectorTile {
+  width: 18rem;
+  min-height: 12rem;
+  border-radius: 0.9rem;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
 .discoverySpecChatList {
   max-height: 18rem;
   overflow-y: auto;
@@ -50,4 +61,10 @@
 .discoveryBubbleUser {
   max-width: 78%;
   background: #dceeff;
+}
+
+@media (max-width: 900px) {
+  .discoverySelectorTile {
+    width: 100%;
+  }
 }

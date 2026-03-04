@@ -251,6 +251,59 @@
     });
   }
 
+  function discoveryGetSchema() {
+    return fetch("/api/discovery/schema", {
+      method: "GET"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function discoveryBusinessChat(mPayload) {
+    return fetch("/api/discovery/business/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: mPayload.message || "",
+        history: mPayload.history || [],
+        csv_files: mPayload.csv_files || []
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function discoveryBusinessUploadCsv(aFiles) {
+    var oFormData = new FormData();
+    (aFiles || []).forEach(function(oFile) {
+      oFormData.append("files", oFile);
+    });
+
+    return fetch("/api/discovery/business/upload-csv", {
+      method: "POST",
+      body: oFormData
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function discoverySpecChatStart(mPayload) {
     return fetch("/api/discovery/spec-chat/start", {
       method: "POST",
@@ -483,6 +536,9 @@
     runSmartSegmentation: runSmartSegmentation,
     sendSmartSegmentationToCrm: sendSmartSegmentationToCrm,
     runDiscovery: runDiscovery,
+    discoveryGetSchema: discoveryGetSchema,
+    discoveryBusinessChat: discoveryBusinessChat,
+    discoveryBusinessUploadCsv: discoveryBusinessUploadCsv,
     discoverySpecChatStart: discoverySpecChatStart,
     discoverySpecChatAnswer: discoverySpecChatAnswer,
     discoveryGenerateTrainingSpec: discoveryGenerateTrainingSpec,

@@ -9,11 +9,19 @@ sap.ui.define([
       oRouter.getRoute("main").attachPatternMatched(this._onMainMatched, this);
       oRouter.getRoute("mainMenu").attachPatternMatched(this._onMainMenuMatched, this);
       oRouter.getRoute("jokerPrompt").attachPatternMatched(this._onJokerPromptMatched, this);
+      oRouter.getRoute("discoveryHome").attachPatternMatched(this._onDiscoveryRouteMatched, this);
+      oRouter.getRoute("discoveryStart").attachPatternMatched(this._onDiscoveryRouteMatched, this);
+      oRouter.getRoute("discoveryBusiness").attachPatternMatched(this._onDiscoveryRouteMatched, this);
+      oRouter.getRoute("discoveryAutoml").attachPatternMatched(this._onDiscoveryRouteMatched, this);
     },
 
     onItemSelect: function(oEvent) {
       var sKey = oEvent.getParameter("item").getKey();
-      if (sKey === "chat" || sKey === "reports" || sKey === "jokers" || sKey === "discovery" || sKey === "noah") {
+      if (sKey === "discovery") {
+        this.getOwnerComponent().getRouter().navTo("discoveryHome");
+        return;
+      }
+      if (sKey === "chat" || sKey === "reports" || sKey === "jokers" || sKey === "noah") {
         this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: sKey });
       }
     },
@@ -58,6 +66,11 @@ sap.ui.define([
     _onJokerPromptMatched: function() {
       this.getView().getModel("app").setProperty("/selectedMenuKey", "jokers");
       this._navigateByKey("jokerPrompt");
+    },
+
+    _onDiscoveryRouteMatched: function() {
+      this.getView().getModel("app").setProperty("/selectedMenuKey", "discovery");
+      this._navigateByKey("discovery");
     },
 
     _navigateByKey: function(sKey) {

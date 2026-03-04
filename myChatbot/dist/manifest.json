@@ -147,6 +147,26 @@
           "pattern": "main/jokers/{jokerId}",
           "name": "jokerPrompt",
           "target": "main"
+        },
+        {
+          "pattern": "discovery",
+          "name": "discoveryHome",
+          "target": "main"
+        },
+        {
+          "pattern": "discovery/start",
+          "name": "discoveryStart",
+          "target": "main"
+        },
+        {
+          "pattern": "discovery/business",
+          "name": "discoveryBusiness",
+          "target": "main"
+        },
+        {
+          "pattern": "discovery/automl",
+          "name": "discoveryAutoml",
+          "target": "main"
         }
       ],
       "targets": {

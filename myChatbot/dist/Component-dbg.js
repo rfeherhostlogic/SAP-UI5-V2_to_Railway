@@ -196,6 +196,7 @@ sap.ui.define([
 
 			// discovery model
 			this.setModel(new JSONModel({
+				currentPage: "selector",
 				busy: false,
 				error: "",
 				promptPreview: "",
@@ -218,7 +219,15 @@ sap.ui.define([
 				resultColumns: [],
 				metricsItems: [],
 				businessSummary: "",
-				csvDownloadUrl: ""
+				csvDownloadUrl: "",
+				businessBusy: false,
+				businessError: "",
+				businessSchemaTables: [],
+				businessChatMessages: [],
+				businessDraft: "",
+				businessCsvFiles: [],
+				businessSuggestedUseCase: null,
+				businessAutoStartPending: false
 			}), "discovery");
 
 			// noah model

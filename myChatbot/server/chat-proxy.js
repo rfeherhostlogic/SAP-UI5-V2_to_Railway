@@ -59,6 +59,13 @@ const oDummy9Upload = multer({
     files: 12
   }
 });
+const oDiscoveryCsvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    files: 8
+  }
+});
 
 const NOAH_LOW_CONFIDENCE_THRESHOLD = Number(process.env.NOAH_LOW_CONFIDENCE_THRESHOLD || 0.55);
 const NOAH_CARDS = [
@@ -1924,6 +1931,143 @@ function buildSchemaHintFromTables(tables) {
   return rows.join("\n");
 }
 
+function parseDiscoveryCsvHeader(buffer, fileName) {
+  const raw = String(buffer || Buffer.from("")).replace(/^\uFEFF/, "");
+  const lines = raw.split(/\r?\n/).filter(function(line) {
+    return !!String(line || "").trim();
+  });
+  const headerLine = lines[0] || "";
+  const delimiterCandidates = [",", ";", "\t", "|"];
+  let delimiter = ",";
+  let bestScore = -1;
+
+  delimiterCandidates.forEach(function(candidate) {
+    const count = headerLine.split(candidate).length;
+    if (count > bestScore) {
+      bestScore = count;
+      delimiter = candidate;
+    }
+  });
+
+  const columns = headerLine.split(delimiter).map(function(col) {
+    return String(col || "").trim().replace(/^"|"$/g, "");
+  }).filter(Boolean);
+
+  return {
+    name: String(fileName || "upload.csv"),
+    row_count: Math.max(0, lines.length - (columns.length > 0 ? 1 : 0)),
+    columns: columns
+  };
+}
+
+function normalizeDiscoveryText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function inferDiscoveryMlType(message) {
+  const s = normalizeDiscoveryText(message);
+  if (s.indexOf("lemorzsol") >= 0 || s.indexOf("churn") >= 0 || s.indexOf("kockaz") >= 0 || s.indexOf("kockazat") >= 0) {
+    return "klasszifikacio";
+  }
+  if (s.indexOf("elorejel") >= 0 || s.indexOf("forecast") >= 0 || s.indexOf("becsl") >= 0) {
+    return "regresszio";
+  }
+  if (s.indexOf("szegmen") >= 0 || s.indexOf("csoport") >= 0 || s.indexOf("cluster") >= 0) {
+    return "klaszterezes";
+  }
+  return "klasszifikacio";
+}
+
+function pickDiscoveryRelevantFields(message, schemaTables, csvFiles) {
+  const tokens = normalizeDiscoveryText(message).split(/\s+/).filter(Boolean);
+  const candidates = [];
+
+  (schemaTables || []).forEach(function(table) {
+    (table.columns || []).forEach(function(column) {
+      const name = String(column && column.name ? column.name : "").trim();
+      if (name) {
+        candidates.push(name);
+      }
+    });
+  });
+
+  (csvFiles || []).forEach(function(file) {
+    (file.columns || []).forEach(function(column) {
+      const name = String(column || "").trim();
+      if (name) {
+        candidates.push(name);
+      }
+    });
+  });
+
+  const unique = [];
+  const seen = {};
+  candidates.forEach(function(item) {
+    const key = String(item).toLowerCase();
+    if (!seen[key]) {
+      seen[key] = true;
+      unique.push(item);
+    }
+  });
+
+  const matched = unique.filter(function(field) {
+    const normalizedField = normalizeDiscoveryText(field);
+    return tokens.some(function(token) {
+      return normalizedField.indexOf(token) >= 0 || token.indexOf(normalizedField) >= 0;
+    });
+  });
+
+  return (matched.length > 0 ? matched : unique).slice(0, 6);
+}
+
+function buildBusinessDiscoveryUseCase(message, schemaTables, csvFiles) {
+  const trimmed = String(message || "").trim();
+  const mlType = inferDiscoveryMlType(trimmed);
+  const requiredFields = pickDiscoveryRelevantFields(trimmed, schemaTables, csvFiles);
+  const title = trimmed
+    ? ("Uzleti use case: " + trimmed.slice(0, 60) + (trimmed.length > 60 ? "..." : ""))
+    : "Uzleti use case";
+
+  return {
+    title: title,
+    business_value: trimmed || "Uzleti problema alapjan keszitett training javaslat.",
+    ml_type: mlType,
+    required_fields: requiredFields.length > 0 ? requiredFields : ["azonosito", "celvaltozo", "ido"]
+  };
+}
+
+function buildBusinessDiscoveryReply(message, schemaTables, csvFiles, useCase) {
+  const hasSql = (schemaTables || []).length > 0;
+  const hasCsv = (csvFiles || []).length > 0;
+
+  if (!hasSql && !hasCsv) {
+    return [
+      "A leirt uzleti problemat ertem, de jelenleg nem latok eleg adatot a training javaslathoz.",
+      "Tolts fel egy vagy tobb CSV fajlt, es visszairom a mezoneveket, hogy mire lehet treninget epiteni."
+    ].join(" ");
+  }
+
+  const schemaSummary = hasSql
+    ? ("Az SQL adatforrasban " + schemaTables.length + " tabla erheto el.")
+    : "SQL adatforras jelenleg nem erheto el.";
+  const csvSummary = hasCsv
+    ? ("A feltoltott CSV fajlok kozul " + csvFiles.length + " all rendelkezesre.")
+    : "Jelenleg nincs feltoltott CSV fajl.";
+
+  return [
+    schemaSummary,
+    csvSummary,
+    "Javasolt ML irany: " + useCase.ml_type + ".",
+    "Elsodleges training koncepcio: " + useCase.title + ".",
+    "A training inditasahoz hasznos mezo(k): " + useCase.required_fields.join(", ") + "."
+  ].join(" ");
+}
+
 async function getNoahDynamicDefaultFieldValues(cardId) {
   const id = String(cardId || "").trim();
   if (id !== "dummy-4") {
@@ -3228,6 +3372,83 @@ app.post("/api/noah/chat", async function(req, res) {
   } catch (err) {
     res.status(500).json({
       error: "Noah chat hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.get("/api/discovery/schema", async function(_req, res) {
+  try {
+    const tables = await loadSqlTableMetadata(DISCOVERY_DB_PATH);
+    res.json({
+      tables: tables
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Schema lekeresi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/discovery/business/upload-csv", oDiscoveryCsvUpload.array("files", 8), function(req, res) {
+  try {
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (files.length === 0) {
+      res.status(400).json({ error: "Legalabb egy CSV fajl kotelezo." });
+      return;
+    }
+
+    const parsedFiles = files.map(function(file) {
+      const mime = String(file && file.mimetype ? file.mimetype : "").toLowerCase();
+      const name = String(file && file.originalname ? file.originalname : "upload.csv");
+      if (mime.indexOf("csv") < 0 && !name.toLowerCase().endsWith(".csv")) {
+        throw new Error("Csak CSV fajlok tamogatottak.");
+      }
+      return parseDiscoveryCsvHeader(file.buffer, name);
+    }).filter(function(file) {
+      return Array.isArray(file.columns) && file.columns.length > 0;
+    });
+
+    if (parsedFiles.length === 0) {
+      res.status(400).json({ error: "A CSV fajlokbol nem sikerult mezoneveket kinyerni." });
+      return;
+    }
+
+    const first = parsedFiles[0];
+    res.json({
+      files: parsedFiles,
+      message: "CSV feltoltes sikeres. Felismert mezok: " + first.columns.join(", ")
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "CSV feldolgozasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/discovery/business/chat", async function(req, res) {
+  try {
+    const message = String(req.body && req.body.message ? req.body.message : "").trim();
+    const csvFiles = Array.isArray(req.body && req.body.csv_files) ? req.body.csv_files : [];
+
+    if (!message) {
+      res.status(400).json({ error: "Az uzleti uzenet kotelezo." });
+      return;
+    }
+
+    const schemaTables = await loadSqlTableMetadata(DISCOVERY_DB_PATH);
+    const useCase = buildBusinessDiscoveryUseCase(message, schemaTables, csvFiles);
+    const reply = buildBusinessDiscoveryReply(message, schemaTables, csvFiles, useCase);
+
+    res.json({
+      message: reply,
+      suggested_use_case: useCase
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Uzleti discovery chatbot hiba",
       details: err && err.message ? err.message : String(err)
     });
   }

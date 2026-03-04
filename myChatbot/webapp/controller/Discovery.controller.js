@@ -10,11 +10,38 @@ sap.ui.define([
 
   return Controller.extend("sap.suite.ui.commons.demo.tutorial.controller.Discovery", {
     onInit: function() {
+      var oRouter = this.getOwnerComponent().getRouter();
       this._statusTimer = null;
+
+      oRouter.getRoute("discoveryHome").attachPatternMatched(this._onDiscoveryHomeMatched, this);
+      oRouter.getRoute("discoveryStart").attachPatternMatched(this._onDiscoveryStartMatched, this);
+      oRouter.getRoute("discoveryBusiness").attachPatternMatched(this._onDiscoveryBusinessMatched, this);
+      oRouter.getRoute("discoveryAutoml").attachPatternMatched(this._onDiscoveryAutomlMatched, this);
+      oRouter.getRoute("mainMenu").attachPatternMatched(this._onLegacyMainMenuMatched, this);
     },
 
     onExit: function() {
       this._clearStatusTimer();
+    },
+
+    onOpenDiscoveryAutoml: function() {
+      this.getOwnerComponent().getRouter().navTo("discoveryAutoml");
+    },
+
+    onOpenDiscoveryStart: function() {
+      this.getOwnerComponent().getRouter().navTo("discoveryStart");
+    },
+
+    onOpenDiscoveryBusiness: function() {
+      this.getOwnerComponent().getRouter().navTo("discoveryBusiness");
+    },
+
+    onBackToDiscoveryHome: function() {
+      this.getOwnerComponent().getRouter().navTo("discoveryHome");
+    },
+
+    onContactAutoml: function() {
+      MessageToast.show("Keres rogzitve");
     },
 
     onStartDiscovery: async function() {
@@ -39,45 +66,12 @@ sap.ui.define([
     },
 
     onStartMlModel: async function(oEvent) {
-      var oModel = this.getView().getModel("discovery");
       var oContext = oEvent.getSource().getBindingContext("discovery");
       var oSuggestion = oContext ? oContext.getObject() : null;
       if (!oSuggestion) {
         return;
       }
-
-      this._clearStatusTimer();
-      this._resetMlFlow();
-      oModel.setProperty("/activeUseCase", oSuggestion);
-      oModel.setProperty("/specBusy", true);
-      oModel.setProperty("/error", "");
-
-      try {
-        var oStart = await AiService.discoverySpecChatStart({
-          use_case: oSuggestion
-        });
-
-        var sQuestion = String(oStart && oStart.question ? oStart.question : "").trim();
-        oModel.setProperty("/specSessionId", oStart && oStart.session_id ? oStart.session_id : "");
-        oModel.setProperty("/specStep", Number(oStart && oStart.step ? oStart.step : 1));
-        oModel.setProperty("/specMaxSteps", Number(oStart && oStart.max_steps ? oStart.max_steps : 5));
-        oModel.setProperty("/specDone", false);
-        oModel.setProperty("/trainingStatus", "SPEC_CHAT");
-        oModel.setProperty("/trainingMessage", "Uzleti pontositas: valaszolj a kerdesekre.");
-
-        if (sQuestion) {
-          oModel.setProperty("/specChatMessages", [{ role: "assistant", content: sQuestion }]);
-        } else {
-          oModel.setProperty("/specChatMessages", []);
-        }
-      } catch (oError) {
-        var sMessage = this._extractError(oError, "Nem sikerult elinditani a specifikacios chatbotot.");
-        oModel.setProperty("/error", sMessage);
-        oModel.setProperty("/trainingStatus", "ERROR");
-        MessageToast.show(sMessage);
-      } finally {
-        oModel.setProperty("/specBusy", false);
-      }
+      await this._startMlModelForSuggestion(oSuggestion);
     },
 
     onSubmitSpecAnswer: async function() {
@@ -139,6 +133,192 @@ sap.ui.define([
     onResetMlFlow: function() {
       this._clearStatusTimer();
       this._resetMlFlow();
+    },
+
+    onBusinessCsvChange: async function(oEvent) {
+      var oModel = this.getView().getModel("discovery");
+      var aFiles = oEvent && oEvent.getParameter ? Array.prototype.slice.call(oEvent.getParameter("files") || []) : [];
+
+      if (aFiles.length === 0) {
+        return;
+      }
+
+      oModel.setProperty("/businessBusy", true);
+      oModel.setProperty("/businessError", "");
+
+      try {
+        var oResp = await AiService.discoveryBusinessUploadCsv(aFiles);
+        var aCurrent = oModel.getProperty("/businessCsvFiles") || [];
+        var aMerged = aCurrent.concat(oResp && oResp.files ? oResp.files : []);
+        oModel.setProperty("/businessCsvFiles", this._dedupeBusinessCsvFiles(aMerged));
+
+        if (oResp && oResp.message) {
+          this._pushBusinessChatMessage("assistant", oResp.message);
+        }
+      } catch (oError) {
+        var sMessage = this._extractError(oError, "CSV feltoltesi hiba.");
+        oModel.setProperty("/businessError", sMessage);
+        MessageToast.show(sMessage);
+      } finally {
+        oModel.setProperty("/businessBusy", false);
+      }
+    },
+
+    onRemoveBusinessCsv: function(oEvent) {
+      var oCtx = oEvent.getSource().getBindingContext("discovery");
+      if (!oCtx) {
+        return;
+      }
+
+      var oModel = this.getView().getModel("discovery");
+      var aFiles = oModel.getProperty("/businessCsvFiles") || [];
+      var iIndex = parseInt(String(oCtx.getPath()).split("/").pop(), 10);
+      if (!isFinite(iIndex) || iIndex < 0 || iIndex >= aFiles.length) {
+        return;
+      }
+
+      aFiles.splice(iIndex, 1);
+      oModel.setProperty("/businessCsvFiles", aFiles);
+    },
+
+    onSendBusinessMessage: async function() {
+      var oModel = this.getView().getModel("discovery");
+      var sMessage = String(oModel.getProperty("/businessDraft") || "").trim();
+
+      if (!sMessage) {
+        return;
+      }
+
+      oModel.setProperty("/businessBusy", true);
+      oModel.setProperty("/businessError", "");
+      this._pushBusinessChatMessage("user", sMessage);
+      oModel.setProperty("/businessDraft", "");
+
+      try {
+        var oResp = await AiService.discoveryBusinessChat({
+          message: sMessage,
+          history: this._buildBusinessHistoryPayload(),
+          csv_files: oModel.getProperty("/businessCsvFiles") || []
+        });
+
+        this._pushBusinessChatMessage("assistant", String(oResp && oResp.message ? oResp.message : "Nincs valasz."));
+        if (oResp && oResp.suggested_use_case) {
+          oModel.setProperty("/businessSuggestedUseCase", oResp.suggested_use_case);
+          this._upsertSuggestionFromBusiness(oResp.suggested_use_case);
+        }
+      } catch (oError) {
+        var sErr = this._extractError(oError, "Uzleti chatbot hiba.");
+        oModel.setProperty("/businessError", sErr);
+        MessageToast.show(sErr);
+      } finally {
+        oModel.setProperty("/businessBusy", false);
+      }
+    },
+
+    onStartTrainingFromBusiness: function() {
+      var oModel = this.getView().getModel("discovery");
+      if (!oModel.getProperty("/businessSuggestedUseCase")) {
+        MessageToast.show("Elobb keszuljon trening javaslat.");
+        return;
+      }
+      oModel.setProperty("/businessAutoStartPending", true);
+      this.getOwnerComponent().getRouter().navTo("discoveryStart");
+    },
+
+    _onLegacyMainMenuMatched: function(oEvent) {
+      var sKey = String(oEvent.getParameter("arguments").menuKey || "");
+      if (sKey === "discovery") {
+        this._setCurrentPage("selector");
+      }
+    },
+
+    _onDiscoveryHomeMatched: function() {
+      this._setCurrentPage("selector");
+    },
+
+    _onDiscoveryAutomlMatched: function() {
+      this._setCurrentPage("automl");
+    },
+
+    _onDiscoveryBusinessMatched: function() {
+      this._setCurrentPage("business");
+      this._ensureBusinessContext();
+    },
+
+    _onDiscoveryStartMatched: async function() {
+      var oModel = this.getView().getModel("discovery");
+      this._setCurrentPage("start");
+
+      if (oModel.getProperty("/businessAutoStartPending") && oModel.getProperty("/businessSuggestedUseCase")) {
+        oModel.setProperty("/businessAutoStartPending", false);
+        await this._startMlModelForSuggestion(oModel.getProperty("/businessSuggestedUseCase"));
+      }
+    },
+
+    _setCurrentPage: function(sPage) {
+      var oModel = this.getView().getModel("discovery");
+      oModel.setProperty("/currentPage", sPage);
+    },
+
+    _ensureBusinessContext: async function() {
+      var oModel = this.getView().getModel("discovery");
+      if ((oModel.getProperty("/businessChatMessages") || []).length === 0) {
+        this._pushBusinessChatMessage(
+          "assistant",
+          "Ird le az uzleti problemat. Figyelembe veszem az elerheto SQL semat, es javaslok egy ML training koncepciot. Ha nem eleg az adat, CSV feltoltest fogok javasolni."
+        );
+      }
+
+      if ((oModel.getProperty("/businessSchemaTables") || []).length > 0) {
+        return;
+      }
+
+      try {
+        var oResp = await AiService.discoveryGetSchema();
+        oModel.setProperty("/businessSchemaTables", oResp && oResp.tables ? oResp.tables : []);
+      } catch (oError) {
+        oModel.setProperty("/businessError", this._extractError(oError, "Schema lekeresi hiba."));
+      }
+    },
+
+    _startMlModelForSuggestion: async function(oSuggestion) {
+      var oModel = this.getView().getModel("discovery");
+      if (!oSuggestion) {
+        return;
+      }
+
+      this._clearStatusTimer();
+      this._resetMlFlow();
+      oModel.setProperty("/activeUseCase", oSuggestion);
+      oModel.setProperty("/specBusy", true);
+      oModel.setProperty("/error", "");
+
+      try {
+        var oStart = await AiService.discoverySpecChatStart({
+          use_case: oSuggestion
+        });
+
+        var sQuestion = String(oStart && oStart.question ? oStart.question : "").trim();
+        oModel.setProperty("/specSessionId", oStart && oStart.session_id ? oStart.session_id : "");
+        oModel.setProperty("/specStep", Number(oStart && oStart.step ? oStart.step : 1));
+        oModel.setProperty("/specMaxSteps", Number(oStart && oStart.max_steps ? oStart.max_steps : 5));
+        oModel.setProperty("/specDone", false);
+        oModel.setProperty("/trainingStatus", "SPEC_CHAT");
+        oModel.setProperty("/trainingMessage", "Uzleti pontositas: valaszolj a kerdesekre.");
+
+        if (sQuestion) {
+          oModel.setProperty("/specChatMessages", [{ role: "assistant", content: sQuestion }]);
+        } else {
+          oModel.setProperty("/specChatMessages", []);
+        }
+      } catch (oError) {
+        var sMessage = this._extractError(oError, "Nem sikerult elinditani a specifikacios chatbotot.");
+        oModel.setProperty("/error", sMessage);
+        oModel.setProperty("/trainingStatus", "ERROR");
+        MessageToast.show(sMessage);
+      } finally {
+        oModel.setProperty("/specBusy", false);
+      }
     },
 
     _generateSpecAndStartTraining: async function() {
@@ -331,6 +511,53 @@ sap.ui.define([
         content: String(sContent || "")
       });
       oModel.setProperty("/specChatMessages", aMessages);
+    },
+
+    _pushBusinessChatMessage: function(sRole, sContent) {
+      var oModel = this.getView().getModel("discovery");
+      var aMessages = oModel.getProperty("/businessChatMessages") || [];
+      aMessages.push({
+        role: sRole,
+        content: String(sContent || "")
+      });
+      oModel.setProperty("/businessChatMessages", aMessages);
+    },
+
+    _buildBusinessHistoryPayload: function() {
+      var oModel = this.getView().getModel("discovery");
+      return (oModel.getProperty("/businessChatMessages") || []).map(function(item) {
+        return {
+          role: item.role,
+          content: item.content
+        };
+      });
+    },
+
+    _dedupeBusinessCsvFiles: function(aFiles) {
+      var mSeen = {};
+      return (aFiles || []).filter(function(item) {
+        var sKey = [
+          String(item && item.name ? item.name : ""),
+          Number(item && item.row_count ? item.row_count : 0),
+          Array.isArray(item && item.columns) ? item.columns.join("|") : ""
+        ].join("|");
+        if (!sKey || mSeen[sKey]) {
+          return false;
+        }
+        mSeen[sKey] = true;
+        return true;
+      });
+    },
+
+    _upsertSuggestionFromBusiness: function(oSuggestion) {
+      var oModel = this.getView().getModel("discovery");
+      var aSuggestions = oModel.getProperty("/suggestions") || [];
+      var sTitle = String(oSuggestion && oSuggestion.title ? oSuggestion.title : "");
+      var aFiltered = aSuggestions.filter(function(item) {
+        return String(item && item.title ? item.title : "") !== sTitle;
+      });
+      aFiltered.unshift(oSuggestion);
+      oModel.setProperty("/suggestions", aFiltered.slice(0, 7));
     },
 
     _resetMlFlow: function() {
