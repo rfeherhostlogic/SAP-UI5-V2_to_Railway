@@ -2562,20 +2562,40 @@ async function sendShieldWebhookMessages(summaryText) {
 
   for (let i = 0; i < webhooks.length; i += 1) {
     const item = webhooks[i];
+    const webhookId = Number(item && item.WebhookId ? item.WebhookId : 0);
+    const channel = String(item && item.Channel ? item.Channel : "").trim();
     const url = String(item && item.Url ? item.Url : "").trim();
     if (!url) {
       continue;
     }
     try {
-      await fetch(url, {
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "text/plain; charset=utf-8"
         },
         body: String(summaryText || "")
       });
+      if (!response.ok) {
+        console.warn("[shield:webhook] nem-2xx valasz", JSON.stringify({
+          webhookId: webhookId,
+          channel: channel,
+          url: url,
+          status: Number(response.status || 0)
+        }));
+      } else {
+        console.log("[shield:webhook] kuldes sikeres", JSON.stringify({
+          webhookId: webhookId,
+          channel: channel,
+          status: Number(response.status || 0)
+        }));
+      }
     } catch (_err) {
-      // webhook hibak nem allithatjak meg a scheduler tobbbi kuldeset
+      console.warn("[shield:webhook] kuldes hiba", JSON.stringify({
+        webhookId: webhookId,
+        channel: channel,
+        url: url
+      }));
     }
   }
 }
@@ -2706,6 +2726,14 @@ async function runDueShieldSchedulesOnce() {
       // scheduler hiba izolaltan kezelve
     }
   }
+}
+
+function triggerShieldScheduleRunSoon() {
+  setTimeout(function() {
+    runDueShieldSchedulesOnce().catch(function(err) {
+      console.warn("[shield:scheduler] azonnali trigger hiba:", err && err.message ? err.message : String(err));
+    });
+  }, 0);
 }
 
 function startShieldScheduler() {
@@ -4009,6 +4037,9 @@ app.post("/api/reports/schedules", async function(req, res) {
     } finally {
       await closeSqlite(db);
     }
+    if (row && Number(row.Enabled || 0) === 1 && String(row.Frequency || "").toLowerCase() === "immediate") {
+      triggerShieldScheduleRunSoon();
+    }
     res.json({ item: row });
   } catch (err) {
     res.status(500).json({ error: "Idozites letrehozas hiba", details: err && err.message ? err.message : String(err) });
@@ -4065,6 +4096,9 @@ app.put("/api/reports/schedules/:id", async function(req, res) {
     if (!row) {
       res.status(404).json({ error: "Idozites nem talalhato." });
       return;
+    }
+    if (Number(row.Enabled || 0) === 1 && String(row.Frequency || "").toLowerCase() === "immediate") {
+      triggerShieldScheduleRunSoon();
     }
     res.json({ item: row });
   } catch (err) {
