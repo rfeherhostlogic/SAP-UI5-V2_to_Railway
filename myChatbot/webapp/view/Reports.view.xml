@@ -77,7 +77,7 @@
                     <cells>
                       <Text text="{reports>JokerId}"/>
                       <Text text="{reports>Frequency}"/>
-                      <Text text="{= ${reports>WeeklyDay} == null ? '-' : ${reports>WeeklyDay} }"/>
+                      <Text text="{= ${reports>WeeklyDay} || '-' }"/>
                       <Text text="{= ${reports>TimeHHMM} ? ${reports>TimeHHMM} : '-' }"/>
                       <Text text="{= ${reports>LastRunAt} ? ${reports>LastRunAt} : '-' }" wrapping="true"/>
                       <Button text="Torles" type="Reject" press=".onDeleteSchedule"/>
