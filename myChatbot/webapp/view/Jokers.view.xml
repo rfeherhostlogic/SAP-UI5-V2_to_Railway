@@ -9,11 +9,17 @@
       <Text text="Valassz egy jokert. Csempe kattintasra megnyilik a prompt oldal." class="jokerIntro sapUiSmallMarginBottom"/>
       <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginBottom">
         <Label text="Tag szuro" class="sapUiTinyMarginEnd"/>
-        <Select width="14rem" selectedKey="{jokers>/activeTag}" change=".onTagFilterChange" items="{jokers>/availableTags}">
+        <MultiComboBox
+          width="20rem"
+          selectedKeys="{jokers>/activeTags}"
+          selectionFinish=".onTagFilterChange"
+          selectionChange=".onTagFilterChange"
+          placeholder="Valassz egy vagy tobb taget"
+          items="{jokers>/availableTags}">
           <items>
             <core:Item key="{jokers>}" text="{jokers>}"/>
           </items>
-        </Select>
+        </MultiComboBox>
       </HBox>
 
       <FlexBox items="{jokers>/filteredTiles}" wrap="Wrap" class="jokerTileGrid">

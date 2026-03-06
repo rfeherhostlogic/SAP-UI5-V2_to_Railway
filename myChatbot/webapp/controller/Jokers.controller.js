@@ -13,12 +13,24 @@
     },
 
     onTagFilterChange: function(oEvent) {
-      var sKey = String(oEvent.getSource().getSelectedKey() || "Összes");
+      var oSource = oEvent.getSource();
+      var aSelectedKeys = typeof oSource.getSelectedKeys === "function" ? oSource.getSelectedKeys() : [];
+      var aNormalized = aSelectedKeys.map(function(sKey) {
+        return String(sKey || "").trim();
+      }).filter(Boolean);
+      if (aNormalized.length === 0 || aNormalized.indexOf("Összes") >= 0) {
+        aNormalized = ["Összes"];
+      } else {
+        aNormalized = aNormalized.filter(function(sKey, idx, arr) {
+          return sKey !== "Összes" && arr.indexOf(sKey) === idx;
+        });
+      }
       var oModel = this.getView().getModel("jokers") || this.getOwnerComponent().getModel("jokers");
       if (!oModel) {
         return;
       }
-      oModel.setProperty("/activeTag", sKey);
+      oModel.setProperty("/activeTags", aNormalized);
+      oModel.setProperty("/activeTag", aNormalized[0] || "Összes");
       this._applyTagFilter();
     },
 
@@ -63,13 +75,21 @@
         return;
       }
       var aTiles = oModel.getProperty("/tiles") || [];
-      var sActiveTag = String(oModel.getProperty("/activeTag") || "Összes");
+      var aActiveTags = oModel.getProperty("/activeTags");
+      if (!Array.isArray(aActiveTags) || aActiveTags.length === 0) {
+        var sFallbackTag = String(oModel.getProperty("/activeTag") || "Összes");
+        aActiveTags = [sFallbackTag];
+        oModel.setProperty("/activeTags", aActiveTags);
+      }
+      var bAll = aActiveTags.indexOf("Összes") >= 0;
       var aFiltered = aTiles.filter(function(oTile) {
-        if (sActiveTag === "Összes") {
+        if (bAll) {
           return true;
         }
         var aTags = Array.isArray(oTile && oTile.tags) ? oTile.tags : [];
-        return aTags.indexOf(sActiveTag) >= 0;
+        return aActiveTags.some(function(sTag) {
+          return aTags.indexOf(sTag) >= 0;
+        });
       });
       oModel.setProperty("/filteredTiles", aFiltered);
     }
