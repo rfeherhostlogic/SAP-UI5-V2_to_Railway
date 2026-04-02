@@ -15,6 +15,38 @@
         <Label text="Kerdes"/>
         <TextArea value="{jokers>/dummy4Question}" rows="4" growing="true" growingMaxLines="8" width="100%" placeholder="Pl.: Az 1005 rendeles milyen osszegu volt?"/>
 
+        <Panel headerText="Idozites" class="sapUiSmallMarginTop">
+          <VBox class="sapUiSmallMargin">
+            <HBox alignItems="Center" wrap="Wrap">
+              <Label text="Idozites" class="sapUiTinyMarginEnd"/>
+              <Switch state="{jokers>/dummy4ScheduleEnabled}" customTextOn="ON" customTextOff="OFF"/>
+            </HBox>
+
+            <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginTop">
+              <Label text="Gyakorisag" class="sapUiTinyMarginEnd"/>
+              <Select width="10rem" selectedKey="{jokers>/dummy4ScheduleFrequency}" enabled="{jokers>/dummy4ScheduleEnabled}">
+                <items>
+                  <core:Item key="immediate" text="Azonnali"/>
+                  <core:Item key="daily" text="Napi"/>
+                  <core:Item key="weekly" text="Heti"/>
+                </items>
+              </Select>
+            </HBox>
+
+            <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy4ScheduleFrequency} === 'weekly' }">
+              <Label text="Het napja (0=Vas)" class="sapUiTinyMarginEnd"/>
+              <Input width="8rem" value="{jokers>/dummy4ScheduleWeeklyDay}" enabled="{jokers>/dummy4ScheduleEnabled}"/>
+            </HBox>
+
+            <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy4ScheduleFrequency} !== 'immediate' }">
+              <Label text="Ido (HH:MM)" class="sapUiTinyMarginEnd"/>
+              <Input width="8rem" value="{jokers>/dummy4ScheduleTime}" enabled="{jokers>/dummy4ScheduleEnabled}" placeholder="09:00"/>
+            </HBox>
+
+            <Button text="Idozites mentese" type="Transparent" press=".onSaveDummy4Schedule" class="sapUiSmallMarginTop" enabled="{jokers>/dummy4ScheduleEnabled}"/>
+          </VBox>
+        </Panel>
+
         <Panel
           headerText="Schema hint"
           expandable="true"

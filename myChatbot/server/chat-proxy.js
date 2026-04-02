@@ -2689,6 +2689,60 @@ async function executeDummy10AndPersistRun(scheduleId, scheduleConfig) {
   };
 }
 
+async function executeDummy4AndPersistRun(scheduleId, scheduleConfig) {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY hianyzik");
+  }
+
+  const question = String(scheduleConfig && scheduleConfig.question ? scheduleConfig.question : "").trim();
+  const schemaHint = String(scheduleConfig && scheduleConfig.schemaHint ? scheduleConfig.schemaHint : "").trim();
+
+  if (!question) {
+    throw new Error("Dummy4 schedule-hoz kerdes szukseges.");
+  }
+  if (!schemaHint) {
+    throw new Error("Dummy4 schedule-hoz schema hint szukseges.");
+  }
+
+  const result = await executeDummy4({
+    apiKey: OPENAI_API_KEY,
+    model: OPENAI_MODEL,
+    question: question,
+    schemaHint: schemaHint
+  });
+
+  const rows = Array.isArray(result && result.rows) ? result.rows : [];
+  const summaryText = [
+    "Riportok Joker idozitett futas lefutott.",
+    "Kerdes: " + question,
+    "SQL: " + String(result && result.generatedSql ? result.generatedSql : ""),
+    "Osszegzes: " + String(result && result.summary ? result.summary : "")
+  ].join("\n");
+  const payload = {
+    question: question,
+    schemaHint: schemaHint,
+    generatedSql: String(result && result.generatedSql ? result.generatedSql : ""),
+    summary: String(result && result.summary ? result.summary : ""),
+    rows: rows.slice(0, 50)
+  };
+
+  const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+  try {
+    await sqliteRun(db, "INSERT INTO ShieldScheduleRun (ScheduleId, RunAt, SummaryText, PayloadJson) VALUES (?, ?, ?, ?)", [
+      scheduleId,
+      nowIso(),
+      summaryText,
+      JSON.stringify(payload)
+    ]);
+  } finally {
+    await closeSqlite(db);
+  }
+
+  await sendShieldWebhookMessages(summaryText);
+
+  return payload;
+}
+
 async function runDueShieldSchedulesOnce() {
   const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
   let schedules = [];
@@ -2701,16 +2755,20 @@ async function runDueShieldSchedulesOnce() {
   const now = new Date();
   for (let i = 0; i < schedules.length; i += 1) {
     const schedule = schedules[i];
-    if (String(schedule.JokerId || "") !== "dummy-10") {
-      continue;
-    }
     if (!isShieldScheduleDue(schedule, now)) {
       continue;
     }
 
+    const jokerId = String(schedule.JokerId || "");
     const config = parseOpenAiReply(String(schedule.ConfigJson || "{}")) || {};
     try {
-      await executeDummy10AndPersistRun(Number(schedule.ScheduleId), config);
+      if (jokerId === "dummy-10") {
+        await executeDummy10AndPersistRun(Number(schedule.ScheduleId), config);
+      } else if (jokerId === "dummy-4") {
+        await executeDummy4AndPersistRun(Number(schedule.ScheduleId), config);
+      } else {
+        continue;
+      }
       const dbWrite = await openSqliteReadWrite(DISCOVERY_DB_PATH);
       try {
         await sqliteRun(dbWrite, "UPDATE ShieldSchedule SET LastRunAt = ?, ImmediateOnce = ?, UpdatedAt = ? WHERE ScheduleId = ?", [

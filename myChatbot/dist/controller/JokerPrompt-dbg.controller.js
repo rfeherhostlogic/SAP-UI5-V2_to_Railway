@@ -303,44 +303,27 @@ sap.ui.define([
     },
 
     onSaveDummy10Schedule: async function() {
+      await this._saveJokerSchedule("dummy-10", "dummy10", {});
+    },
+
+    onSaveDummy4Schedule: async function() {
       var oModel = this.getView().getModel("jokers");
-      var bEnabled = !!oModel.getProperty("/dummy10ScheduleEnabled");
-      var sFrequency = String(oModel.getProperty("/dummy10ScheduleFrequency") || "immediate");
-      var iWeeklyDay = Number(oModel.getProperty("/dummy10ScheduleWeeklyDay") || 1);
-      var sTime = String(oModel.getProperty("/dummy10ScheduleTime") || "").trim();
-      var iScheduleId = Number(oModel.getProperty("/dummy10ScheduleId") || 0);
+      var sQuestion = String(oModel.getProperty("/dummy4Question") || "").trim();
+      var sSchemaHint = String(oModel.getProperty("/dummy4SchemaHint") || "").trim();
 
-      if (!bEnabled) {
-        MessageToast.show("Kapcsold be az Idozites kapcsolot a menteshez.");
+      if (!sQuestion) {
+        MessageToast.show("Az idoziteshez toltsd ki a Kerdes mezot.");
+        return;
+      }
+      if (!sSchemaHint) {
+        MessageToast.show("Az idoziteshez toltsd ki a Schema hint mezot.");
         return;
       }
 
-      if ((sFrequency === "daily" || sFrequency === "weekly") && !/^\d{1,2}:\d{2}$/.test(sTime)) {
-        MessageToast.show("Adj meg ervenyes idot, pl. 09:30.");
-        return;
-      }
-
-      var oPayload = {
-        jokerId: "dummy-10",
-        enabled: true,
-        frequency: sFrequency,
-        weeklyDay: sFrequency === "weekly" ? iWeeklyDay : null,
-        timeHHMM: (sFrequency === "daily" || sFrequency === "weekly") ? sTime : null,
-        config: {}
-      };
-
-      try {
-        var oResp;
-        if (iScheduleId > 0) {
-          oResp = await AiService.reportsUpdateSchedule(Object.assign({ id: iScheduleId }, oPayload));
-        } else {
-          oResp = await AiService.reportsCreateSchedule(oPayload);
-        }
-        oModel.setProperty("/dummy10ScheduleId", Number(oResp && oResp.item && oResp.item.ScheduleId ? oResp.item.ScheduleId : iScheduleId));
-        MessageToast.show("Idozites mentve.");
-      } catch (oError) {
-        MessageToast.show(oError && oError.message ? oError.message : "Idozites mentesi hiba.");
-      }
+      await this._saveJokerSchedule("dummy-4", "dummy4", {
+        question: sQuestion,
+        schemaHint: sSchemaHint
+      });
     },
 
     onRefreshDummy4SchemaHint: async function() {
@@ -523,13 +506,14 @@ sap.ui.define([
           this._resetDummy4Chart();
           this._resetDummy4LocalChart();
           this._rebindDummy4PreviewTable();
+          this._loadJokerSchedule("dummy-4", "dummy4");
         } else if (oSelected.id === "dummy-9") {
           this._resetDummy9State();
           this._rebindDummy9PreviewTable();
         } else if (oSelected.id === "dummy-10") {
           this._resetDummy10State();
           this._rebindDummy10PreviewTable();
-          this._loadDummy10Schedule();
+          this._loadJokerSchedule("dummy-10", "dummy10");
         } else if (oSelected.id === "dummy-5") {
           this._resetDummy5State();
         } else if (oSelected.id === "dummy-7") {
@@ -568,26 +552,67 @@ sap.ui.define([
       this._rebindDummy10PreviewTable();
     },
 
-    _loadDummy10Schedule: async function() {
+    _loadJokerSchedule: async function(sJokerId, sPrefix) {
       var oModel = this.getView().getModel("jokers");
       try {
         var oResp = await AiService.reportsListSchedules();
         var aItems = Array.isArray(oResp && oResp.items) ? oResp.items : [];
         var oSchedule = aItems.find(function(item) {
-          return String(item && item.JokerId ? item.JokerId : "") === "dummy-10";
+          return String(item && item.JokerId ? item.JokerId : "") === sJokerId;
         });
         if (!oSchedule) {
-          oModel.setProperty("/dummy10ScheduleId", 0);
-          oModel.setProperty("/dummy10ScheduleEnabled", false);
+          oModel.setProperty("/" + sPrefix + "ScheduleId", 0);
+          oModel.setProperty("/" + sPrefix + "ScheduleEnabled", false);
           return;
         }
-        oModel.setProperty("/dummy10ScheduleId", Number(oSchedule.ScheduleId || 0));
-        oModel.setProperty("/dummy10ScheduleEnabled", Number(oSchedule.Enabled || 0) === 1);
-        oModel.setProperty("/dummy10ScheduleFrequency", String(oSchedule.Frequency || "immediate"));
-        oModel.setProperty("/dummy10ScheduleWeeklyDay", Number(oSchedule.WeeklyDay != null ? oSchedule.WeeklyDay : 1));
-        oModel.setProperty("/dummy10ScheduleTime", String(oSchedule.TimeHHMM || "09:00"));
+        oModel.setProperty("/" + sPrefix + "ScheduleId", Number(oSchedule.ScheduleId || 0));
+        oModel.setProperty("/" + sPrefix + "ScheduleEnabled", Number(oSchedule.Enabled || 0) === 1);
+        oModel.setProperty("/" + sPrefix + "ScheduleFrequency", String(oSchedule.Frequency || "immediate"));
+        oModel.setProperty("/" + sPrefix + "ScheduleWeeklyDay", Number(oSchedule.WeeklyDay != null ? oSchedule.WeeklyDay : 1));
+        oModel.setProperty("/" + sPrefix + "ScheduleTime", String(oSchedule.TimeHHMM || "09:00"));
       } catch (_e) {
         // schedule lekeres hiba eseten maradnak a default ertekek
+      }
+    },
+
+    _saveJokerSchedule: async function(sJokerId, sPrefix, oConfig) {
+      var oModel = this.getView().getModel("jokers");
+      var bEnabled = !!oModel.getProperty("/" + sPrefix + "ScheduleEnabled");
+      var sFrequency = String(oModel.getProperty("/" + sPrefix + "ScheduleFrequency") || "immediate");
+      var iWeeklyDay = Number(oModel.getProperty("/" + sPrefix + "ScheduleWeeklyDay") || 1);
+      var sTime = String(oModel.getProperty("/" + sPrefix + "ScheduleTime") || "").trim();
+      var iScheduleId = Number(oModel.getProperty("/" + sPrefix + "ScheduleId") || 0);
+
+      if (!bEnabled) {
+        MessageToast.show("Kapcsold be az Idozites kapcsolot a menteshez.");
+        return;
+      }
+
+      if ((sFrequency === "daily" || sFrequency === "weekly") && !/^\d{1,2}:\d{2}$/.test(sTime)) {
+        MessageToast.show("Adj meg ervenyes idot, pl. 09:30.");
+        return;
+      }
+
+      var oPayload = {
+        jokerId: sJokerId,
+        enabled: true,
+        frequency: sFrequency,
+        weeklyDay: sFrequency === "weekly" ? iWeeklyDay : null,
+        timeHHMM: (sFrequency === "daily" || sFrequency === "weekly") ? sTime : null,
+        config: oConfig || {}
+      };
+
+      try {
+        var oResp;
+        if (iScheduleId > 0) {
+          oResp = await AiService.reportsUpdateSchedule(Object.assign({ id: iScheduleId }, oPayload));
+        } else {
+          oResp = await AiService.reportsCreateSchedule(oPayload);
+        }
+        oModel.setProperty("/" + sPrefix + "ScheduleId", Number(oResp && oResp.item && oResp.item.ScheduleId ? oResp.item.ScheduleId : iScheduleId));
+        MessageToast.show("Idozites mentve.");
+      } catch (oError) {
+        MessageToast.show(oError && oError.message ? oError.message : "Idozites mentesi hiba.");
       }
     },
 
