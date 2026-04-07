@@ -333,6 +333,43 @@ const NOAH_CARDS = [
         validation: { maxLength: 120 }
       }
     ]
+  },
+  {
+    id: "dummy-11",
+    name: "Prompt Epito Asszisztens",
+    description: "Gyenge vagy homalyos prompt otletbol production-ready AI promptot epit scorecarddal es tisztazo kerdesekkel.",
+    prompt_template: [
+      "Feladat: fejlessz production-ready promptot a nyers igenybol.",
+      "Nyers keres: {{raw_request}}",
+      "Cel: {{goal_hint}}",
+      "Kimeneti forma: {{output_hint}}"
+    ].join("\n"),
+    fields: [
+      {
+        field_id: "raw_request",
+        label: "Nyers prompt otlet",
+        type: "textarea",
+        required: true,
+        placeholder: "Pl. Segits riportot elemezni es irj rola vezetoi osszefoglalot.",
+        validation: { minLength: 8 }
+      },
+      {
+        field_id: "goal_hint",
+        label: "Cel",
+        type: "text",
+        required: false,
+        placeholder: "Pl. vezeto dontes-elokeszites",
+        validation: { maxLength: 160 }
+      },
+      {
+        field_id: "output_hint",
+        label: "Kimeneti forma",
+        type: "text",
+        required: false,
+        placeholder: "Pl. 5 pont + 3 kovetkezo lepes",
+        validation: { maxLength: 160 }
+      }
+    ]
   }
 ];
 
@@ -639,6 +676,99 @@ function parseOpenAiReply(rawText) {
   return json;
 }
 
+function parseLooseJsonObject(rawText) {
+  const direct = parseOpenAiReply(rawText);
+  if (direct && typeof direct === "object") {
+    return direct;
+  }
+  const text = String(rawText || "").trim();
+  const fenceMatch = text.match(/```json\s*([\s\S]*?)```/i) || text.match(/```\s*([\s\S]*?)```/i);
+  if (fenceMatch && fenceMatch[1]) {
+    const parsedFence = parseOpenAiReply(String(fenceMatch[1] || "").trim());
+    if (parsedFence && typeof parsedFence === "object") {
+      return parsedFence;
+    }
+  }
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    const parsedSlice = parseOpenAiReply(text.slice(start, end + 1));
+    if (parsedSlice && typeof parsedSlice === "object") {
+      return parsedSlice;
+    }
+  }
+  return null;
+}
+
+function clampNumber(value, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    return min;
+  }
+  return Math.max(min, Math.min(max, n));
+}
+
+function normalizeDummy11Messages(messages) {
+  return (Array.isArray(messages) ? messages : []).map(function(item) {
+    return {
+      role: String(item && item.role ? item.role : "user").toLowerCase() === "assistant" ? "assistant" : "user",
+      content: String(item && item.content ? item.content : "").trim()
+    };
+  }).filter(function(item) {
+    return !!item.content;
+  }).slice(-20);
+}
+
+function buildDummy11Scorecard(scorecard) {
+  const defs = [
+    { key: "clarity", label: "Egyertelmuseg" },
+    { key: "specificity", label: "Cel pontossaga" },
+    { key: "context", label: "Kontextus" },
+    { key: "output_format", label: "Kimeneti forma" },
+    { key: "input_definition", label: "Bemenet / forras" },
+    { key: "readiness", label: "Hasznalhatosag" }
+  ];
+  const source = scorecard && Array.isArray(scorecard.breakdown) ? scorecard.breakdown : [];
+  const breakdown = defs.map(function(def) {
+    const found = source.find(function(item) {
+      return String(item && item.key ? item.key : "") === def.key;
+    }) || {};
+    return {
+      key: def.key,
+      label: def.label,
+      score: clampNumber(found.score, 0, 10),
+      max: 10,
+      reason: String(found.reason || ""),
+      improvement_hint: String(found.improvement_hint || "")
+    };
+  });
+  const total = Math.round((breakdown.reduce(function(sum, item) {
+    return sum + Number(item.score || 0);
+  }, 0) / Math.max(1, breakdown.length)) * 10) / 10;
+  return {
+    total: total,
+    max: 10,
+    eligible_to_save: total >= 6,
+    label: total >= 6 ? "Mentheto" : "Meg nem mentheto",
+    breakdown: breakdown
+  };
+}
+
+function buildDummy11SaveBlock(scorecard) {
+  const weak = (scorecard && Array.isArray(scorecard.breakdown) ? scorecard.breakdown : []).filter(function(item) {
+    return Number(item.score || 0) < 6;
+  }).sort(function(a, b) {
+    return Number(a.score || 0) - Number(b.score || 0);
+  });
+  return {
+    blocked: !(scorecard && scorecard.eligible_to_save),
+    reason: scorecard && scorecard.eligible_to_save ? "" : "A prompt minosege " + Number(scorecard && scorecard.total ? scorecard.total : 0) + "/10. A menteshez legalabb 6/10 szukseges.",
+    guidance: weak.slice(0, 3).map(function(item) {
+      return item.improvement_hint || (item.label + " tovabbi pontositasa szukseges.");
+    })
+  };
+}
+
 function extractResponsesOutputText(responseJson) {
   if (!responseJson) {
     return "";
@@ -870,6 +1000,100 @@ async function callOpenAiText(messages, temperature) {
     json.choices[0].message.content;
 
   return String(text || "").trim();
+}
+
+async function evaluateDummy11Prompt(payload) {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY hianyzik");
+  }
+
+  const rawRequest = String(payload && payload.raw_request ? payload.raw_request : "").trim();
+  const currentPrompt = String(payload && payload.current_prompt ? payload.current_prompt : "").trim();
+  const messages = normalizeDummy11Messages(payload && payload.messages);
+  const attachments = Array.isArray(payload && payload.attachments) ? payload.attachments : [];
+  const featureFlags = payload && payload.feature_flags ? payload.feature_flags : {};
+  const attachmentLines = attachments.map(function(item) {
+    return "- " + String(item && item.name ? item.name : "ismeretlen") + " (" +
+      String(item && item.type ? item.type : "application/octet-stream") + ", " +
+      Number(item && item.size ? item.size : 0) + " B)";
+  });
+
+  const systemPrompt = [
+    "Te egy senior prompt engineer es UX coach vagy.",
+    "A felhasznalo nyers igenyebol egy production-ready AI promptot kell keszitened.",
+    "Mindig magyarul irj.",
+    "A valaszod CSAK JSON legyen, markdown nelkul.",
+    "A JSON schema:",
+    "{",
+    '  "assistant_message": "string",',
+    '  "follow_up_questions": ["string"],',
+    '  "improved_prompt": "string",',
+    '  "scorecard": {',
+    '    "breakdown": [',
+    '      {"key":"clarity","score":0-10,"reason":"string","improvement_hint":"string"},',
+    '      {"key":"specificity","score":0-10,"reason":"string","improvement_hint":"string"},',
+    '      {"key":"context","score":0-10,"reason":"string","improvement_hint":"string"},',
+    '      {"key":"output_format","score":0-10,"reason":"string","improvement_hint":"string"},',
+    '      {"key":"input_definition","score":0-10,"reason":"string","improvement_hint":"string"},',
+    '      {"key":"readiness","score":0-10,"reason":"string","improvement_hint":"string"}',
+    "    ]",
+    "  },",
+    '  "needs_clarification": true,',
+    '  "what_improved": ["string"]',
+    "}",
+    "Legfeljebb 3 follow-up kerdes legyen.",
+    "Ha a prompt mar mentheto szintu, follow_up_questions legyen ures tomb."
+  ].join("\n");
+
+  const userPrompt = [
+    "Nyers keres:",
+    rawRequest,
+    "",
+    "Jelenlegi javitott prompt:",
+    currentPrompt || "(meg nincs)",
+    "",
+    "Eddigi beszelgetes JSON:",
+    JSON.stringify(messages),
+    "",
+    "Feature flag-ek JSON:",
+    JSON.stringify({
+      timing_enabled: !!featureFlags.timing_enabled,
+      attachments_enabled: !!featureFlags.attachments_enabled
+    }),
+    "",
+    "Csatolmany metadata:",
+    attachmentLines.length > 0 ? attachmentLines.join("\n") : "(nincs csatolmany)",
+    "",
+    "Keszits konkret, uzleti appban hasznalhato promptot.",
+    "Ha attachments_enabled=true, a prompt utaljon a csatolt fajlok feldolgozasara.",
+    "Ha timing_enabled=true, a prompt legyen stabil, ujrafuttathato es kovetkezetes."
+  ].join("\n");
+
+  const raw = await callOpenAiText([
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userPrompt }
+  ], 0.3);
+
+  const parsed = parseLooseJsonObject(raw) || {};
+  const scorecard = buildDummy11Scorecard(parsed.scorecard || {});
+  const saveBlock = buildDummy11SaveBlock(scorecard);
+  const whatImproved = Array.isArray(parsed.what_improved) ? parsed.what_improved.map(function(item) {
+    return String(item || "").trim();
+  }).filter(Boolean).slice(0, 4) : [];
+
+  return {
+    evaluation_id: crypto.randomUUID(),
+    status: "ok",
+    needs_clarification: !!parsed.needs_clarification,
+    assistant_message: String(parsed.assistant_message || "Atneztem a promptot, es keszitettem egy jobb verziot."),
+    follow_up_questions: Array.isArray(parsed.follow_up_questions)
+      ? parsed.follow_up_questions.map(function(item) { return String(item || "").trim(); }).filter(Boolean).slice(0, 3)
+      : [],
+    improved_prompt: String(parsed.improved_prompt || rawRequest),
+    what_improved: whatImproved,
+    scorecard: scorecard,
+    save_block: saveBlock
+  };
 }
 
 function sanitizeUploadFileName(fileName, fallbackPrefix, index) {
@@ -2377,6 +2601,23 @@ async function ensureShieldTables() {
       "  FOREIGN KEY (ScheduleId) REFERENCES ShieldSchedule(ScheduleId)",
       ")"
     ].join("\n"));
+    await sqliteRun(db, [
+      "CREATE TABLE IF NOT EXISTS PromptBuilderPrompt (",
+      "  PromptId INTEGER PRIMARY KEY AUTOINCREMENT,",
+      "  JokerId TEXT NOT NULL,",
+      "  Title TEXT NOT NULL,",
+      "  RawRequest TEXT NOT NULL,",
+      "  FinalPrompt TEXT NOT NULL,",
+      "  ScoreTotal REAL NOT NULL,",
+      "  ScoreJson TEXT NOT NULL DEFAULT '{}',",
+      "  MessagesJson TEXT NOT NULL DEFAULT '[]',",
+      "  FeatureFlagsJson TEXT NOT NULL DEFAULT '{}',",
+      "  AttachmentsJson TEXT NOT NULL DEFAULT '[]',",
+      "  Status TEXT NOT NULL DEFAULT 'draft',",
+      "  CreatedAt TEXT NOT NULL,",
+      "  UpdatedAt TEXT NOT NULL",
+      ")"
+    ].join("\n"));
   } finally {
     await closeSqlite(db);
   }
@@ -2757,6 +2998,67 @@ async function executeDummy4AndPersistRun(scheduleId, scheduleConfig) {
   return payload;
 }
 
+async function executeDummy11AndPersistRun(scheduleId, scheduleConfig) {
+  let title = String(scheduleConfig && scheduleConfig.title ? scheduleConfig.title : "").trim();
+  let finalPrompt = String(scheduleConfig && scheduleConfig.finalPrompt ? scheduleConfig.finalPrompt : "").trim();
+  let scoreTotal = Number(scheduleConfig && scheduleConfig.scoreTotal ? scheduleConfig.scoreTotal : 0);
+  const attachmentsEnabled = !!(scheduleConfig && scheduleConfig.attachments_enabled);
+  const timingEnabled = !!(scheduleConfig && scheduleConfig.timing_enabled);
+  const promptId = Number(scheduleConfig && scheduleConfig.promptId ? scheduleConfig.promptId : 0);
+
+  if ((!title || !finalPrompt) && promptId > 0) {
+    const dbRead = await openSqliteReadOnly(DISCOVERY_DB_PATH);
+    try {
+      const row = await sqliteGet(dbRead, "SELECT Title, FinalPrompt, ScoreTotal FROM PromptBuilderPrompt WHERE PromptId = ?", [promptId]);
+      if (row) {
+        title = title || String(row.Title || "");
+        finalPrompt = finalPrompt || String(row.FinalPrompt || "");
+        scoreTotal = scoreTotal || Number(row.ScoreTotal || 0);
+      }
+    } finally {
+      await closeSqlite(dbRead);
+    }
+  }
+
+  if (!finalPrompt) {
+    throw new Error("Dummy11 schedule-hoz vegleges prompt szukseges.");
+  }
+
+  const summaryText = [
+    "Prompt Epito Asszisztens idozitett futas lefutott.",
+    "Cim: " + (title || "Mentett prompt"),
+    "Pontszam: " + scoreTotal + "/10",
+    "Csatolmanyok engedelyezve: " + (attachmentsEnabled ? "igen" : "nem"),
+    "Idozites aktiv: " + (timingEnabled ? "igen" : "nem"),
+    "",
+    finalPrompt
+  ].join("\n");
+
+  const payload = {
+    title: title || "Mentett prompt",
+    finalPrompt: finalPrompt,
+    scoreTotal: scoreTotal,
+    attachments_enabled: attachmentsEnabled,
+    timing_enabled: timingEnabled,
+    promptId: promptId
+  };
+
+  const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+  try {
+    await sqliteRun(db, "INSERT INTO ShieldScheduleRun (ScheduleId, RunAt, SummaryText, PayloadJson) VALUES (?, ?, ?, ?)", [
+      scheduleId,
+      nowIso(),
+      summaryText,
+      JSON.stringify(payload)
+    ]);
+  } finally {
+    await closeSqlite(db);
+  }
+
+  await sendShieldWebhookMessages(summaryText);
+  return payload;
+}
+
 async function runDueShieldSchedulesOnce() {
   const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
   let schedules = [];
@@ -2780,6 +3082,8 @@ async function runDueShieldSchedulesOnce() {
         await executeDummy10AndPersistRun(Number(schedule.ScheduleId), config);
       } else if (jokerId === "dummy-4") {
         await executeDummy4AndPersistRun(Number(schedule.ScheduleId), config);
+      } else if (jokerId === "dummy-11") {
+        await executeDummy11AndPersistRun(Number(schedule.ScheduleId), config);
       } else {
         continue;
       }
@@ -5536,6 +5840,87 @@ app.post("/api/jokers/dummy4", async function(req, res) {
   } catch (err) {
     res.status(500).json({
       error: "Dummy4 feldolgozasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/dummy11/evaluate", async function(req, res) {
+  try {
+    const rawRequest = String(req.body && req.body.raw_request ? req.body.raw_request : "").trim();
+    if (!rawRequest) {
+      res.status(400).json({ error: "A nyers keres kotelezo." });
+      return;
+    }
+    const result = await evaluateDummy11Prompt({
+      raw_request: rawRequest,
+      current_prompt: String(req.body && req.body.current_prompt ? req.body.current_prompt : ""),
+      messages: req.body && req.body.messages ? req.body.messages : [],
+      feature_flags: req.body && req.body.feature_flags ? req.body.feature_flags : {},
+      attachments: req.body && req.body.attachments ? req.body.attachments : []
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      error: "Dummy11 ertekelesi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/dummy11/save", async function(req, res) {
+  try {
+    const title = String(req.body && req.body.title ? req.body.title : "").trim() || "Prompt Epito Asszisztens";
+    const rawRequest = String(req.body && req.body.raw_request ? req.body.raw_request : "").trim();
+    const finalPrompt = String(req.body && req.body.final_prompt ? req.body.final_prompt : "").trim();
+    const status = String(req.body && req.body.status ? req.body.status : "draft").trim().toLowerCase();
+    const scoreTotal = Number(req.body && req.body.score_total ? req.body.score_total : 0);
+    const scorecard = req.body && req.body.scorecard ? req.body.scorecard : {};
+    const messages = normalizeDummy11Messages(req.body && req.body.messages ? req.body.messages : []);
+    const featureFlags = req.body && req.body.feature_flags ? req.body.feature_flags : {};
+    const attachments = Array.isArray(req.body && req.body.attachments) ? req.body.attachments : [];
+
+    if (!rawRequest) {
+      res.status(400).json({ error: "A nyers keres kotelezo." });
+      return;
+    }
+    if (!finalPrompt) {
+      res.status(400).json({ error: "A vegleges prompt kotelezo." });
+      return;
+    }
+    if (status === "final" && scoreTotal < 6) {
+      res.status(400).json({ error: "A prompt menteshez legalabb 6/10 pont szukseges." });
+      return;
+    }
+
+    const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+    let row = null;
+    try {
+      const ins = await sqliteRun(db, [
+        "INSERT INTO PromptBuilderPrompt (JokerId, Title, RawRequest, FinalPrompt, ScoreTotal, ScoreJson, MessagesJson, FeatureFlagsJson, AttachmentsJson, Status, CreatedAt, UpdatedAt)",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ].join("\n"), [
+        "dummy-11",
+        title,
+        rawRequest,
+        finalPrompt,
+        scoreTotal,
+        JSON.stringify(scorecard || {}),
+        JSON.stringify(messages || []),
+        JSON.stringify(featureFlags || {}),
+        JSON.stringify(attachments || []),
+        status === "final" ? "final" : "draft",
+        nowIso(),
+        nowIso()
+      ]);
+      row = await sqliteGet(db, "SELECT * FROM PromptBuilderPrompt WHERE PromptId = ?", [ins.lastID]);
+    } finally {
+      await closeSqlite(db);
+    }
+    res.json({ item: row });
+  } catch (err) {
+    res.status(500).json({
+      error: "Dummy11 mentesi hiba",
       details: err && err.message ? err.message : String(err)
     });
   }

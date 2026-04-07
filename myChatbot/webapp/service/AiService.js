@@ -112,6 +112,46 @@
     });
   }
 
+  function evaluateDummy11(mPayload) {
+    return fetch("/api/jokers/dummy11/evaluate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        raw_request: mPayload.raw_request || "",
+        current_prompt: mPayload.current_prompt || "",
+        messages: mPayload.messages || [],
+        feature_flags: mPayload.feature_flags || {},
+        attachments: mPayload.attachments || []
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function saveDummy11Prompt(mPayload) {
+    return fetch("/api/jokers/dummy11/save", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(mPayload || {})
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function getDummy4SchemaHint() {
     return fetch("/api/jokers/dummy4/schema-hint", {
       method: "GET"
@@ -689,6 +729,8 @@
     runDummy4: runDummy4,
     runDummy9: runDummy9,
     runDummy10: runDummy10,
+    evaluateDummy11: evaluateDummy11,
+    saveDummy11Prompt: saveDummy11Prompt,
     getDummy4SchemaHint: getDummy4SchemaHint,
     uploadDummy5Pdf: uploadDummy5Pdf,
     summarizeDummy5: summarizeDummy5,

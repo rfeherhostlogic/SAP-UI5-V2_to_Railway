@@ -326,6 +326,101 @@ sap.ui.define([
       });
     },
 
+    onRunDummy11Evaluate: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var sRawRequest = String(oModel.getProperty("/dummy11RawRequest") || "").trim();
+
+      if (!sRawRequest) {
+        MessageToast.show("Ird le, mit szeretnel, hogy az AI csinaljon.");
+        return;
+      }
+
+      oModel.setProperty("/generating", true);
+      oModel.setProperty("/dummy11Error", "");
+      try {
+        var oResp = await AiService.evaluateDummy11({
+          raw_request: sRawRequest,
+          current_prompt: String(oModel.getProperty("/dummy11ImprovedPrompt") || ""),
+          messages: oModel.getProperty("/dummy11Messages") || [],
+          feature_flags: {
+            timing_enabled: !!oModel.getProperty("/dummy11TimingEnabled"),
+            attachments_enabled: !!oModel.getProperty("/dummy11AttachmentsEnabled")
+          },
+          attachments: this._getDummy11AttachmentMeta()
+        });
+        this._applyDummy11Evaluation(oResp, false);
+      } catch (oError) {
+        oModel.setProperty("/dummy11Error", oError && oError.message ? oError.message : "Dummy11 ertekelesi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "Dummy11 ertekelesi hiba.");
+      } finally {
+        oModel.setProperty("/generating", false);
+      }
+    },
+
+    onDummy11SendReply: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var sReply = String(oModel.getProperty("/dummy11ReplyDraft") || "").trim();
+      if (!sReply) {
+        MessageToast.show("Valaszolj az AI kerdesere.");
+        return;
+      }
+
+      oModel.setProperty("/generating", true);
+      oModel.setProperty("/dummy11Error", "");
+      try {
+        var aMessages = (oModel.getProperty("/dummy11Messages") || []).slice();
+        aMessages.push({
+          role: "user",
+          content: sReply
+        });
+        var oResp = await AiService.evaluateDummy11({
+          raw_request: String(oModel.getProperty("/dummy11RawRequest") || ""),
+          current_prompt: String(oModel.getProperty("/dummy11ImprovedPrompt") || ""),
+          messages: aMessages,
+          feature_flags: {
+            timing_enabled: !!oModel.getProperty("/dummy11TimingEnabled"),
+            attachments_enabled: !!oModel.getProperty("/dummy11AttachmentsEnabled")
+          },
+          attachments: this._getDummy11AttachmentMeta()
+        });
+        oModel.setProperty("/dummy11ReplyDraft", "");
+        this._applyDummy11Evaluation(oResp, true, sReply);
+      } catch (oError) {
+        oModel.setProperty("/dummy11Error", oError && oError.message ? oError.message : "Dummy11 valaszfeldolgozasi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "Dummy11 valaszfeldolgozasi hiba.");
+      } finally {
+        oModel.setProperty("/generating", false);
+      }
+    },
+
+    onDummy11FileChange: function(oEvent) {
+      var aFiles = oEvent && oEvent.getParameter ? oEvent.getParameter("files") : [];
+      this._appendDummy11Files(aFiles || []);
+    },
+
+    onRemoveDummy11File: function(oEvent) {
+      var oCtx = oEvent && oEvent.getSource ? oEvent.getSource().getBindingContext("jokers") : null;
+      if (!oCtx) {
+        return;
+      }
+      var oModel = this.getView().getModel("jokers");
+      var aFiles = oModel.getProperty("/dummy11Files") || [];
+      var iIndex = parseInt(String(oCtx.getPath()).split("/").pop(), 10);
+      if (!isFinite(iIndex) || iIndex < 0 || iIndex >= aFiles.length) {
+        return;
+      }
+      aFiles.splice(iIndex, 1);
+      oModel.setProperty("/dummy11Files", aFiles);
+    },
+
+    onSaveDummy11Draft: async function() {
+      await this._saveDummy11Prompt("draft");
+    },
+
+    onSaveDummy11Prompt: async function() {
+      await this._saveDummy11Prompt("final");
+    },
+
     onRefreshDummy4SchemaHint: async function() {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/generating", true);
@@ -475,6 +570,7 @@ sap.ui.define([
       oModel.setProperty("/dummy4ChartReady", false);
       this._resetDummy9State();
       this._resetDummy10State();
+      this._resetDummy11State();
       this._resetDummy5State();
       this._resetDummy7State();
       this._resetSmartSegState();
@@ -514,6 +610,9 @@ sap.ui.define([
           this._resetDummy10State();
           this._rebindDummy10PreviewTable();
           this._loadJokerSchedule("dummy-10", "dummy10");
+        } else if (oSelected.id === "dummy-11") {
+          this._resetDummy11State();
+          this._loadJokerSchedule("dummy-11", "dummy11");
         } else if (oSelected.id === "dummy-5") {
           this._resetDummy5State();
         } else if (oSelected.id === "dummy-7") {
@@ -563,6 +662,9 @@ sap.ui.define([
         if (!oSchedule) {
           oModel.setProperty("/" + sPrefix + "ScheduleId", 0);
           oModel.setProperty("/" + sPrefix + "ScheduleEnabled", false);
+          if (sPrefix === "dummy11") {
+            oModel.setProperty("/dummy11TimingEnabled", false);
+          }
           return;
         }
         oModel.setProperty("/" + sPrefix + "ScheduleId", Number(oSchedule.ScheduleId || 0));
@@ -570,6 +672,9 @@ sap.ui.define([
         oModel.setProperty("/" + sPrefix + "ScheduleFrequency", String(oSchedule.Frequency || "immediate"));
         oModel.setProperty("/" + sPrefix + "ScheduleWeeklyDay", Number(oSchedule.WeeklyDay != null ? oSchedule.WeeklyDay : 1));
         oModel.setProperty("/" + sPrefix + "ScheduleTime", String(oSchedule.TimeHHMM || "09:00"));
+        if (sPrefix === "dummy11") {
+          oModel.setProperty("/dummy11TimingEnabled", true);
+        }
       } catch (_e) {
         // schedule lekeres hiba eseten maradnak a default ertekek
       }
@@ -613,6 +718,163 @@ sap.ui.define([
         MessageToast.show("Idozites mentve.");
       } catch (oError) {
         MessageToast.show(oError && oError.message ? oError.message : "Idozites mentesi hiba.");
+      }
+    },
+
+    _getDummy11AttachmentMeta: function() {
+      var oModel = this.getView().getModel("jokers");
+      return (oModel.getProperty("/dummy11Files") || []).map(function(oFile) {
+        return {
+          name: oFile.name || "unknown",
+          type: oFile.type || "application/octet-stream",
+          size: Number(oFile.size || 0)
+        };
+      });
+    },
+
+    _appendDummy11Files: function(aFilesLike) {
+      var oModel = this.getView().getModel("jokers");
+      var aCurrent = oModel.getProperty("/dummy11Files") || [];
+      var aFiles = Array.prototype.slice.call(aFilesLike || []);
+      var mSeen = {};
+      aCurrent.forEach(function(oFile) {
+        mSeen[(oFile.name || "") + "|" + Number(oFile.size || 0) + "|" + (oFile.type || "")] = true;
+      });
+      aFiles.forEach(function(oFile) {
+        var sKey = (oFile.name || "") + "|" + Number(oFile.size || 0) + "|" + (oFile.type || "");
+        if (!mSeen[sKey]) {
+          mSeen[sKey] = true;
+          aCurrent.push(oFile);
+        }
+      });
+      oModel.setProperty("/dummy11Files", aCurrent);
+    },
+
+    _applyDummy11Evaluation: function(oResp, bAppendUserReply, sUserReply) {
+      var oModel = this.getView().getModel("jokers");
+      var aMessages = oModel.getProperty("/dummy11Messages") || [];
+      if (bAppendUserReply && sUserReply) {
+        aMessages = aMessages.concat([{ role: "user", content: sUserReply }]);
+      }
+      if (oResp && oResp.assistant_message) {
+        aMessages = aMessages.concat([{ role: "assistant", content: oResp.assistant_message }]);
+      }
+      oModel.setProperty("/dummy11Messages", aMessages);
+      oModel.setProperty("/dummy11AssistantMessage", oResp && oResp.assistant_message ? oResp.assistant_message : "");
+      oModel.setProperty("/dummy11ImprovedPrompt", oResp && oResp.improved_prompt ? oResp.improved_prompt : "");
+      oModel.setProperty("/dummy11ScoreTotal", Number(oResp && oResp.scorecard && oResp.scorecard.total ? oResp.scorecard.total : 0));
+      oModel.setProperty("/dummy11ScoreLabel", oResp && oResp.scorecard && oResp.scorecard.label ? oResp.scorecard.label : "Nincs ertekeles");
+      oModel.setProperty("/dummy11CanSave", !!(oResp && oResp.scorecard && oResp.scorecard.eligible_to_save));
+      oModel.setProperty("/dummy11NeedsClarification", !!(oResp && oResp.needs_clarification));
+      oModel.setProperty("/dummy11PendingQuestions", oResp && oResp.follow_up_questions ? oResp.follow_up_questions : []);
+      oModel.setProperty("/dummy11ScoreBreakdown", oResp && oResp.scorecard && oResp.scorecard.breakdown ? oResp.scorecard.breakdown : []);
+      oModel.setProperty("/dummy11LastEvaluationId", oResp && oResp.evaluation_id ? oResp.evaluation_id : "");
+      oModel.setProperty("/dummy11WhatImproved", oResp && oResp.what_improved ? oResp.what_improved : []);
+      oModel.setProperty("/dummy11SaveBlockedReason", oResp && oResp.save_block && oResp.save_block.reason ? oResp.save_block.reason : "");
+      oModel.setProperty("/dummy11SaveGuidance", oResp && oResp.save_block && oResp.save_block.guidance ? oResp.save_block.guidance : []);
+      if (!oModel.getProperty("/dummy11Title")) {
+        oModel.setProperty("/dummy11Title", "AI Joker 11 prompt");
+      }
+    },
+
+    _saveDummy11Prompt: async function(sStatus) {
+      var oModel = this.getView().getModel("jokers");
+      var sTitle = String(oModel.getProperty("/dummy11Title") || "").trim() || "AI Joker 11 prompt";
+      var sRawRequest = String(oModel.getProperty("/dummy11RawRequest") || "").trim();
+      var sFinalPrompt = String(oModel.getProperty("/dummy11ImprovedPrompt") || "").trim();
+      var fScore = Number(oModel.getProperty("/dummy11ScoreTotal") || 0);
+      var bTimingEnabled = !!oModel.getProperty("/dummy11TimingEnabled");
+      var bAttachmentsEnabled = !!oModel.getProperty("/dummy11AttachmentsEnabled");
+
+      if (!sRawRequest) {
+        MessageToast.show("A nyers keres kotelezo.");
+        return;
+      }
+      if (!sFinalPrompt) {
+        MessageToast.show("Elobb generalj egy javitott promptot.");
+        return;
+      }
+      if (sStatus === "final" && fScore < 6) {
+        var sReason = String(oModel.getProperty("/dummy11SaveBlockedReason") || "A prompt menteshez legalabb 6/10 pont szukseges.");
+        oModel.setProperty("/dummy11Error", sReason);
+        MessageToast.show(sReason);
+        return;
+      }
+
+      oModel.setProperty("/generating", true);
+      oModel.setProperty("/dummy11Error", "");
+      try {
+        var oSaveResp = await AiService.saveDummy11Prompt({
+          title: sTitle,
+          raw_request: sRawRequest,
+          final_prompt: sFinalPrompt,
+          score_total: fScore,
+          scorecard: {
+            total: fScore,
+            breakdown: oModel.getProperty("/dummy11ScoreBreakdown") || []
+          },
+          messages: oModel.getProperty("/dummy11Messages") || [],
+          attachments: this._getDummy11AttachmentMeta(),
+          feature_flags: {
+            timing_enabled: bTimingEnabled,
+            attachments_enabled: bAttachmentsEnabled
+          },
+          status: sStatus
+        });
+        var iPromptId = Number(oSaveResp && oSaveResp.item && oSaveResp.item.PromptId ? oSaveResp.item.PromptId : 0);
+        oModel.setProperty("/dummy11SavedPromptId", iPromptId);
+
+        if (sStatus === "final" && bTimingEnabled && !!oModel.getProperty("/dummy11ScheduleEnabled")) {
+          await this._saveJokerSchedule("dummy-11", "dummy11", {
+            promptId: iPromptId,
+            title: sTitle,
+            finalPrompt: sFinalPrompt,
+            scoreTotal: fScore,
+            timing_enabled: bTimingEnabled,
+            attachments_enabled: bAttachmentsEnabled
+          });
+        }
+
+        MessageToast.show(sStatus === "final" ? "Prompt mentve." : "Piszkozat mentve.");
+      } catch (oError) {
+        oModel.setProperty("/dummy11Error", oError && oError.message ? oError.message : "Dummy11 mentesi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "Dummy11 mentesi hiba.");
+      } finally {
+        oModel.setProperty("/generating", false);
+      }
+    },
+
+    _resetDummy11State: function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy11RawRequest", "");
+      oModel.setProperty("/dummy11Title", "");
+      oModel.setProperty("/dummy11ReplyDraft", "");
+      oModel.setProperty("/dummy11ImprovedPrompt", "");
+      oModel.setProperty("/dummy11ScoreTotal", 0);
+      oModel.setProperty("/dummy11ScoreLabel", "Nincs ertekeles");
+      oModel.setProperty("/dummy11CanSave", false);
+      oModel.setProperty("/dummy11NeedsClarification", false);
+      oModel.setProperty("/dummy11AssistantMessage", "");
+      oModel.setProperty("/dummy11WhatImproved", []);
+      oModel.setProperty("/dummy11Messages", []);
+      oModel.setProperty("/dummy11PendingQuestions", []);
+      oModel.setProperty("/dummy11ScoreBreakdown", []);
+      oModel.setProperty("/dummy11Error", "");
+      oModel.setProperty("/dummy11LastEvaluationId", "");
+      oModel.setProperty("/dummy11SaveBlockedReason", "");
+      oModel.setProperty("/dummy11SaveGuidance", []);
+      oModel.setProperty("/dummy11SavedPromptId", 0);
+      oModel.setProperty("/dummy11TimingEnabled", false);
+      oModel.setProperty("/dummy11ScheduleEnabled", false);
+      oModel.setProperty("/dummy11ScheduleId", 0);
+      oModel.setProperty("/dummy11ScheduleFrequency", "immediate");
+      oModel.setProperty("/dummy11ScheduleWeeklyDay", 1);
+      oModel.setProperty("/dummy11ScheduleTime", "09:00");
+      oModel.setProperty("/dummy11AttachmentsEnabled", false);
+      oModel.setProperty("/dummy11Files", []);
+      var oFileUploader = this.byId("dummy11FileUploader");
+      if (oFileUploader && oFileUploader.clear) {
+        oFileUploader.clear();
       }
     },
 

@@ -465,7 +465,174 @@
         </Panel>
       </VBox>
 
-      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' }" width="100%">
+      <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-11' }" width="100%">
+        <Panel headerText="Prompt Epito Asszisztens">
+          <VBox class="sapUiSmallMargin">
+            <Text text="Nem kell tokeletesen megfogalmaznod. Ird le egyszeruen, mire van szukseged, az AI pedig segit ebbol jo, mentheto promptot kesziteni." wrapping="true"/>
+            <Label text="Prompt cime" class="sapUiSmallMarginTop"/>
+            <Input value="{jokers>/dummy11Title}" placeholder="Pl. Vezetoi riport elemzo prompt"/>
+            <Label text="Mit szeretnel, hogy az AI csinaljon?" class="sapUiSmallMarginTop"/>
+            <TextArea value="{jokers>/dummy11RawRequest}" rows="5" growing="true" growingMaxLines="10" width="100%" placeholder="Pl. Keszits promptot, ami egy ertekesitesi riportbol 5 vezeto dontest tamogato megallapitast es 3 kovetkezo lepest ad."/>
+
+            <HBox class="jokerPromptButtons sapUiSmallMarginTop" wrap="Wrap">
+              <Button text="Ertekeles inditasa" type="Emphasized" press=".onRunDummy11Evaluate" busy="{jokers>/generating}" enabled="{= ${jokers>/generating} ? false : true }"/>
+              <Button text="Piszkozat mentese" type="Transparent" press=".onSaveDummy11Draft" enabled="{= ${jokers>/generating} ? false : (${jokers>/dummy11ImprovedPrompt} ? true : false) }" class="sapUiTinyMarginBegin"/>
+              <Button text="Vegleges prompt mentese" type="Accept" press=".onSaveDummy11Prompt" enabled="{= ${jokers>/generating} ? false : (${jokers>/dummy11ImprovedPrompt} ? true : false) }" class="sapUiTinyMarginBegin"/>
+            </HBox>
+
+            <MessageStrip text="{jokers>/dummy11Error}" visible="{= ${jokers>/dummy11Error} ? true : false }" type="Error" showIcon="true" class="sapUiSmallMarginTop"/>
+            <MessageStrip text="{= ${jokers>/dummy11CanSave} ? 'A prompt elerte a mentesi kuszobot.' : (${jokers>/dummy11SaveBlockedReason} ? ${jokers>/dummy11SaveBlockedReason} : 'A menteshez legalabb 6/10 pont szukseges.') }" type="{= ${jokers>/dummy11CanSave} ? 'Success' : 'Warning' }" showIcon="true" class="sapUiSmallMarginTop"/>
+          </VBox>
+        </Panel>
+
+        <HBox wrap="Wrap" renderType="Bare" width="100%" justifyContent="SpaceBetween" alignItems="Start" class="sapUiSmallMarginTop">
+          <VBox width="100%">
+            <layoutData>
+              <FlexItemData growFactor="2" baseSize="36rem"/>
+            </layoutData>
+
+            <Panel headerText="AI beszelgetes es tisztazas">
+              <VBox class="sapUiSmallMargin">
+                <List items="{jokers>/dummy11Messages}" showSeparators="Inner" visible="{= ${jokers>/dummy11Messages}.length > 0 }">
+                  <CustomListItem>
+                    <VBox>
+                      <ObjectStatus text="{= ${jokers>role} === 'user' ? 'Te' : 'AI coach' }" state="{= ${jokers>role} === 'user' ? 'Information' : 'Success' }"/>
+                      <Text text="{jokers>content}" wrapping="true"/>
+                    </VBox>
+                  </CustomListItem>
+                </List>
+                <Text text="Az AI itt kerdez vissza, ha a jo prompthoz meg hianyzik valami." wrapping="true" visible="{= ${jokers>/dummy11Messages}.length === 0 }"/>
+
+                <VBox class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy11PendingQuestions}.length > 0 }">
+                  <Title text="Nyitott kerdesek" level="H5"/>
+                  <List items="{jokers>/dummy11PendingQuestions}">
+                    <CustomListItem>
+                      <Text text="{jokers>}" wrapping="true"/>
+                    </CustomListItem>
+                  </List>
+                </VBox>
+
+                <Label text="Valaszod" class="sapUiSmallMarginTop"/>
+                <TextArea value="{jokers>/dummy11ReplyDraft}" rows="3" growing="true" growingMaxLines="6" width="100%" placeholder="Valaszolj roviden a fenti AI kerdesekre."/>
+                <Button text="Valasz kuldese" type="Transparent" press=".onDummy11SendReply" class="sapUiTinyMarginTop" enabled="{= ${jokers>/generating} ? false : (${jokers>/dummy11PendingQuestions}.length > 0 ? true : false) }"/>
+              </VBox>
+            </Panel>
+
+            <Panel headerText="Javasolt vegleges prompt" class="sapUiSmallMarginTop">
+              <VBox class="sapUiSmallMargin">
+                <TextArea value="{jokers>/dummy11ImprovedPrompt}" rows="12" growing="true" growingMaxLines="18" width="100%" placeholder="Itt jelenik meg a javitott prompt."/>
+                <VBox class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy11WhatImproved}.length > 0 }">
+                  <Title text="Mit javitott az AI?" level="H5"/>
+                  <List items="{jokers>/dummy11WhatImproved}">
+                    <CustomListItem>
+                      <Text text="{jokers>}" wrapping="true"/>
+                    </CustomListItem>
+                  </List>
+                </VBox>
+              </VBox>
+            </Panel>
+          </VBox>
+
+          <VBox width="100%">
+            <layoutData>
+              <FlexItemData growFactor="1" baseSize="24rem"/>
+            </layoutData>
+
+            <Panel headerText="Prompt scorecard">
+              <VBox class="sapUiSmallMargin">
+                <ObjectNumber number="{jokers>/dummy11ScoreTotal}" unit="/10" state="{= ${jokers>/dummy11ScoreTotal} >= 8 ? 'Success' : (${jokers>/dummy11ScoreTotal} >= 6 ? 'Warning' : 'Error') }"/>
+                <ObjectStatus text="{jokers>/dummy11ScoreLabel}" state="{= ${jokers>/dummy11CanSave} ? 'Success' : 'Warning' }" class="sapUiTinyMarginTop"/>
+                <List items="{jokers>/dummy11ScoreBreakdown}" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy11ScoreBreakdown}.length > 0 }">
+                  <CustomListItem>
+                    <VBox>
+                      <HBox justifyContent="SpaceBetween" alignItems="Center">
+                        <Title text="{jokers>label}" level="H6"/>
+                        <ObjectNumber number="{jokers>score}" unit="/10" state="{= ${jokers>score} >= 8 ? 'Success' : (${jokers>score} >= 6 ? 'Warning' : 'Error') }"/>
+                      </HBox>
+                      <Text text="{jokers>reason}" wrapping="true"/>
+                      <Text text="{= ${jokers>improvement_hint} ? 'Javaslat: ' + ${jokers>improvement_hint} : '' }" wrapping="true"/>
+                    </VBox>
+                  </CustomListItem>
+                </List>
+              </VBox>
+            </Panel>
+
+            <Panel headerText="Opcionális kepessegek" class="sapUiSmallMarginTop">
+              <VBox class="sapUiSmallMargin">
+                <HBox alignItems="Center" wrap="Wrap">
+                  <Switch state="{jokers>/dummy11TimingEnabled}" customTextOn="ON" customTextOff="OFF"/>
+                  <VBox class="sapUiTinyMarginBegin">
+                    <Title text="Idozites" level="H6"/>
+                    <Text text="A mentett prompt idozitve is kuldheto webhookra." wrapping="true"/>
+                  </VBox>
+                </HBox>
+
+                <VBox visible="{jokers>/dummy11TimingEnabled}" class="sapUiSmallMarginTop">
+                  <HBox alignItems="Center" wrap="Wrap">
+                    <Switch state="{jokers>/dummy11ScheduleEnabled}" customTextOn="Aktiv" customTextOff="Ki"/>
+                    <Label text="Idozites aktiv" class="sapUiTinyMarginBegin"/>
+                  </HBox>
+                  <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginTop">
+                    <Label text="Gyakorisag" class="sapUiTinyMarginEnd"/>
+                    <Select width="10rem" selectedKey="{jokers>/dummy11ScheduleFrequency}" enabled="{jokers>/dummy11ScheduleEnabled}">
+                      <items>
+                        <core:Item key="immediate" text="Azonnali"/>
+                        <core:Item key="daily" text="Napi"/>
+                        <core:Item key="weekly" text="Heti"/>
+                      </items>
+                    </Select>
+                  </HBox>
+                  <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy11ScheduleFrequency} === 'weekly' }">
+                    <Label text="Het napja (0=Vas)" class="sapUiTinyMarginEnd"/>
+                    <Input width="8rem" value="{jokers>/dummy11ScheduleWeeklyDay}" enabled="{jokers>/dummy11ScheduleEnabled}"/>
+                  </HBox>
+                  <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy11ScheduleFrequency} !== 'immediate' }">
+                    <Label text="Ido (HH:MM)" class="sapUiTinyMarginEnd"/>
+                    <Input width="8rem" value="{jokers>/dummy11ScheduleTime}" enabled="{jokers>/dummy11ScheduleEnabled}" placeholder="09:00"/>
+                  </HBox>
+                </VBox>
+
+                <HBox alignItems="Center" wrap="Wrap" class="sapUiMediumMarginTop">
+                  <Switch state="{jokers>/dummy11AttachmentsEnabled}" customTextOn="ON" customTextOff="OFF"/>
+                  <VBox class="sapUiTinyMarginBegin">
+                    <Title text="Csatolmanyok" level="H6"/>
+                    <Text text="A prompt hasznalhat feltoltott fajlokat is." wrapping="true"/>
+                  </VBox>
+                </HBox>
+
+                <VBox visible="{jokers>/dummy11AttachmentsEnabled}" class="sapUiSmallMarginTop">
+                  <unif:FileUploader
+                    id="dummy11FileUploader"
+                    width="100%"
+                    sameFilenameAllowed="true"
+                    multiple="true"
+                    uploadOnChange="false"
+                    buttonText="Fajlok kivalasztasa"
+                    change=".onDummy11FileChange"/>
+                  <List items="{jokers>/dummy11Files}" visible="{= ${jokers>/dummy11Files}.length > 0 }" class="sapUiTinyMarginTop">
+                    <CustomListItem>
+                      <HBox justifyContent="SpaceBetween" alignItems="Center">
+                        <Text text="{= ${jokers>name} + ' (' + (${jokers>type} || 'ismeretlen') + ', ' + ${jokers>size} + ' B)' }" wrapping="true"/>
+                        <Button icon="sap-icon://decline" type="Transparent" press=".onRemoveDummy11File"/>
+                      </HBox>
+                    </CustomListItem>
+                  </List>
+                </VBox>
+              </VBox>
+            </Panel>
+
+            <Panel headerText="Mentesi iranymutatas" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy11SaveGuidance}.length > 0 }">
+              <List items="{jokers>/dummy11SaveGuidance}">
+                <CustomListItem>
+                  <Text text="{jokers>}" wrapping="true"/>
+                </CustomListItem>
+              </List>
+            </Panel>
+          </VBox>
+        </HBox>
+      </VBox>
+
+      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-11' }" width="100%">
         <TextArea value="{jokers>/promptInput}" rows="10" growing="true" growingMaxLines="16" width="100%" placeholder="Ide ird a feldolgozando szoveget..."/>
 
         <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">
