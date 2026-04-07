@@ -476,12 +476,10 @@
 
             <HBox class="jokerPromptButtons sapUiSmallMarginTop" wrap="Wrap">
               <Button text="Ertekeles inditasa" type="Emphasized" press=".onRunDummy11Evaluate" busy="{jokers>/generating}" enabled="{= ${jokers>/generating} ? false : true }"/>
-              <Button text="Piszkozat mentese" type="Transparent" press=".onSaveDummy11Draft" enabled="{= ${jokers>/generating} ? false : (${jokers>/dummy11ImprovedPrompt} ? true : false) }" class="sapUiTinyMarginBegin"/>
-              <Button text="Vegleges prompt mentese" type="Accept" press=".onSaveDummy11Prompt" enabled="{= ${jokers>/generating} ? false : (${jokers>/dummy11ImprovedPrompt} ? true : false) }" class="sapUiTinyMarginBegin"/>
             </HBox>
 
             <MessageStrip text="{jokers>/dummy11Error}" visible="{= ${jokers>/dummy11Error} ? true : false }" type="Error" showIcon="true" class="sapUiSmallMarginTop"/>
-            <MessageStrip text="{= ${jokers>/dummy11CanSave} ? 'A prompt elerte a mentesi kuszobot.' : (${jokers>/dummy11SaveBlockedReason} ? ${jokers>/dummy11SaveBlockedReason} : 'A menteshez legalabb 6/10 pont szukseges.') }" type="{= ${jokers>/dummy11CanSave} ? 'Success' : 'Warning' }" showIcon="true" class="sapUiSmallMarginTop"/>
+            <MessageStrip text="{= ${jokers>/dummy11CanSave} ? 'A prompt mar jo minosegu es keszen all a futtatasra.' : (${jokers>/dummy11SaveBlockedReason} ? ${jokers>/dummy11SaveBlockedReason} : 'A prompt meg tovabbi pontositast igenyel.') }" type="{= ${jokers>/dummy11CanSave} ? 'Success' : 'Warning' }" showIcon="true" class="sapUiSmallMarginTop"/>
           </VBox>
         </Panel>
 
@@ -512,15 +510,20 @@
                   </List>
                 </VBox>
 
-                <Label text="Valaszod" class="sapUiSmallMarginTop"/>
+                <Label text="Modositas" class="sapUiSmallMarginTop"/>
                 <TextArea value="{jokers>/dummy11ReplyDraft}" rows="3" growing="true" growingMaxLines="6" width="100%" placeholder="Valaszolj roviden a fenti AI kerdesekre."/>
-                <Button text="Valasz kuldese" type="Transparent" press=".onDummy11SendReply" class="sapUiTinyMarginTop" enabled="{= ${jokers>/generating} ? false : (${jokers>/dummy11PendingQuestions}.length > 0 ? true : false) }"/>
+                <Button text="Modositas kuldese" type="Transparent" press=".onDummy11SendReply" class="sapUiTinyMarginTop" enabled="{= ${jokers>/generating} ? false : (${jokers>/dummy11PendingQuestions}.length > 0 ? true : false) }"/>
               </VBox>
             </Panel>
 
             <Panel headerText="Javasolt vegleges prompt" class="sapUiSmallMarginTop">
               <VBox class="sapUiSmallMargin">
                 <TextArea value="{jokers>/dummy11ImprovedPrompt}" rows="12" growing="true" growingMaxLines="18" width="100%" placeholder="Itt jelenik meg a javitott prompt."/>
+                <Button text="Prompt futtatasa" type="Accept" press=".onRunDummy11Prompt" class="sapUiSmallMarginTop" enabled="{= ${jokers>/generating} ? false : (${jokers>/dummy11ImprovedPrompt} ? true : false) }"/>
+                <VBox class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy11ResultText} ? true : false }">
+                  <Title text="Eredmeny" level="H5"/>
+                  <TextArea value="{jokers>/dummy11ResultText}" rows="8" growing="true" growingMaxLines="14" width="100%" editable="false"/>
+                </VBox>
                 <VBox class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy11WhatImproved}.length > 0 }">
                   <Title text="Mit javitott az AI?" level="H5"/>
                   <List items="{jokers>/dummy11WhatImproved}">

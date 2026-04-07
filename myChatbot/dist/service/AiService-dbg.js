@@ -152,6 +152,26 @@
     });
   }
 
+  function runDummy11Prompt(mPayload) {
+    return fetch("/api/jokers/dummy11/run", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        final_prompt: mPayload.final_prompt || "",
+        attachments: mPayload.attachments || []
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function getDummy4SchemaHint() {
     return fetch("/api/jokers/dummy4/schema-hint", {
       method: "GET"
@@ -731,6 +751,7 @@
     runDummy10: runDummy10,
     evaluateDummy11: evaluateDummy11,
     saveDummy11Prompt: saveDummy11Prompt,
+    runDummy11Prompt: runDummy11Prompt,
     getDummy4SchemaHint: getDummy4SchemaHint,
     uploadDummy5Pdf: uploadDummy5Pdf,
     summarizeDummy5: summarizeDummy5,

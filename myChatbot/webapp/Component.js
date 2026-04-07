@@ -200,6 +200,7 @@ sap.ui.define([
 				dummy11Title: "",
 				dummy11ReplyDraft: "",
 				dummy11ImprovedPrompt: "",
+				dummy11ResultText: "",
 				dummy11ScoreTotal: 0,
 				dummy11ScoreLabel: "Nincs ertekeles",
 				dummy11CanSave: false,

@@ -421,6 +421,32 @@ sap.ui.define([
       await this._saveDummy11Prompt("final");
     },
 
+    onRunDummy11Prompt: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var sFinalPrompt = String(oModel.getProperty("/dummy11ImprovedPrompt") || "").trim();
+
+      if (!sFinalPrompt) {
+        MessageToast.show("Elobb generalj egy javitott promptot.");
+        return;
+      }
+
+      oModel.setProperty("/generating", true);
+      oModel.setProperty("/dummy11Error", "");
+      oModel.setProperty("/dummy11ResultText", "");
+      try {
+        var oResp = await AiService.runDummy11Prompt({
+          final_prompt: sFinalPrompt,
+          attachments: this._getDummy11AttachmentMeta()
+        });
+        oModel.setProperty("/dummy11ResultText", String(oResp && oResp.result ? oResp.result : ""));
+      } catch (oError) {
+        oModel.setProperty("/dummy11Error", oError && oError.message ? oError.message : "Dummy11 futtatasi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "Dummy11 futtatasi hiba.");
+      } finally {
+        oModel.setProperty("/generating", false);
+      }
+    },
+
     onRefreshDummy4SchemaHint: async function() {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/generating", true);
@@ -850,6 +876,7 @@ sap.ui.define([
       oModel.setProperty("/dummy11Title", "");
       oModel.setProperty("/dummy11ReplyDraft", "");
       oModel.setProperty("/dummy11ImprovedPrompt", "");
+      oModel.setProperty("/dummy11ResultText", "");
       oModel.setProperty("/dummy11ScoreTotal", 0);
       oModel.setProperty("/dummy11ScoreLabel", "Nincs ertekeles");
       oModel.setProperty("/dummy11CanSave", false);

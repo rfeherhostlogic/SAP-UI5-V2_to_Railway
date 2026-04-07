@@ -5926,6 +5926,53 @@ app.post("/api/jokers/dummy11/save", async function(req, res) {
   }
 });
 
+app.post("/api/jokers/dummy11/run", async function(req, res) {
+  try {
+    if (!OPENAI_API_KEY) {
+      res.status(500).json({ error: "OPENAI_API_KEY hianyzik" });
+      return;
+    }
+    const finalPrompt = String(req.body && req.body.final_prompt ? req.body.final_prompt : "").trim();
+    const attachments = Array.isArray(req.body && req.body.attachments) ? req.body.attachments : [];
+    if (!finalPrompt) {
+      res.status(400).json({ error: "A vegleges prompt kotelezo." });
+      return;
+    }
+
+    const attachmentLines = attachments.map(function(item) {
+      return "- " + String(item && item.name ? item.name : "ismeretlen") + " (" +
+        String(item && item.type ? item.type : "application/octet-stream") + ", " +
+        Number(item && item.size ? item.size : 0) + " B)";
+    });
+
+    const userMessage = [
+      finalPrompt,
+      "",
+      attachmentLines.length > 0 ? "Csatolmany metadata:\n" + attachmentLines.join("\n") : ""
+    ].filter(Boolean).join("\n");
+
+    const resultText = await callOpenAiText([
+      {
+        role: "system",
+        content: "Kovesd pontosan a felhasznalo altal megadott promptot, es magyarul valaszolj, ha a prompt maskepp nem keri."
+      },
+      {
+        role: "user",
+        content: userMessage
+      }
+    ], 0.4);
+
+    res.json({
+      result: String(resultText || "").trim()
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Dummy11 futtatasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
 app.use(express.static(UI_STATIC_DIR));
 
 app.get("*", function(req, res) {
