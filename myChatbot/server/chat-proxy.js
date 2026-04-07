@@ -2849,7 +2849,22 @@ function buildTransitionLines(transitions) {
   });
 }
 
-async function sendShieldWebhookMessages(summaryText) {
+function formatShieldWebhookMessage(payload) {
+  const joker = String(payload && payload.joker ? payload.joker : "").trim();
+  const question = String(payload && payload.question ? payload.question : "").trim();
+  const result = String(payload && payload.result ? payload.result : "").trim();
+  const parts = [];
+  if (joker) {
+    parts.push("Joker= " + joker);
+  }
+  if (question) {
+    parts.push("Kerdes= " + question);
+  }
+  parts.push("Eredmeny: " + result);
+  return parts.join("; ");
+}
+
+async function sendShieldWebhookMessages(messagePayload) {
   const db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
   let webhooks = [];
   try {
@@ -2863,6 +2878,9 @@ async function sendShieldWebhookMessages(summaryText) {
     const webhookId = Number(item && item.WebhookId ? item.WebhookId : 0);
     const channel = String(item && item.Channel ? item.Channel : "").trim();
     const url = String(item && item.Url ? item.Url : "").trim();
+    const messageText = typeof messagePayload === "string"
+      ? String(messagePayload || "")
+      : formatShieldWebhookMessage(messagePayload || {});
     if (!url) {
       continue;
     }
@@ -2873,8 +2891,8 @@ async function sendShieldWebhookMessages(summaryText) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          message: String(summaryText || ""),
-          text: String(summaryText || ""),
+          message: messageText,
+          text: messageText,
           channel: channel,
           sentAt: nowIso()
         })
@@ -2885,7 +2903,7 @@ async function sendShieldWebhookMessages(summaryText) {
           headers: {
             "Content-Type": "text/plain; charset=utf-8"
           },
-          body: String(summaryText || "")
+          body: messageText
         });
       }
       if (!response.ok) {
@@ -2991,7 +3009,11 @@ async function executeDummy10AndPersistRun(scheduleId, scheduleConfig) {
     await closeSqlite(db);
   }
 
-  await sendShieldWebhookMessages(summaryText);
+  await sendShieldWebhookMessages({
+    joker: "Lemorzsolodo ugyfelek azonositasa",
+    question: "Idozitett futas",
+    result: summaryText
+  });
 
   return {
     summaryText: summaryText,
@@ -3050,7 +3072,11 @@ async function executeDummy4AndPersistRun(scheduleId, scheduleConfig) {
     await closeSqlite(db);
   }
 
-  await sendShieldWebhookMessages(summaryText);
+  await sendShieldWebhookMessages({
+    joker: "Riportok",
+    question: question,
+    result: String(result && result.summary ? result.summary : "")
+  });
 
   return payload;
 }
@@ -3112,7 +3138,11 @@ async function executeDummy11AndPersistRun(scheduleId, scheduleConfig) {
     await closeSqlite(db);
   }
 
-  await sendShieldWebhookMessages(summaryText);
+  await sendShieldWebhookMessages({
+    joker: "Prompt Epito Asszisztens",
+    question: title || "Mentett prompt",
+    result: finalPrompt
+  });
   return payload;
 }
 
