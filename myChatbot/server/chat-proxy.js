@@ -2569,13 +2569,27 @@ async function sendShieldWebhookMessages(summaryText) {
       continue;
     }
     try {
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         method: "POST",
         headers: {
-          "Content-Type": "text/plain; charset=utf-8"
+          "Content-Type": "application/json"
         },
-        body: String(summaryText || "")
+        body: JSON.stringify({
+          message: String(summaryText || ""),
+          text: String(summaryText || ""),
+          channel: channel,
+          sentAt: nowIso()
+        })
       });
+      if (!response.ok) {
+        response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8"
+          },
+          body: String(summaryText || "")
+        });
+      }
       if (!response.ok) {
         console.warn("[shield:webhook] nem-2xx valasz", JSON.stringify({
           webhookId: webhookId,
@@ -2780,8 +2794,12 @@ async function runDueShieldSchedulesOnce() {
       } finally {
         await closeSqlite(dbWrite);
       }
-    } catch (_err) {
-      // scheduler hiba izolaltan kezelve
+    } catch (err) {
+      console.warn("[shield:scheduler] schedule futasi hiba", JSON.stringify({
+        scheduleId: Number(schedule.ScheduleId || 0),
+        jokerId: jokerId,
+        message: err && err.message ? err.message : String(err)
+      }));
     }
   }
 }
