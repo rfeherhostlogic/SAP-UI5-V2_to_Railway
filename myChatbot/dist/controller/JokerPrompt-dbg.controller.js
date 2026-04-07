@@ -346,7 +346,7 @@ sap.ui.define([
             timing_enabled: !!oModel.getProperty("/dummy11TimingEnabled"),
             attachments_enabled: !!oModel.getProperty("/dummy11AttachmentsEnabled")
           },
-          attachments: this._getDummy11AttachmentMeta()
+          files: oModel.getProperty("/dummy11Files") || []
         });
         this._applyDummy11Evaluation(oResp, false);
       } catch (oError) {
@@ -381,7 +381,7 @@ sap.ui.define([
             timing_enabled: !!oModel.getProperty("/dummy11TimingEnabled"),
             attachments_enabled: !!oModel.getProperty("/dummy11AttachmentsEnabled")
           },
-          attachments: this._getDummy11AttachmentMeta()
+          files: oModel.getProperty("/dummy11Files") || []
         });
         oModel.setProperty("/dummy11ReplyDraft", "");
         this._applyDummy11Evaluation(oResp, true, sReply);
@@ -436,7 +436,7 @@ sap.ui.define([
       try {
         var oResp = await AiService.runDummy11Prompt({
           final_prompt: sFinalPrompt,
-          attachments: this._getDummy11AttachmentMeta()
+          files: oModel.getProperty("/dummy11Files") || []
         });
         oModel.setProperty("/dummy11ResultText", String(oResp && oResp.result ? oResp.result : ""));
       } catch (oError) {

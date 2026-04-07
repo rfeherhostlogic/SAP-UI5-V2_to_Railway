@@ -71,6 +71,13 @@ const oDiscoveryCsvUpload = multer({
     files: 8
   }
 });
+const oDummy11Upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 8
+  }
+});
 
 const NOAH_LOW_CONFIDENCE_THRESHOLD = Number(process.env.NOAH_LOW_CONFIDENCE_THRESHOLD || 0.55);
 const NOAH_CARDS = [
@@ -1013,9 +1020,12 @@ async function evaluateDummy11Prompt(payload) {
   const attachments = Array.isArray(payload && payload.attachments) ? payload.attachments : [];
   const featureFlags = payload && payload.feature_flags ? payload.feature_flags : {};
   const attachmentLines = attachments.map(function(item) {
-    return "- " + String(item && item.name ? item.name : "ismeretlen") + " (" +
-      String(item && item.type ? item.type : "application/octet-stream") + ", " +
-      Number(item && item.size ? item.size : 0) + " B)";
+    return [
+      "- " + String(item && item.name ? item.name : "ismeretlen") + " (" +
+        String(item && item.type ? item.type : "application/octet-stream") + ", " +
+        Number(item && item.size ? item.size : 0) + " B)",
+      item && item.excerpt ? ("Kivonat: " + String(item.excerpt)) : "Kivonat: (nem olvashato vagy nem tamogatott tartalom)"
+    ].join("\n");
   });
 
   const systemPrompt = [
@@ -1061,11 +1071,11 @@ async function evaluateDummy11Prompt(payload) {
       attachments_enabled: !!featureFlags.attachments_enabled
     }),
     "",
-    "Csatolmany metadata:",
+    "Csatolmanyok:",
     attachmentLines.length > 0 ? attachmentLines.join("\n") : "(nincs csatolmany)",
     "",
     "Keszits konkret, uzleti appban hasznalhato promptot.",
-    "Ha attachments_enabled=true, a prompt utaljon a csatolt fajlok feldolgozasara.",
+    "Ha attachments_enabled=true, a prompt konkretan utaljon a csatolt fajlok tartalmanak feldolgozasara.",
     "Ha timing_enabled=true, a prompt legyen stabil, ujrafuttathato es kovetkezetes."
   ].join("\n");
 
@@ -1103,6 +1113,53 @@ function sanitizeUploadFileName(fileName, fallbackPrefix, index) {
     return index + "_" + cleaned;
   }
   return String(fallbackPrefix || "upload") + "_" + index + ".csv";
+}
+
+async function extractDummy11AttachmentContents(files) {
+  const results = [];
+  const input = Array.isArray(files) ? files : [];
+
+  for (let i = 0; i < input.length; i += 1) {
+    const file = input[i] || {};
+    const name = String(file.originalname || file.name || ("attachment_" + i)).trim() || ("attachment_" + i);
+    const mime = String(file.mimetype || file.type || "").toLowerCase();
+    const buffer = file.buffer || Buffer.from("");
+    let text = "";
+    let sourceType = "unsupported";
+
+    if ((mime === "application/pdf" || name.toLowerCase().endsWith(".pdf")) && buffer.length > 0) {
+      const parser = new PDFParse({ data: buffer });
+      try {
+        const parsed = await parser.getText();
+        text = String(parsed && parsed.text ? parsed.text : "").trim();
+        sourceType = "pdf";
+      } finally {
+        await parser.destroy();
+      }
+    } else if (
+      mime.indexOf("text/") === 0 ||
+      mime === "application/json" ||
+      name.toLowerCase().endsWith(".txt") ||
+      name.toLowerCase().endsWith(".csv") ||
+      name.toLowerCase().endsWith(".json") ||
+      name.toLowerCase().endsWith(".md")
+    ) {
+      text = String(buffer || Buffer.from("")).replace(/^\uFEFF/, "").trim();
+      sourceType = "text";
+    }
+
+    const normalized = String(text || "").replace(/\s+/g, " ").trim();
+    results.push({
+      name: name,
+      type: mime || "application/octet-stream",
+      size: Number(file.size || buffer.length || 0),
+      sourceType: sourceType,
+      text: normalized,
+      excerpt: normalized ? normalized.slice(0, 4000) : ""
+    });
+  }
+
+  return results;
 }
 
 function tokenizeDummy9(value) {
@@ -5845,19 +5902,32 @@ app.post("/api/jokers/dummy4", async function(req, res) {
   }
 });
 
-app.post("/api/jokers/dummy11/evaluate", async function(req, res) {
+app.post("/api/jokers/dummy11/evaluate", oDummy11Upload.array("files", 8), async function(req, res) {
   try {
     const rawRequest = String(req.body && req.body.raw_request ? req.body.raw_request : "").trim();
     if (!rawRequest) {
       res.status(400).json({ error: "A nyers keres kotelezo." });
       return;
     }
+    const attachmentContents = await extractDummy11AttachmentContents(req.files || []);
+    let parsedMessages = [];
+    let parsedFlags = {};
+    try {
+      parsedMessages = parseOpenAiReply(String(req.body && req.body.messages ? req.body.messages : "[]")) || [];
+    } catch (_err) {
+      parsedMessages = [];
+    }
+    try {
+      parsedFlags = parseOpenAiReply(String(req.body && req.body.feature_flags ? req.body.feature_flags : "{}")) || {};
+    } catch (_err2) {
+      parsedFlags = {};
+    }
     const result = await evaluateDummy11Prompt({
       raw_request: rawRequest,
       current_prompt: String(req.body && req.body.current_prompt ? req.body.current_prompt : ""),
-      messages: req.body && req.body.messages ? req.body.messages : [],
-      feature_flags: req.body && req.body.feature_flags ? req.body.feature_flags : {},
-      attachments: req.body && req.body.attachments ? req.body.attachments : []
+      messages: parsedMessages,
+      feature_flags: parsedFlags,
+      attachments: attachmentContents
     });
     res.json(result);
   } catch (err) {
@@ -5926,23 +5996,26 @@ app.post("/api/jokers/dummy11/save", async function(req, res) {
   }
 });
 
-app.post("/api/jokers/dummy11/run", async function(req, res) {
+app.post("/api/jokers/dummy11/run", oDummy11Upload.array("files", 8), async function(req, res) {
   try {
     if (!OPENAI_API_KEY) {
       res.status(500).json({ error: "OPENAI_API_KEY hianyzik" });
       return;
     }
     const finalPrompt = String(req.body && req.body.final_prompt ? req.body.final_prompt : "").trim();
-    const attachments = Array.isArray(req.body && req.body.attachments) ? req.body.attachments : [];
+    const attachments = await extractDummy11AttachmentContents(req.files || []);
     if (!finalPrompt) {
       res.status(400).json({ error: "A vegleges prompt kotelezo." });
       return;
     }
 
     const attachmentLines = attachments.map(function(item) {
-      return "- " + String(item && item.name ? item.name : "ismeretlen") + " (" +
-        String(item && item.type ? item.type : "application/octet-stream") + ", " +
-        Number(item && item.size ? item.size : 0) + " B)";
+      return [
+        "- " + String(item && item.name ? item.name : "ismeretlen") + " (" +
+          String(item && item.type ? item.type : "application/octet-stream") + ", " +
+          Number(item && item.size ? item.size : 0) + " B)",
+        item && item.excerpt ? ("Kivonat: " + String(item.excerpt)) : "Kivonat: (nem olvashato vagy nem tamogatott tartalom)"
+      ].join("\n");
     });
 
     const userMessage = [

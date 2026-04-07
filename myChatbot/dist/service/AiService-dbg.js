@@ -113,18 +113,18 @@
   }
 
   function evaluateDummy11(mPayload) {
+    var oFormData = new FormData();
+    oFormData.append("raw_request", mPayload.raw_request || "");
+    oFormData.append("current_prompt", mPayload.current_prompt || "");
+    oFormData.append("messages", JSON.stringify(mPayload.messages || []));
+    oFormData.append("feature_flags", JSON.stringify(mPayload.feature_flags || {}));
+    (mPayload.files || []).forEach(function(oFile) {
+      oFormData.append("files", oFile);
+    });
+
     return fetch("/api/jokers/dummy11/evaluate", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        raw_request: mPayload.raw_request || "",
-        current_prompt: mPayload.current_prompt || "",
-        messages: mPayload.messages || [],
-        feature_flags: mPayload.feature_flags || {},
-        attachments: mPayload.attachments || []
-      })
+      body: oFormData
     }).then(function(oResponse) {
       if (!oResponse.ok) {
         return oResponse.text().then(function(sError) {
@@ -153,15 +153,15 @@
   }
 
   function runDummy11Prompt(mPayload) {
+    var oFormData = new FormData();
+    oFormData.append("final_prompt", mPayload.final_prompt || "");
+    (mPayload.files || []).forEach(function(oFile) {
+      oFormData.append("files", oFile);
+    });
+
     return fetch("/api/jokers/dummy11/run", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        final_prompt: mPayload.final_prompt || "",
-        attachments: mPayload.attachments || []
-      })
+      body: oFormData
     }).then(function(oResponse) {
       if (!oResponse.ok) {
         return oResponse.text().then(function(sError) {
