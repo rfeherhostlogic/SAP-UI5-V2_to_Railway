@@ -643,7 +643,7 @@
                 <Title text="Elemzesi setup" level="H4"/>
                 <Text text="{= 'Ceghelyek szama: ' + ${jokers>/dummy12Companies}.length + ' / 5' }" wrapping="true"/>
               </VBox>
-              <Button text="Versenytars hozzaadasa" type="Transparent" press=".onDummy12AddCompetitor" enabled="{= ${jokers>/dummy12Companies}.length < 5 }"/>
+              <Button text="Versenytars hozzaadasa" type="Transparent" press=".onDummy12AddCompetitor" enabled="{= ${jokers>/dummy12Companies}.length &lt; 5 }"/>
             </HBox>
             <Text text="Az elso kartya mindig a sajat ceg. Adj meg cegnevet, URL-eket, es tolts fel eves beszamolo PDF-et. A sajat ceghez legalabb egy merleg / beszamolo PDF kotelezo." wrapping="true" class="sapUiSmallMarginTop"/>
 
