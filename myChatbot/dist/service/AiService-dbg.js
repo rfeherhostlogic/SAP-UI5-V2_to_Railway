@@ -172,6 +172,27 @@
     });
   }
 
+  function analyzeDummy12(mPayload) {
+    var oFormData = new FormData();
+    oFormData.append("companies", JSON.stringify(mPayload.companies || []));
+    oFormData.append("file_descriptors", JSON.stringify(mPayload.file_descriptors || []));
+    (mPayload.files || []).forEach(function(oFile) {
+      oFormData.append("files", oFile);
+    });
+
+    return fetch("/api/jokers/dummy12/analyze", {
+      method: "POST",
+      body: oFormData
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function getDummy4SchemaHint() {
     return fetch("/api/jokers/dummy4/schema-hint", {
       method: "GET"
@@ -752,6 +773,7 @@
     evaluateDummy11: evaluateDummy11,
     saveDummy11Prompt: saveDummy11Prompt,
     runDummy11Prompt: runDummy11Prompt,
+    analyzeDummy12: analyzeDummy12,
     getDummy4SchemaHint: getDummy4SchemaHint,
     uploadDummy5Pdf: uploadDummy5Pdf,
     summarizeDummy5: summarizeDummy5,

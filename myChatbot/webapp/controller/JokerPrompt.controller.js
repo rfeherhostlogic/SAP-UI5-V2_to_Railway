@@ -447,6 +447,115 @@ sap.ui.define([
       }
     },
 
+    onDummy12AddCompetitor: function() {
+      var oModel = this.getView().getModel("jokers");
+      var aCompanies = (oModel.getProperty("/dummy12Companies") || []).slice();
+      if (aCompanies.length >= 5) {
+        MessageToast.show("Maximum 5 ceg elemezheto egyszerre.");
+        return;
+      }
+      aCompanies.push(this._createDummy12Company(false, aCompanies.length));
+      oModel.setProperty("/dummy12Companies", aCompanies);
+    },
+
+    onDummy12RemoveCompany: function(oEvent) {
+      var oCtx = oEvent && oEvent.getSource ? oEvent.getSource().getBindingContext("jokers") : null;
+      if (!oCtx) {
+        return;
+      }
+      var iIndex = parseInt(String(oCtx.getPath()).split("/").pop(), 10);
+      if (!isFinite(iIndex) || iIndex <= 0) {
+        MessageToast.show("A sajat ceg kartyaja nem torolheto.");
+        return;
+      }
+      var oModel = this.getView().getModel("jokers");
+      var aCompanies = (oModel.getProperty("/dummy12Companies") || []).slice();
+      aCompanies.splice(iIndex, 1);
+      aCompanies = aCompanies.map(function(oCompany, idx) {
+        return Object.assign({}, oCompany, {
+          slotLabel: idx === 0 ? "Sajat ceg" : ("Versenytars " + idx)
+        });
+      });
+      oModel.setProperty("/dummy12Companies", aCompanies);
+    },
+
+    onDummy12ReportFileChange: function(oEvent) {
+      this._appendDummy12Files(oEvent, "reportFiles");
+    },
+
+    onDummy12BalanceFileChange: function(oEvent) {
+      this._appendDummy12Files(oEvent, "balanceFiles");
+    },
+
+    onDummy12RemoveReportFile: function(oEvent) {
+      this._removeDummy12FileFromPath(oEvent, "reportFiles");
+    },
+
+    onDummy12RemoveBalanceFile: function(oEvent) {
+      this._removeDummy12FileFromPath(oEvent, "balanceFiles");
+    },
+
+    onRunDummy12Analysis: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var aCompanies = oModel.getProperty("/dummy12Companies") || [];
+      var oValidation = this._validateDummy12Companies(aCompanies);
+      if (!oValidation.ok) {
+        oModel.setProperty("/dummy12Error", oValidation.message);
+        MessageToast.show(oValidation.message);
+        return;
+      }
+
+      oModel.setProperty("/dummy12Busy", true);
+      oModel.setProperty("/dummy12Error", "");
+      oModel.setProperty("/dummy12ProgressText", "Konkurenciaelemzes folyamatban...");
+      try {
+        var oPayload = this._buildDummy12AnalyzePayload(aCompanies);
+        var oResp = await AiService.analyzeDummy12(oPayload);
+        this._applyDummy12Result(oResp);
+        oModel.setProperty("/dummy12ProgressText", "Elemzes elkeszult.");
+      } catch (oError) {
+        oModel.setProperty("/dummy12Error", oError && oError.message ? oError.message : "Dummy12 elemzesi hiba.");
+        oModel.setProperty("/dummy12ProgressText", "");
+        MessageToast.show(oError && oError.message ? oError.message : "Dummy12 elemzesi hiba.");
+      } finally {
+        oModel.setProperty("/dummy12Busy", false);
+      }
+    },
+
+    onDummy12OpenPreview: function(oEvent) {
+      var oCtx = oEvent && oEvent.getSource ? oEvent.getSource().getBindingContext("jokers") : null;
+      var oItem = oCtx ? oCtx.getObject() : null;
+      if (!oItem) {
+        return;
+      }
+      var oModel = this.getView().getModel("jokers");
+      var sPreviewId = String(oItem.previewId || "");
+      oModel.setProperty("/dummy12SelectedPreviewId", sPreviewId);
+      oModel.setProperty("/dummy12SelectedPreviewTitle", String((oItem.companyName || "") + " - " + (oItem.fileName || "")).trim());
+      oModel.setProperty("/dummy12SelectedPreviewSummary", String(oItem.summary || ""));
+      oModel.setProperty("/dummy12SelectedPreviewRows", oItem.sourceKind === "balance_sheet" ? (oItem.metricRows || []) : ((oItem.metricRows || []).concat(oItem.sectionRows || [])));
+      this._rebindDummy12PreviewTable();
+    },
+
+    onDownloadDummy12Summary: function() {
+      var oModel = this.getView().getModel("jokers");
+      var sText = String(oModel.getProperty("/dummy12ExportText") || "").trim();
+      if (!sText) {
+        MessageToast.show("Nincs letoltheto osszefoglalo.");
+        return;
+      }
+      var oBlob = new Blob([sText], { type: "text/plain;charset=utf-8" });
+      this._downloadDummy7Pdf = this._downloadDummy7Pdf; // keep linter calm in minified build context
+      var sUrl = window.URL.createObjectURL(oBlob);
+      var oLink = document.createElement("a");
+      oLink.href = sUrl;
+      oLink.download = "konkurencia_elemzes_osszefoglalo.txt";
+      document.body.appendChild(oLink);
+      oLink.click();
+      document.body.removeChild(oLink);
+      window.URL.revokeObjectURL(sUrl);
+    },
+
     onRefreshDummy4SchemaHint: async function() {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/generating", true);
@@ -597,6 +706,7 @@ sap.ui.define([
       this._resetDummy9State();
       this._resetDummy10State();
       this._resetDummy11State();
+      this._resetDummy12State();
       this._resetDummy5State();
       this._resetDummy7State();
       this._resetSmartSegState();
@@ -639,6 +749,8 @@ sap.ui.define([
         } else if (oSelected.id === "dummy-11") {
           this._resetDummy11State();
           this._loadJokerSchedule("dummy-11", "dummy11");
+        } else if (oSelected.id === "dummy-12") {
+          this._resetDummy12State();
         } else if (oSelected.id === "dummy-5") {
           this._resetDummy5State();
         } else if (oSelected.id === "dummy-7") {
@@ -903,6 +1015,185 @@ sap.ui.define([
       if (oFileUploader && oFileUploader.clear) {
         oFileUploader.clear();
       }
+    },
+
+    _createDummy12Company: function(bOwn, iIndex) {
+      return {
+        slotLabel: bOwn ? "Sajat ceg" : ("Versenytars " + iIndex),
+        companyName: "",
+        websiteUrl: "",
+        linkedinUrl: "",
+        reportFiles: [],
+        balanceFiles: []
+      };
+    },
+
+    _resetDummy12State: function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy12Companies", [this._createDummy12Company(true, 0)]);
+      oModel.setProperty("/dummy12Busy", false);
+      oModel.setProperty("/dummy12Error", "");
+      oModel.setProperty("/dummy12ProgressText", "");
+      oModel.setProperty("/dummy12ExecutiveSummary", []);
+      oModel.setProperty("/dummy12OwnCompany", {});
+      oModel.setProperty("/dummy12Competitors", []);
+      oModel.setProperty("/dummy12ComparisonRows", []);
+      oModel.setProperty("/dummy12FinancialInsights", []);
+      oModel.setProperty("/dummy12OnlineInsights", []);
+      oModel.setProperty("/dummy12HiringInsights", []);
+      oModel.setProperty("/dummy12StrategicTakeaways", []);
+      oModel.setProperty("/dummy12RecommendedActions", []);
+      oModel.setProperty("/dummy12ExportText", "");
+      oModel.setProperty("/dummy12AnnualReportPreviews", []);
+      oModel.setProperty("/dummy12SelectedPreviewId", "");
+      oModel.setProperty("/dummy12SelectedPreviewTitle", "");
+      oModel.setProperty("/dummy12SelectedPreviewRows", []);
+      oModel.setProperty("/dummy12SelectedPreviewSummary", "");
+      this._rebindDummy12PreviewTable();
+    },
+
+    _appendDummy12Files: function(oEvent, sKey) {
+      var oSource = oEvent && oEvent.getSource ? oEvent.getSource() : null;
+      var oCtx = oSource ? oSource.getBindingContext("jokers") : null;
+      var aFiles = oEvent && oEvent.getParameter ? Array.prototype.slice.call(oEvent.getParameter("files") || []) : [];
+      if (!oCtx || aFiles.length === 0) {
+        return;
+      }
+      var iIndex = parseInt(String(oCtx.getPath()).split("/").pop(), 10);
+      var oModel = this.getView().getModel("jokers");
+      var aCompanies = (oModel.getProperty("/dummy12Companies") || []).slice();
+      var oCompany = Object.assign({}, aCompanies[iIndex] || {});
+      var aCurrent = Array.isArray(oCompany[sKey]) ? oCompany[sKey].slice() : [];
+      var mSeen = {};
+      aCurrent.forEach(function(oFile) {
+        mSeen[(oFile.name || "") + "|" + Number(oFile.size || 0)] = true;
+      });
+      aFiles.forEach(function(oFile) {
+        var sExt = String(oFile.name || "").toLowerCase();
+        if (String(oFile.type || "").toLowerCase() !== "application/pdf" && sExt.slice(-4) !== ".pdf") {
+          return;
+        }
+        var sId = (oFile.name || "") + "|" + Number(oFile.size || 0);
+        if (!mSeen[sId]) {
+          mSeen[sId] = true;
+          aCurrent.push(oFile);
+        }
+      });
+      oCompany[sKey] = aCurrent;
+      aCompanies[iIndex] = oCompany;
+      oModel.setProperty("/dummy12Companies", aCompanies);
+    },
+
+    _removeDummy12FileFromPath: function(oEvent, sKey) {
+      var oCtx = oEvent && oEvent.getSource ? oEvent.getSource().getBindingContext("jokers") : null;
+      if (!oCtx) {
+        return;
+      }
+      var aParts = String(oCtx.getPath()).split("/");
+      var iCompanyIndex = parseInt(aParts[2], 10);
+      var iFileIndex = parseInt(aParts[4], 10);
+      if (!isFinite(iCompanyIndex) || !isFinite(iFileIndex)) {
+        return;
+      }
+      var oModel = this.getView().getModel("jokers");
+      var aCompanies = (oModel.getProperty("/dummy12Companies") || []).slice();
+      var oCompany = Object.assign({}, aCompanies[iCompanyIndex] || {});
+      var aFiles = Array.isArray(oCompany[sKey]) ? oCompany[sKey].slice() : [];
+      aFiles.splice(iFileIndex, 1);
+      oCompany[sKey] = aFiles;
+      aCompanies[iCompanyIndex] = oCompany;
+      oModel.setProperty("/dummy12Companies", aCompanies);
+    },
+
+    _validateDummy12Companies: function(aCompanies) {
+      if (!Array.isArray(aCompanies) || aCompanies.length === 0) {
+        return { ok: false, message: "Legalabb a sajat ceg adatait add meg." };
+      }
+      if (aCompanies.length > 5) {
+        return { ok: false, message: "Maximum 5 ceg elemezheto." };
+      }
+      if (!String(aCompanies[0].companyName || "").trim()) {
+        return { ok: false, message: "A sajat ceg neve kotelezo." };
+      }
+      if (!Array.isArray(aCompanies[0].balanceFiles) || aCompanies[0].balanceFiles.length === 0) {
+        return { ok: false, message: "A sajat ceghez legalabb egy eves beszamolo / merleg PDF kotelezo." };
+      }
+      for (var i = 0; i < aCompanies.length; i += 1) {
+        var oCompany = aCompanies[i] || {};
+        if (!String(oCompany.companyName || "").trim()) {
+          return { ok: false, message: "Minden cegkartyan add meg a ceg nevet." };
+        }
+        if (oCompany.websiteUrl && !/^https?:\/\/.+/i.test(String(oCompany.websiteUrl || "").trim())) {
+          return { ok: false, message: "A weboldal URL csak http:// vagy https:// formatumu lehet." };
+        }
+        if (oCompany.linkedinUrl && !/^https?:\/\/.+/i.test(String(oCompany.linkedinUrl || "").trim())) {
+          return { ok: false, message: "A LinkedIn URL csak http:// vagy https:// formatumu lehet." };
+        }
+      }
+      return { ok: true };
+    },
+
+    _buildDummy12AnalyzePayload: function(aCompanies) {
+      var aFiles = [];
+      var aDescriptors = [];
+      var aCompaniesPayload = (aCompanies || []).map(function(oCompany, iIndex) {
+        (oCompany.reportFiles || []).forEach(function(oFile) {
+          aFiles.push(oFile);
+          aDescriptors.push({
+            company_index: iIndex,
+            kind: "report",
+            name: oFile.name || "report.pdf"
+          });
+        });
+        (oCompany.balanceFiles || []).forEach(function(oFile) {
+          aFiles.push(oFile);
+          aDescriptors.push({
+            company_index: iIndex,
+            kind: "balance",
+            name: oFile.name || "balance.pdf"
+          });
+        });
+        return {
+          companyName: String(oCompany.companyName || "").trim(),
+          websiteUrl: String(oCompany.websiteUrl || "").trim(),
+          linkedinUrl: String(oCompany.linkedinUrl || "").trim()
+        };
+      });
+      return {
+        companies: aCompaniesPayload,
+        files: aFiles,
+        file_descriptors: aDescriptors
+      };
+    },
+
+    _applyDummy12Result: function(oResp) {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy12ExecutiveSummary", Array.isArray(oResp && oResp.executive_summary) ? oResp.executive_summary : []);
+      oModel.setProperty("/dummy12OwnCompany", oResp && oResp.own_company ? oResp.own_company : {});
+      oModel.setProperty("/dummy12Competitors", Array.isArray(oResp && oResp.competitors) ? oResp.competitors : []);
+      oModel.setProperty("/dummy12ComparisonRows", Array.isArray(oResp && oResp.comparison_table) ? oResp.comparison_table : []);
+      oModel.setProperty("/dummy12FinancialInsights", Array.isArray(oResp && oResp.financial_insights) ? oResp.financial_insights : []);
+      oModel.setProperty("/dummy12OnlineInsights", Array.isArray(oResp && oResp.online_presence_insights) ? oResp.online_presence_insights : []);
+      oModel.setProperty("/dummy12HiringInsights", Array.isArray(oResp && oResp.hiring_insights) ? oResp.hiring_insights : []);
+      oModel.setProperty("/dummy12StrategicTakeaways", Array.isArray(oResp && oResp.strategic_takeaways) ? oResp.strategic_takeaways : []);
+      oModel.setProperty("/dummy12RecommendedActions", Array.isArray(oResp && oResp.recommended_actions) ? oResp.recommended_actions : []);
+      oModel.setProperty("/dummy12ExportText", String(oResp && oResp.export_text ? oResp.export_text : ""));
+      oModel.setProperty("/dummy12AnnualReportPreviews", Array.isArray(oResp && oResp.annual_report_previews) ? oResp.annual_report_previews : []);
+
+      var aPreviews = oModel.getProperty("/dummy12AnnualReportPreviews") || [];
+      if (aPreviews.length > 0) {
+        var oFirst = aPreviews[0];
+        oModel.setProperty("/dummy12SelectedPreviewId", String(oFirst.previewId || ""));
+        oModel.setProperty("/dummy12SelectedPreviewTitle", String((oFirst.companyName || "") + " - " + (oFirst.fileName || "")).trim());
+        oModel.setProperty("/dummy12SelectedPreviewSummary", String(oFirst.summary || ""));
+        oModel.setProperty("/dummy12SelectedPreviewRows", (oFirst.metricRows || []).concat(oFirst.sectionRows || []));
+      } else {
+        oModel.setProperty("/dummy12SelectedPreviewId", "");
+        oModel.setProperty("/dummy12SelectedPreviewTitle", "");
+        oModel.setProperty("/dummy12SelectedPreviewSummary", "");
+        oModel.setProperty("/dummy12SelectedPreviewRows", []);
+      }
+      this._rebindDummy12PreviewTable();
     },
 
     _bindDummy9DropZoneEvents: function() {
@@ -1493,6 +1784,45 @@ sap.ui.define([
 
       oTable.bindItems({
         path: "jokers>/dummy10Rows",
+        template: new ColumnListItem({
+          cells: aCells
+        }),
+        templateShareable: false
+      });
+    },
+
+    _rebindDummy12PreviewTable: function() {
+      var oTable = this.byId("dummy12PreviewTable");
+      var oModel = this.getView().getModel("jokers");
+      var aRows = oModel.getProperty("/dummy12SelectedPreviewRows") || [];
+      var aColumns = this._extractDummy4Columns(aRows);
+
+      if (!oTable) {
+        return;
+      }
+
+      oTable.unbindItems();
+      oTable.removeAllColumns();
+
+      if (aColumns.length === 0) {
+        return;
+      }
+
+      aColumns.forEach(function(sColName) {
+        oTable.addColumn(new Column({
+          header: new Text({ text: sColName })
+        }));
+      });
+
+      var aCells = aColumns.map(function(sColName) {
+        return new Text({
+          text: "{jokers>" + sColName + "}",
+          wrapping: true
+        });
+      });
+
+      oTable.bindItems({
+        path: "jokers>/dummy12SelectedPreviewRows",
         template: new ColumnListItem({
           cells: aCells
         }),

@@ -39,6 +39,9 @@ const DUMMY9_RUNNER_PY = path.resolve(
 const DUMMY10_RUNNER_PY = path.resolve(
   process.env.DUMMY10_RUNNER_PY || path.join(__dirname, "dummy10_rfm_runner.py")
 );
+const DUMMY12_PROMPT_PATH = path.resolve(
+  process.env.DUMMY12_PROMPT_PATH || path.join(__dirname, "competition_analysis_prompt.txt")
+);
 const DISCOVERY_JOBS_DIR = path.resolve(
   process.env.DISCOVERY_JOBS_DIR || path.join(__dirname, "jobs")
 );
@@ -76,6 +79,13 @@ const oDummy11Upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024,
     files: 8
+  }
+});
+const oDummy12Upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 15 * 1024 * 1024,
+    files: 24
   }
 });
 
@@ -1160,6 +1170,339 @@ async function extractDummy11AttachmentContents(files) {
   }
 
   return results;
+}
+
+function loadDummy12PromptTemplate() {
+  try {
+    return fs.readFileSync(DUMMY12_PROMPT_PATH, "utf8");
+  } catch (_err) {
+    return [
+      "Te egy senior piackutato, versenytarselemzo es uzleti elemzo AI vagy.",
+      "A sajat ceget es a versenytarsakat elemezd a megadott inputok alapjan.",
+      "Ne talalj ki tenyeket, a bizonytalansagot mindig jelezd."
+    ].join("\n");
+  }
+}
+
+function isValidHttpUrl(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch (_err) {
+    return false;
+  }
+}
+
+function stripHtml(value) {
+  return String(value || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function fetchPublicPageSnapshot(url) {
+  if (!isValidHttpUrl(url)) {
+    return {
+      ok: false,
+      url: String(url || ""),
+      title: "",
+      description: "",
+      headings: [],
+      excerpt: "",
+      error: "Ervenytelen URL."
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(function() {
+    controller.abort();
+  }, 8000);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; Joker12Bot/1.0)"
+      }
+    });
+    const html = await response.text();
+    const titleMatch = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+    const descMatch = /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i.exec(html) ||
+      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i.exec(html);
+    const headingMatches = Array.from(html.matchAll(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi)).slice(0, 6).map(function(match) {
+      return stripHtml(match[1] || "");
+    }).filter(Boolean);
+    const excerpt = stripHtml(html).slice(0, 2000);
+    return {
+      ok: response.ok,
+      url: String(response.url || url),
+      title: stripHtml(titleMatch && titleMatch[1] ? titleMatch[1] : ""),
+      description: stripHtml(descMatch && descMatch[1] ? descMatch[1] : ""),
+      headings: headingMatches,
+      excerpt: excerpt,
+      error: response.ok ? "" : ("HTTP " + Number(response.status || 0))
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      url: String(url || ""),
+      title: "",
+      description: "",
+      headings: [],
+      excerpt: "",
+      error: err && err.message ? err.message : String(err)
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function extractFinancialMetricLine(text, patterns) {
+  const lines = String(text || "").split(/\r?\n/).map(function(line) {
+    return String(line || "").trim();
+  }).filter(Boolean);
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const normalizedLine = normalizeSearchText(line);
+    if (patterns.some(function(pattern) { return pattern.test(normalizedLine); })) {
+      const values = line.match(/-?\d[\d\s.]*,?\d*/g) || [];
+      return {
+        line: line,
+        value: values.join(" | ")
+      };
+    }
+  }
+  return {
+    line: "",
+    value: ""
+  };
+}
+
+function buildAnnualReportPreview(fileName, rawText) {
+  const text = String(rawText || "");
+  const compact = text.replace(/\s+/g, " ").trim();
+  const metrics = [
+    { label: "Arbevetel", patterns: [/arbevetel/i, /ertekesites netto arbevetele/i] },
+    { label: "Adozott eredmeny", patterns: [/adozott eredmeny/i] },
+    { label: "Merlegfoosszeg", patterns: [/merlegfoosszeg/i] },
+    { label: "Sajat toke", patterns: [/sajat toke/i] },
+    { label: "Letszam", patterns: [/atlagos statisztikai allomanyi letszam/i, /letszam/i] }
+  ].map(function(def) {
+    const match = extractFinancialMetricLine(text, def.patterns);
+    return {
+      Mutato: def.label,
+      Ertek: match.value || "-",
+      Forras: match.line || "-"
+    };
+  });
+
+  const lines = text.split(/\r?\n/).map(function(line) {
+    return String(line || "").trim();
+  }).filter(Boolean);
+  const sections = lines.slice(0, 12).map(function(line, idx) {
+    return {
+      Sor: String(idx + 1),
+      Reszlet: line.slice(0, 180)
+    };
+  });
+
+  return {
+    previewId: crypto.randomUUID(),
+    fileName: fileName,
+    summary: compact.slice(0, 1000),
+    metricRows: metrics,
+    sectionRows: sections
+  };
+}
+
+async function extractDummy12CompanyFiles(files, descriptors) {
+  const list = [];
+  const inputFiles = Array.isArray(files) ? files : [];
+  const metaList = Array.isArray(descriptors) ? descriptors : [];
+
+  for (let i = 0; i < inputFiles.length; i += 1) {
+    const file = inputFiles[i] || {};
+    const descriptor = metaList[i] || {};
+    const name = String(file.originalname || descriptor.name || ("document_" + i + ".pdf"));
+    const kind = String(descriptor.kind || "report");
+    const companyIndex = Number(descriptor.company_index || 0);
+    const mime = String(file.mimetype || "").toLowerCase();
+    let text = "";
+    if ((mime === "application/pdf" || name.toLowerCase().endsWith(".pdf")) && file.buffer) {
+      const parser = new PDFParse({ data: file.buffer });
+      try {
+        const parsed = await parser.getText();
+        text = String(parsed && parsed.text ? parsed.text : "");
+      } finally {
+        await parser.destroy();
+      }
+    } else {
+      text = String(file.buffer || Buffer.from("")).trim();
+    }
+    list.push({
+      companyIndex: companyIndex,
+      kind: kind,
+      name: name,
+      type: mime || "application/octet-stream",
+      size: Number(file.size || (file.buffer ? file.buffer.length : 0)),
+      text: text,
+      preview: buildAnnualReportPreview(name, text)
+    });
+  }
+
+  return list;
+}
+
+function buildDummy12ExportText(result) {
+  const sections = [];
+  sections.push("VEZETOI OSSZEFOGLALO");
+  (result.executive_summary || []).forEach(function(item) { sections.push("- " + item); });
+  sections.push("");
+  sections.push("SAJAT CEG");
+  sections.push(String(result.own_company && result.own_company.financial_summary ? result.own_company.financial_summary : ""));
+  sections.push("");
+  sections.push("STRATEGIAI INSIGHTOK");
+  (result.strategic_takeaways || []).forEach(function(item) { sections.push("- " + item); });
+  sections.push("");
+  sections.push("JAVASOLT AKCIOK");
+  (result.recommended_actions || []).forEach(function(item) { sections.push("- " + item); });
+  return sections.join("\n").trim();
+}
+
+async function analyzeDummy12(payload) {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY hianyzik");
+  }
+
+  const companies = Array.isArray(payload && payload.companies) ? payload.companies : [];
+  const fileEntries = Array.isArray(payload && payload.fileEntries) ? payload.fileEntries : [];
+  const promptTemplate = loadDummy12PromptTemplate();
+
+  const enrichedCompanies = [];
+  for (let i = 0; i < companies.length; i += 1) {
+    const company = companies[i] || {};
+    const reports = fileEntries.filter(function(item) {
+      return Number(item.companyIndex) === i && item.kind === "report";
+    });
+    const balances = fileEntries.filter(function(item) {
+      return Number(item.companyIndex) === i && item.kind === "balance";
+    });
+    const websiteSnapshot = company.websiteUrl ? await fetchPublicPageSnapshot(company.websiteUrl) : null;
+    const linkedinSnapshot = company.linkedinUrl ? await fetchPublicPageSnapshot(company.linkedinUrl) : null;
+
+    enrichedCompanies.push({
+      role: i === 0 ? "own" : "competitor",
+      company_name: String(company.companyName || ""),
+      website_url: String(company.websiteUrl || ""),
+      linkedin_url: String(company.linkedinUrl || ""),
+      website_snapshot: websiteSnapshot,
+      linkedin_snapshot: linkedinSnapshot,
+      annual_reports: reports.map(function(item) {
+        return {
+          file_name: item.name,
+          extracted_text_excerpt: String(item.text || "").replace(/\s+/g, " ").trim().slice(0, 5000),
+          preview: item.preview
+        };
+      }),
+      balance_sheets: balances.map(function(item) {
+        return {
+          file_name: item.name,
+          extracted_text_excerpt: String(item.text || "").replace(/\s+/g, " ").trim().slice(0, 5000),
+          preview: item.preview
+        };
+      })
+    });
+  }
+
+  const systemPrompt = [
+    promptTemplate,
+    "",
+    "A valaszod CSAK JSON legyen.",
+    "JSON schema:",
+    "{",
+    '  "executive_summary": ["string"],',
+    '  "own_company": {',
+    '    "financial_summary": "string",',
+    '    "financial_strengths": ["string"],',
+    '    "financial_risks": ["string"],',
+    '    "website_positioning": "string",',
+    '    "linkedin_communication": "string",',
+    '    "hiring_signals": "string"',
+    "  },",
+    '  "competitors": [',
+    '    {"company_name":"string","short_description":"string","website_positioning":"string","linkedin_communication":"string","hiring_signals":"string","strengths":["string"],"weaknesses":["string"]}',
+    "  ],",
+    '  "comparison_table": [',
+    '    {"Ceg":"string","Pozicionalas":"string","FoUzenet":"string","OnlineAktivitas":"string","HiringAktivitas":"string","PenzugyiJelzesek":"string","StrategiaiMegjegyzes":"string"}',
+    "  ],",
+    '  "financial_insights": ["string"],',
+    '  "online_presence_insights": ["string"],',
+    '  "hiring_insights": ["string"],',
+    '  "strategic_takeaways": ["string"],',
+    '  "recommended_actions": ["string"]',
+    "}"
+  ].join("\n");
+
+  const userPrompt = [
+    "Elemzesi input JSON:",
+    JSON.stringify({
+      companies: enrichedCompanies
+    })
+  ].join("\n");
+
+  const raw = await callOpenAiText([
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userPrompt }
+  ], 0.25);
+
+  const parsed = parseLooseJsonObject(raw) || {};
+  const previews = [];
+  enrichedCompanies.forEach(function(company) {
+    (company.annual_reports || []).forEach(function(report) {
+      previews.push(Object.assign({
+        companyName: company.company_name,
+        sourceKind: "annual_report"
+      }, report.preview || {}));
+    });
+    (company.balance_sheets || []).forEach(function(report) {
+      previews.push(Object.assign({
+        companyName: company.company_name,
+        sourceKind: "balance_sheet"
+      }, report.preview || {}));
+    });
+  });
+
+  return {
+    executive_summary: Array.isArray(parsed.executive_summary) ? parsed.executive_summary : [],
+    own_company: parsed.own_company || {},
+    competitors: Array.isArray(parsed.competitors) ? parsed.competitors : [],
+    comparison_table: Array.isArray(parsed.comparison_table) ? parsed.comparison_table : [],
+    financial_insights: Array.isArray(parsed.financial_insights) ? parsed.financial_insights : [],
+    online_presence_insights: Array.isArray(parsed.online_presence_insights) ? parsed.online_presence_insights : [],
+    hiring_insights: Array.isArray(parsed.hiring_insights) ? parsed.hiring_insights : [],
+    strategic_takeaways: Array.isArray(parsed.strategic_takeaways) ? parsed.strategic_takeaways : [],
+    recommended_actions: Array.isArray(parsed.recommended_actions) ? parsed.recommended_actions : [],
+    annual_report_previews: previews,
+    export_text: buildDummy12ExportText({
+      executive_summary: Array.isArray(parsed.executive_summary) ? parsed.executive_summary : [],
+      own_company: parsed.own_company || {},
+      strategic_takeaways: Array.isArray(parsed.strategic_takeaways) ? parsed.strategic_takeaways : [],
+      recommended_actions: Array.isArray(parsed.recommended_actions) ? parsed.recommended_actions : []
+    })
+  };
 }
 
 function tokenizeDummy9(value) {
@@ -6071,6 +6414,48 @@ app.post("/api/jokers/dummy11/run", oDummy11Upload.array("files", 8), async func
   } catch (err) {
     res.status(500).json({
       error: "Dummy11 futtatasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/dummy12/analyze", oDummy12Upload.array("files", 24), async function(req, res) {
+  try {
+    const companies = parseOpenAiReply(String(req.body && req.body.companies ? req.body.companies : "[]")) || [];
+    const fileDescriptors = parseOpenAiReply(String(req.body && req.body.file_descriptors ? req.body.file_descriptors : "[]")) || [];
+
+    if (!Array.isArray(companies) || companies.length === 0) {
+      res.status(400).json({ error: "Legalabb egy ceg kotelezo." });
+      return;
+    }
+    if (companies.length > 5) {
+      res.status(400).json({ error: "Maximum 5 ceg elemezheto egyszerre." });
+      return;
+    }
+
+    const ownCompany = companies[0] || {};
+    if (!String(ownCompany.companyName || "").trim()) {
+      res.status(400).json({ error: "A sajat ceg neve kotelezo." });
+      return;
+    }
+
+    const fileEntries = await extractDummy12CompanyFiles(req.files || [], fileDescriptors);
+    const ownBalanceCount = fileEntries.filter(function(item) {
+      return Number(item.companyIndex) === 0 && item.kind === "balance";
+    }).length;
+    if (ownBalanceCount === 0) {
+      res.status(400).json({ error: "A sajat ceghez legalabb egy merleg / eves beszamolo PDF kotelezo." });
+      return;
+    }
+
+    const result = await analyzeDummy12({
+      companies: companies,
+      fileEntries: fileEntries
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      error: "Dummy12 elemzesi hiba",
       details: err && err.message ? err.message : String(err)
     });
   }
