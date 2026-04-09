@@ -1228,9 +1228,9 @@ sap.ui.define([
 
     _pollDummy12Job: async function(sJobId) {
       var oModel = this.getView().getModel("jokers");
-      var iGuard = 0;
-      while (iGuard < 120) {
-        iGuard += 1;
+      var iStartedAt = Date.now();
+      var iTimeoutMs = 15 * 60 * 1000;
+      while (Date.now() - iStartedAt < iTimeoutMs) {
         var oStatus = await AiService.getDummy12Status(sJobId);
         this._applyDummy12Status(oStatus);
         if (oStatus.status === "done") {
@@ -1240,10 +1240,11 @@ sap.ui.define([
           throw new Error(oStatus.error || "Dummy12 elemzesi hiba.");
         }
         await new Promise(function(resolve) {
-          window.setTimeout(resolve, 1200);
+          window.setTimeout(resolve, 1500);
         });
       }
-      throw new Error("A konkurenciaelemzes tul sokaig futott. Probald meg ujra.");
+      oModel.setProperty("/dummy12ProgressText", "Az elemzes a vartnal tovabb fut. Probald meg ujra, vagy nezd meg par perc mulva.");
+      throw new Error("A konkurenciaelemzes a vartnal tovabb futott. A feldolgozas a szerveren meg folytatodhat, probald meg ujra par perc mulva.");
     },
 
     _bindDummy9DropZoneEvents: function() {

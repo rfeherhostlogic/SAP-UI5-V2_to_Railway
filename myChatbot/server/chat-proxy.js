@@ -1944,49 +1944,58 @@ function buildDummy12PressPrompt(company) {
 
 async function analyzeDummy12PressCoverage(contexts) {
   const mentionItems = [];
-  const companySummaries = [];
-
-  for (let i = 0; i < (contexts || []).length; i += 1) {
-    const company = contexts[i];
+  const coverageResults = await Promise.all((contexts || []).map(async function(company) {
     if (!company || !company.company_name) {
-      continue;
+      return null;
     }
     try {
       const searchResp = await callOpenAiResponsesWebSearch(buildDummy12PressPrompt(company), DUMMY12_PRESS_MODEL);
       const parsed = parseLooseJsonObject(searchResp.text) || {};
       const items = Array.isArray(parsed.items) ? parsed.items : [];
-      items.forEach(function(item) {
-        mentionItems.push({
-          company_name: String(company.company_name || ""),
-          title: String(item.title || ""),
-          source_name: String(item.source_name || ""),
-          published_at: String(item.published_at || ""),
-          url: String(item.url || ""),
-          summary: String(item.summary || ""),
-          sentiment: String(item.sentiment || "semleges"),
-          relevance_reason: String(item.relevance_reason || "")
-        });
-      });
-      if (parsed.summary) {
-        companySummaries.push({
-          company_name: String(company.company_name || ""),
-          total_mentions: Number(parsed.summary.total_mentions || items.length || 0),
-          period_summary: String(parsed.summary.period_summary || ""),
-          top_mention: String(parsed.summary.top_mention || ""),
-          overall_sentiment: String(parsed.summary.overall_sentiment || "semleges")
-        });
-      }
-    } catch (err) {
-      companySummaries.push({
+      return {
         company_name: String(company.company_name || ""),
-        total_mentions: 0,
-        period_summary: "A sajtokereses ehhez a ceghez most nem volt elerheto.",
-        top_mention: "",
-        overall_sentiment: "ismeretlen",
-        error: err && err.message ? err.message : String(err)
-      });
+        items: items.map(function(item) {
+          return {
+            company_name: String(company.company_name || ""),
+            title: String(item.title || ""),
+            source_name: String(item.source_name || ""),
+            published_at: String(item.published_at || ""),
+            url: String(item.url || ""),
+            summary: String(item.summary || ""),
+            sentiment: String(item.sentiment || "semleges"),
+            relevance_reason: String(item.relevance_reason || "")
+          };
+        }),
+        summary: {
+          company_name: String(company.company_name || ""),
+          total_mentions: Number(parsed.summary && parsed.summary.total_mentions ? parsed.summary.total_mentions : (items.length || 0)),
+          period_summary: String(parsed.summary && parsed.summary.period_summary ? parsed.summary.period_summary : ""),
+          top_mention: String(parsed.summary && parsed.summary.top_mention ? parsed.summary.top_mention : ""),
+          overall_sentiment: String(parsed.summary && parsed.summary.overall_sentiment ? parsed.summary.overall_sentiment : "semleges")
+        }
+      };
+    } catch (err) {
+      return {
+        company_name: String(company.company_name || ""),
+        items: [],
+        summary: {
+          company_name: String(company.company_name || ""),
+          total_mentions: 0,
+          period_summary: "A sajtokereses ehhez a ceghez most nem volt elerheto.",
+          top_mention: "",
+          overall_sentiment: "ismeretlen",
+          error: err && err.message ? err.message : String(err)
+        }
+      };
     }
-  }
+  }));
+
+  const companySummaries = coverageResults.filter(Boolean).map(function(result) {
+    (result.items || []).forEach(function(item) {
+      mentionItems.push(item);
+    });
+    return result.summary;
+  });
 
   mentionItems.sort(function(a, b) {
     return String(b.published_at || "").localeCompare(String(a.published_at || ""));
