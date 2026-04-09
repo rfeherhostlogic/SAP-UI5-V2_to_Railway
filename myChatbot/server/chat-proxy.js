@@ -19,6 +19,7 @@ const app = express();
 const PORT = Number(process.env.PORT || process.env.CHAT_PROXY_PORT || 4000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const DUMMY12_PRESS_MODEL = process.env.DUMMY12_PRESS_MODEL || "gpt-5";
 const DUMMY7_MODEL = process.env.DUMMY7_MODEL || "gpt-4.1";
 const DUMMY7_VECTOR_STORE_ID = "vs_698f417bc0e481919720698508275ad3";
 const SMART_SEGMENT_VECTOR_STORE_ID = "vs_699ec6f7dc188191881c8d782ade2131";
@@ -1022,6 +1023,33 @@ async function callOpenAiText(messages, temperature) {
   return String(text || "").trim();
 }
 
+async function callOpenAiResponsesWebSearch(prompt, model) {
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + OPENAI_API_KEY
+    },
+    body: JSON.stringify({
+      model: model || DUMMY12_PRESS_MODEL,
+      input: String(prompt || ""),
+      tools: [{
+        type: "web_search_preview"
+      }]
+    })
+  });
+
+  const raw = await response.text();
+  const json = parseOpenAiReply(raw);
+  if (!response.ok) {
+    throw new Error("OpenAI web search hiba: " + (json ? JSON.stringify(json) : raw));
+  }
+  return {
+    json: json || {},
+    text: extractResponsesOutputText(json || {})
+  };
+}
+
 async function evaluateDummy11Prompt(payload) {
   if (!OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY hianyzik");
@@ -1749,6 +1777,11 @@ function buildDummy12ExportText(result) {
   sections.push("");
   sections.push("JAVASOLT AKCIOK");
   (result.recommended_actions || []).forEach(function(item) { sections.push("- " + item); });
+  if (result.press_summary && result.press_summary.summary) {
+    sections.push("");
+    sections.push("SAJTOMEGJELENESEK");
+    sections.push(String(result.press_summary.summary || ""));
+  }
   return sections.join("\n").trim();
 }
 
@@ -1875,6 +1908,102 @@ function buildDummy12Previews(contexts) {
   return previews;
 }
 
+function buildDummy12PressPrompt(company) {
+  const now = new Date();
+  const from = new Date(now.getTime() - 1000 * 60 * 60 * 24 * 365);
+  const domain = company && company.website_url ? String(company.website_url || "").replace(/^https?:\/\//i, "").replace(/\/.*$/, "") : "";
+  const aliases = [company && company.company_name ? String(company.company_name) : ""].filter(Boolean);
+  return [
+    "Feladatod, hogy web search API hasznalataval gyujtsd ossze es elemezd a megadott ceg online sajtomegjeleneseit.",
+    "",
+    "Vizsgalt ceg:",
+    "- cegnev: " + String(company && company.company_name ? company.company_name : ""),
+    "- alternativ nevek / rovid nev: " + aliases.join(", "),
+    "- hivatalos domain: " + domain,
+    "- opcionális tovabbi azonositok: " + [domain, company && company.linkedin_url ? company.linkedin_url : ""].filter(Boolean).join(", "),
+    "",
+    "Idoszak:",
+    "- csak a kovetkezo idoszakban megjelent talalatokat vizsgald: " + from.toISOString().slice(0, 10) + " - " + now.toISOString().slice(0, 10),
+    "",
+    "Keresesi szabalyok:",
+    "- csak egyertelmuen a cegre vonatkozo, nyilvanos online cikkeket vedd figyelembe",
+    "- zard ki a duplikalt vagy bizonytalan talalatokat",
+    "- a legfrissebb relevans talalatokkal kezdj",
+    "- ha nincs relevans talalat, ezt egyertelmuen jelezd",
+    "- ne talalj ki forrasokat vagy cikkeket",
+    "",
+    "A valaszod CSAK JSON legyen az alabbi schema szerint:",
+    "{",
+    '  "items": [',
+    '    {"title":"string","source_name":"string","published_at":"YYYY-MM-DD","url":"string","summary":"string","sentiment":"pozitiv|semleges|negativ","relevance_reason":"string"}',
+    "  ],",
+    '  "summary": {"total_mentions":0,"period_summary":"string","top_mention":"string","overall_sentiment":"string"}',
+    "}"
+  ].join("\n");
+}
+
+async function analyzeDummy12PressCoverage(contexts) {
+  const mentionItems = [];
+  const companySummaries = [];
+
+  for (let i = 0; i < (contexts || []).length; i += 1) {
+    const company = contexts[i];
+    if (!company || !company.company_name) {
+      continue;
+    }
+    try {
+      const searchResp = await callOpenAiResponsesWebSearch(buildDummy12PressPrompt(company), DUMMY12_PRESS_MODEL);
+      const parsed = parseLooseJsonObject(searchResp.text) || {};
+      const items = Array.isArray(parsed.items) ? parsed.items : [];
+      items.forEach(function(item) {
+        mentionItems.push({
+          company_name: String(company.company_name || ""),
+          title: String(item.title || ""),
+          source_name: String(item.source_name || ""),
+          published_at: String(item.published_at || ""),
+          url: String(item.url || ""),
+          summary: String(item.summary || ""),
+          sentiment: String(item.sentiment || "semleges"),
+          relevance_reason: String(item.relevance_reason || "")
+        });
+      });
+      if (parsed.summary) {
+        companySummaries.push({
+          company_name: String(company.company_name || ""),
+          total_mentions: Number(parsed.summary.total_mentions || items.length || 0),
+          period_summary: String(parsed.summary.period_summary || ""),
+          top_mention: String(parsed.summary.top_mention || ""),
+          overall_sentiment: String(parsed.summary.overall_sentiment || "semleges")
+        });
+      }
+    } catch (err) {
+      companySummaries.push({
+        company_name: String(company.company_name || ""),
+        total_mentions: 0,
+        period_summary: "A sajtokereses ehhez a ceghez most nem volt elerheto.",
+        top_mention: "",
+        overall_sentiment: "ismeretlen",
+        error: err && err.message ? err.message : String(err)
+      });
+    }
+  }
+
+  mentionItems.sort(function(a, b) {
+    return String(b.published_at || "").localeCompare(String(a.published_at || ""));
+  });
+
+  return {
+    mentions: mentionItems,
+    summary: {
+      total_mentions: mentionItems.length,
+      summary: companySummaries.map(function(item) {
+        return item.company_name + ": " + (item.period_summary || "Nincs relevans sajtotalalat.");
+      }).join(" "),
+      by_company: companySummaries
+    }
+  };
+}
+
 async function analyzeDummy12(payload) {
   if (!OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY hianyzik");
@@ -1947,7 +2076,8 @@ function createDummy12Job() {
     steps: [
       { step: 1, title: "Adatkinyeres", status: "pending", detail: "Merleg, eredmenykimutatas es letszam olvasasa." },
       { step: 2, title: "KPI szamitas", status: "pending", detail: "Mutatok szamitasa a KPI tabla alapjan." },
-      { step: 3, title: "Vezetoi osszefoglalo", status: "pending", detail: "CFO-szintu osszegzes es versenytars pozicionalas." }
+      { step: 3, title: "Vezetoi osszefoglalo", status: "pending", detail: "CFO-szintu osszegzes es versenytars pozicionalas." },
+      { step: 4, title: "Sajtomegjelenesek", status: "pending", detail: "Friss online sajtoanyagok webes osszegyujtese es osszegzese." }
     ]
   };
   oDummy12Jobs.set(id, job);
@@ -2016,10 +2146,14 @@ async function runDummy12Job(job, payload) {
     const kpiSummary = buildDummy12KpiItems(extractedFinancials);
     setDummy12JobStep(job, 2, "done", "KPI mutatok elkeszultek.", 70);
 
-    setDummy12JobStep(job, 3, "running", "CFO-szintu osszefoglalo es versenytars insightok generalasa...", 82);
+    setDummy12JobStep(job, 3, "running", "CFO-szintu osszefoglalo es versenytars insightok generalasa...", 78);
     const marketAnalysis = await generateDummy12MarketAnalysis(companyContexts);
     const cfoSummary = await generateDummy12CfoSummary(companyContexts, kpiSummary, marketAnalysis);
     const previews = buildDummy12Previews(companyContexts);
+    setDummy12JobStep(job, 3, "done", "Vezetoi osszefoglalo elkeszult.", 86);
+
+    setDummy12JobStep(job, 4, "running", "Sajtomegjelenesek gyujtese OpenAI web search API-val...", 92);
+    const pressCoverage = await analyzeDummy12PressCoverage(companyContexts);
     const result = {
       executive_summary: Array.isArray(cfoSummary.executive_summary) ? cfoSummary.executive_summary : [],
       own_company: Object.assign({
@@ -2038,6 +2172,8 @@ async function runDummy12Job(job, payload) {
       hiring_insights: Array.isArray(marketAnalysis.hiring_insights) ? marketAnalysis.hiring_insights : [],
       strategic_takeaways: Array.isArray(marketAnalysis.strategic_takeaways) ? marketAnalysis.strategic_takeaways : [],
       recommended_actions: Array.isArray(cfoSummary.recommended_actions) ? cfoSummary.recommended_actions : [],
+      press_mentions: pressCoverage.mentions,
+      press_summary: pressCoverage.summary,
       extracted_financials: extractedFinancials,
       kpi_items: kpiSummary.items,
       kpi_summary: kpiSummary.summary,
@@ -2050,7 +2186,7 @@ async function runDummy12Job(job, payload) {
       })
     };
 
-    setDummy12JobStep(job, 3, "done", "Vezetoi osszefoglalo elkeszult.", 100);
+    setDummy12JobStep(job, 4, "done", "Sajtomegjelenesek elemzese elkeszult.", 100);
     updateDummy12Job(job, {
       status: "done",
       result: result
