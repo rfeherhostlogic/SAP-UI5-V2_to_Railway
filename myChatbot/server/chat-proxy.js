@@ -1309,7 +1309,24 @@ function extractNumericTokensFromLine(line) {
     .match(/-?\d{1,3}(?:[ .]\d{3})*(?:,\d+)?|-?\d+(?:,\d+)?/g) || [];
 }
 
-function extractMetricByCode(text, code) {
+function extractTrailingYearValues(line) {
+  const tailMatch = /(\d[\d\s,.-]*)\s*$/.exec(String(line || ""));
+  if (!tailMatch) {
+    return null;
+  }
+  const numericTail = String(tailMatch[1] || "").trim();
+  const groups = numericTail.match(/\d{1,3}(?:,\d+)?/g) || [];
+  if (groups.length >= 2) {
+    const half = Math.ceil(groups.length / 2);
+    return {
+      current: parseHungarianNumber(groups.slice(0, half).join(" ")),
+      previous: parseHungarianNumber(groups.slice(half).join(" "))
+    };
+  }
+  return null;
+}
+
+function extractMetricByCode(text, code, matchers) {
   const matcher = new RegExp("^\\s*" + String(code) + "\\.?\\s+", "i");
   const lines = String(text || "").split(/\r?\n/);
   for (let i = 0; i < lines.length; i += 1) {
@@ -1317,16 +1334,27 @@ function extractMetricByCode(text, code) {
     if (!matcher.test(rawLine)) {
       continue;
     }
+    const normalizedLine = normalizeSearchText(rawLine);
+    if (Array.isArray(matchers) && matchers.length > 0) {
+      const hasMatcher = matchers.some(function(item) {
+        return normalizedLine.indexOf(normalizeSearchText(item)) >= 0;
+      });
+      if (!hasMatcher) {
+        continue;
+      }
+    }
     const lineWithoutCode = rawLine.replace(matcher, "");
-    const tokens = extractNumericTokensFromLine(lineWithoutCode)
+    const sanitizedLine = lineWithoutCode.replace(/^(?:[A-ZIVX]+|\d+)\.\s+/i, "");
+    const trailing = extractTrailingYearValues(sanitizedLine);
+    const tokens = extractNumericTokensFromLine(sanitizedLine)
       .map(function(token) {
         return parseHungarianNumber(token);
       })
       .filter(function(num) {
         return num != null;
       });
-    const current = tokens.length > 0 ? tokens[0] : null;
-    const previous = tokens.length > 1 ? tokens[1] : null;
+    const current = trailing ? trailing.current : (tokens.length > 0 ? tokens[tokens.length - 2 >= 0 ? tokens.length - 2 : 0] : null);
+    const previous = trailing ? trailing.previous : (tokens.length > 1 ? tokens[tokens.length - 1] : null);
     return {
       code: String(code),
       line: rawLine,
@@ -1410,25 +1438,25 @@ function buildAnnualReportPreview(fileName, rawText) {
 }
 
 const DUMMY12_FINANCIAL_CODE_MAP = [
-  { code: "003", key: "revenue", label: "Arbevetel", sourceType: "profit_loss" },
-  { code: "014", key: "material_costs", label: "Anyagjellegu raforditas", sourceType: "profit_loss" },
-  { code: "015", key: "salary_costs", label: "Berkoltseg", sourceType: "profit_loss" },
-  { code: "018", key: "personnel_costs", label: "Szemelyi jellegu raforditas", sourceType: "profit_loss" },
-  { code: "019", key: "depreciation", label: "Ertekcsokkenes", sourceType: "profit_loss" },
-  { code: "022", key: "operating_profit", label: "Uzemi eredmeny", sourceType: "profit_loss" },
-  { code: "038", key: "interest_costs", label: "Kamatok", sourceType: "profit_loss" },
-  { code: "048", key: "net_income", label: "Adozott eredmeny", sourceType: "profit_loss" },
-  { code: "031", key: "current_assets", label: "Forgoeszkozok", sourceType: "balance_sheet" },
-  { code: "032", key: "inventory", label: "Keszletek", sourceType: "balance_sheet" },
-  { code: "040", key: "receivables", label: "Vevok", sourceType: "balance_sheet" },
-  { code: "055", key: "cash", label: "Penzeszkozok", sourceType: "balance_sheet" },
-  { code: "062", key: "total_assets", label: "Eszkozok osszesen", sourceType: "balance_sheet" },
-  { code: "064", key: "equity", label: "Sajat toke", sourceType: "balance_sheet" },
-  { code: "079", key: "total_liabilities", label: "Kotelezettsegek", sourceType: "balance_sheet" },
-  { code: "085", key: "long_term_liabilities", label: "Hosszu lejaratu kotelezettsegek", sourceType: "balance_sheet" },
-  { code: "096", key: "short_term_liabilities", label: "Rovid lejaratu kotelezettsegek", sourceType: "balance_sheet" },
-  { code: "101", key: "payables", label: "Szallitok", sourceType: "balance_sheet" },
-  { code: "113", key: "total_sources", label: "Forrasok osszesen", sourceType: "balance_sheet" }
+  { code: "003", key: "revenue", label: "Arbevetel", sourceType: "profit_loss", matchers: ["ertekesites netto arbevetele", "arbevetele"] },
+  { code: "014", key: "material_costs", label: "Anyagjellegu raforditas", sourceType: "profit_loss", matchers: ["anyagjellegu raforditas"] },
+  { code: "015", key: "salary_costs", label: "Berkoltseg", sourceType: "profit_loss", matchers: ["berkoltseg"] },
+  { code: "018", key: "personnel_costs", label: "Szemelyi jellegu raforditas", sourceType: "profit_loss", matchers: ["szemelyi jellegu raforditas"] },
+  { code: "019", key: "depreciation", label: "Ertekcsokkenes", sourceType: "profit_loss", matchers: ["ertekcsokkenesi leiras", "ertekcsokkenes"] },
+  { code: "022", key: "operating_profit", label: "Uzemi eredmeny", sourceType: "profit_loss", matchers: ["uzemi (uzleti) tevekenyseg eredmenye", "uzemi tevekenyseg eredmenye"] },
+  { code: "038", key: "interest_costs", label: "Kamatok", sourceType: "profit_loss", matchers: ["fizetendo kamatok", "kamatr"] },
+  { code: "048", key: "net_income", label: "Adozott eredmeny", sourceType: "profit_loss", matchers: ["adozott eredmeny"] },
+  { code: "031", key: "current_assets", label: "Forgoeszkozok", sourceType: "balance_sheet", matchers: ["forgoeszkozok"] },
+  { code: "032", key: "inventory", label: "Keszletek", sourceType: "balance_sheet", matchers: ["keszletek"] },
+  { code: "040", key: "receivables", label: "Vevok", sourceType: "balance_sheet", matchers: ["kovetelesek aruszallitasbol", "vevok"] },
+  { code: "055", key: "cash", label: "Penzeszkozok", sourceType: "balance_sheet", matchers: ["penzeszkozok"] },
+  { code: "062", key: "total_assets", label: "Eszkozok osszesen", sourceType: "balance_sheet", matchers: ["eszkozok (aktivak) osszesen", "eszkozok osszesen"] },
+  { code: "064", key: "equity", label: "Sajat toke", sourceType: "balance_sheet", matchers: ["sajat toke"] },
+  { code: "079", key: "total_liabilities", label: "Kotelezettsegek", sourceType: "balance_sheet", matchers: ["kotelezettsegek"] },
+  { code: "085", key: "long_term_liabilities", label: "Hosszu lejaratu kotelezettsegek", sourceType: "balance_sheet", matchers: ["hosszu lejaratu kotelezettsegek"] },
+  { code: "096", key: "short_term_liabilities", label: "Rovid lejaratu kotelezettsegek", sourceType: "balance_sheet", matchers: ["rovid lejaratu kotelezettsegek"] },
+  { code: "101", key: "payables", label: "Szallitok", sourceType: "balance_sheet", matchers: ["kotelezettsegek aruszallitasbol", "szallitok"] },
+  { code: "113", key: "total_sources", label: "Forrasok osszesen", sourceType: "balance_sheet", matchers: ["forrasok (passzivak) osszesen", "forrasok osszesen"] }
 ];
 
 function formatMetricDisplay(value, isPercent) {
@@ -1503,24 +1531,27 @@ function averageNumeric(values) {
   }, 0) / filtered.length;
 }
 
-function extractDummy12FinancialDataset(companyName, reportEntries, balanceEntries) {
-  const reportText = (reportEntries || []).map(function(item) {
+function computeYoYChange(current, previous) {
+  if (current == null || previous == null || !isFinite(current) || !isFinite(previous) || previous === 0) {
+    return null;
+  }
+  return ((Number(current) - Number(previous)) / Math.abs(Number(previous))) * 100;
+}
+
+function extractDummy12FinancialDataset(companyName, annualReportEntries) {
+  const combinedText = (annualReportEntries || []).map(function(item) {
     return String(item && item.text ? item.text : "");
   }).join("\n");
-  const balanceText = (balanceEntries || []).map(function(item) {
-    return String(item && item.text ? item.text : "");
-  }).join("\n");
-  const combinedText = [reportText, balanceText].filter(Boolean).join("\n");
   const metrics = {};
 
   DUMMY12_FINANCIAL_CODE_MAP.forEach(function(def) {
-    const sourceText = def.sourceType === "balance_sheet" ? [balanceText, reportText].filter(Boolean).join("\n") : [reportText, balanceText].filter(Boolean).join("\n");
-    const found = extractMetricByCode(sourceText, def.code);
+    const found = extractMetricByCode(combinedText, def.code, def.matchers || []);
     metrics[def.key] = {
       code: def.code,
       label: def.label,
       current: found ? found.current : null,
       previous: found ? found.previous : null,
+      yoy_change_percent: found ? computeYoYChange(found.current, found.previous) : null,
       source_line: found ? found.line : ""
     };
   });
@@ -1531,6 +1562,7 @@ function extractDummy12FinancialDataset(companyName, reportEntries, balanceEntri
     label: "Letszam",
     current: headcount ? headcount.current : null,
     previous: headcount ? headcount.previous : null,
+    yoy_change_percent: headcount ? computeYoYChange(headcount.current, headcount.previous) : null,
     source_line: headcount ? headcount.line : ""
   };
 
@@ -1545,6 +1577,7 @@ function extractDummy12FinancialDataset(companyName, reportEntries, balanceEntri
         mutato: item.label,
         aktualis: item.current,
         elozo: item.previous,
+        valtozasSzazalek: item.yoy_change_percent,
         forras: item.source_line || "-"
       };
     })
@@ -1559,160 +1592,81 @@ function buildDummy12KpiItems(financialDatasets) {
     return ownData.metrics && ownData.metrics[key] ? ownData.metrics[key].current : null;
   }
 
+  function ownPrevious(key) {
+    return ownData.metrics && ownData.metrics[key] ? ownData.metrics[key].previous : null;
+  }
+
   function competitorAverage(key) {
     return averageNumeric(competitorData.map(function(item) {
       return item && item.metrics && item.metrics[key] ? item.metrics[key].current : null;
     }));
   }
 
-  const computed = DUMMY12_KPI_DEFINITIONS.map(function(def) {
-    let ownValue = null;
-    let benchmarkValue = null;
-    switch (def.code) {
+  function computeKpiValue(code, metricsAccessor) {
+    switch (code) {
       case "operating_margin":
-        ownValue = safeDivide(own("operating_profit"), own("revenue"), 100);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.operating_profit.current, item.metrics.revenue.current, 100);
-        }));
-        break;
+        return safeDivide(metricsAccessor("operating_profit"), metricsAccessor("revenue"), 100);
       case "net_margin":
-        ownValue = safeDivide(own("net_income"), own("revenue"), 100);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.net_income.current, item.metrics.revenue.current, 100);
-        }));
-        break;
+        return safeDivide(metricsAccessor("net_income"), metricsAccessor("revenue"), 100);
       case "roe":
-        ownValue = safeDivide(own("net_income"), own("equity"), 100);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.net_income.current, item.metrics.equity.current, 100);
-        }));
-        break;
+        return safeDivide(metricsAccessor("net_income"), metricsAccessor("equity"), 100);
       case "roa":
-        ownValue = safeDivide(own("net_income"), own("total_assets"), 100);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.net_income.current, item.metrics.total_assets.current, 100);
-        }));
-        break;
+        return safeDivide(metricsAccessor("net_income"), metricsAccessor("total_assets"), 100);
       case "ebitda_margin":
-        ownValue = safeDivide((own("operating_profit") || 0) + (own("depreciation") || 0), own("revenue"), 100);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide((item.metrics.operating_profit.current || 0) + (item.metrics.depreciation.current || 0), item.metrics.revenue.current, 100);
-        }));
-        break;
+        return safeDivide((metricsAccessor("operating_profit") || 0) + (metricsAccessor("depreciation") || 0), metricsAccessor("revenue"), 100);
       case "revenue_per_employee":
       case "revenue_per_fte":
-        ownValue = safeDivide(own("revenue"), own("headcount"), 1);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.revenue.current, item.metrics.headcount.current, 1);
-        }));
-        break;
+        return safeDivide(metricsAccessor("revenue"), metricsAccessor("headcount"), 1);
       case "material_cost_ratio":
-        ownValue = safeDivide(own("material_costs"), own("revenue"), 100);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.material_costs.current, item.metrics.revenue.current, 100);
-        }));
-        break;
+        return safeDivide(metricsAccessor("material_costs"), metricsAccessor("revenue"), 100);
       case "personnel_cost_ratio":
-        ownValue = safeDivide(own("personnel_costs"), own("revenue"), 100);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.personnel_costs.current, item.metrics.revenue.current, 100);
-        }));
-        break;
+        return safeDivide(metricsAccessor("personnel_costs"), metricsAccessor("revenue"), 100);
       case "current_ratio":
-        ownValue = safeDivide(own("current_assets"), own("short_term_liabilities"), 1);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.current_assets.current, item.metrics.short_term_liabilities.current, 1);
-        }));
-        break;
+        return safeDivide(metricsAccessor("current_assets"), metricsAccessor("short_term_liabilities"), 1);
       case "quick_ratio":
-        ownValue = safeDivide((own("current_assets") || 0) - (own("inventory") || 0), own("short_term_liabilities"), 1);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide((item.metrics.current_assets.current || 0) - (item.metrics.inventory.current || 0), item.metrics.short_term_liabilities.current, 1);
-        }));
-        break;
+        return safeDivide((metricsAccessor("current_assets") || 0) - (metricsAccessor("inventory") || 0), metricsAccessor("short_term_liabilities"), 1);
       case "cash_ratio":
-        ownValue = safeDivide(own("cash"), own("short_term_liabilities"), 1);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.cash.current, item.metrics.short_term_liabilities.current, 1);
-        }));
-        break;
+        return safeDivide(metricsAccessor("cash"), metricsAccessor("short_term_liabilities"), 1);
       case "equity_ratio":
-        ownValue = safeDivide(own("equity"), own("total_sources"), 100);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.equity.current, item.metrics.total_sources.current, 100);
-        }));
-        break;
+        return safeDivide(metricsAccessor("equity"), metricsAccessor("total_sources"), 100);
       case "debt_ratio":
-        ownValue = safeDivide(own("total_liabilities"), own("total_sources"), 100);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.total_liabilities.current, item.metrics.total_sources.current, 100);
-        }));
-        break;
+        return safeDivide(metricsAccessor("total_liabilities"), metricsAccessor("total_sources"), 100);
       case "interest_coverage":
-        ownValue = safeDivide(own("operating_profit"), own("interest_costs"), 1);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.operating_profit.current, item.metrics.interest_costs.current, 1);
-        }));
-        break;
+        return safeDivide(metricsAccessor("operating_profit"), metricsAccessor("interest_costs"), 1);
       case "long_term_debt_ratio":
-        ownValue = safeDivide(own("long_term_liabilities"), own("total_sources"), 100);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.long_term_liabilities.current, item.metrics.total_sources.current, 100);
-        }));
-        break;
+        return safeDivide(metricsAccessor("long_term_liabilities"), metricsAccessor("total_sources"), 100);
       case "asset_turnover":
-        ownValue = safeDivide(own("revenue"), own("total_assets"), 1);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.revenue.current, item.metrics.total_assets.current, 1);
-        }));
-        break;
+        return safeDivide(metricsAccessor("revenue"), metricsAccessor("total_assets"), 1);
       case "receivables_ratio":
-        ownValue = safeDivide(own("receivables"), own("revenue"), 100);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.receivables.current, item.metrics.revenue.current, 100);
-        }));
-        break;
+        return safeDivide(metricsAccessor("receivables"), metricsAccessor("revenue"), 100);
       case "payables_ratio":
-        ownValue = safeDivide(own("payables"), own("material_costs"), 100);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.payables.current, item.metrics.material_costs.current, 100);
-        }));
-        break;
+        return safeDivide(metricsAccessor("payables"), metricsAccessor("material_costs"), 100);
       case "operating_profit_per_fte":
-        ownValue = safeDivide(own("operating_profit"), own("headcount"), 1);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.operating_profit.current, item.metrics.headcount.current, 1);
-        }));
-        break;
+        return safeDivide(metricsAccessor("operating_profit"), metricsAccessor("headcount"), 1);
       case "net_profit_per_fte":
-        ownValue = safeDivide(own("net_income"), own("headcount"), 1);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.net_income.current, item.metrics.headcount.current, 1);
-        }));
-        break;
+        return safeDivide(metricsAccessor("net_income"), metricsAccessor("headcount"), 1);
       case "salary_per_fte":
-        ownValue = safeDivide(own("salary_costs"), own("headcount"), 1);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.salary_costs.current, item.metrics.headcount.current, 1);
-        }));
-        break;
+        return safeDivide(metricsAccessor("salary_costs"), metricsAccessor("headcount"), 1);
       case "personnel_cost_per_fte":
-        ownValue = safeDivide(own("personnel_costs"), own("headcount"), 1);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.personnel_costs.current, item.metrics.headcount.current, 1);
-        }));
-        break;
+        return safeDivide(metricsAccessor("personnel_costs"), metricsAccessor("headcount"), 1);
       case "assets_per_fte":
-        ownValue = safeDivide(own("total_assets"), own("headcount"), 1);
-        benchmarkValue = averageNumeric(competitorData.map(function(item) {
-          return safeDivide(item.metrics.total_assets.current, item.metrics.headcount.current, 1);
-        }));
-        break;
+        return safeDivide(metricsAccessor("total_assets"), metricsAccessor("headcount"), 1);
       default:
-        break;
+        return null;
     }
+  }
+
+  const computed = DUMMY12_KPI_DEFINITIONS.map(function(def) {
+    var ownValue = computeKpiValue(def.code, own);
+    var ownPreviousValue = computeKpiValue(def.code, ownPrevious);
+    var benchmarkValue = averageNumeric(competitorData.map(function(item) {
+      return computeKpiValue(def.code, function(key) {
+        return item && item.metrics && item.metrics[key] ? item.metrics[key].current : null;
+      });
+    }));
 
     const isPercent = /margin|ratio|roe|roa/.test(def.code);
+    const yoyChange = computeYoYChange(ownValue, ownPreviousValue);
     return {
       key: def.code,
       category: def.category,
@@ -1720,10 +1674,14 @@ function buildDummy12KpiItems(financialDatasets) {
       formulaLabel: def.formulaLabel,
       source: def.source,
       ownValue: ownValue,
+      ownPreviousValue: ownPreviousValue,
       benchmarkValue: benchmarkValue,
       ownDisplayValue: formatMetricDisplay(ownValue, isPercent),
+      ownPreviousDisplayValue: formatMetricDisplay(ownPreviousValue, isPercent),
       benchmarkDisplayValue: formatMetricDisplay(benchmarkValue, isPercent),
       deltaDisplayValue: ownValue != null && benchmarkValue != null ? formatMetricDisplay(ownValue - benchmarkValue, isPercent) : "-",
+      yoyChangePercent: yoyChange,
+      yoyDisplayValue: formatMetricDisplay(yoyChange, true),
       color: evaluateKpiStatus(def.code, ownValue, benchmarkValue)
     };
   }).filter(function(item) {
@@ -1731,7 +1689,7 @@ function buildDummy12KpiItems(financialDatasets) {
   });
 
   const summary = computed.slice(0, 6).map(function(item) {
-    return item.name + ": sajat ceg " + item.ownDisplayValue + ", versenytars atlag " + item.benchmarkDisplayValue;
+    return item.name + ": sajat ceg " + item.ownDisplayValue + ", elozo ev " + item.ownPreviousDisplayValue + ", valtozas " + item.yoyDisplayValue + ", versenytars atlag " + item.benchmarkDisplayValue;
   });
 
   return {
@@ -1749,7 +1707,7 @@ async function extractDummy12CompanyFiles(files, descriptors) {
     const file = inputFiles[i] || {};
     const descriptor = metaList[i] || {};
     const name = String(file.originalname || descriptor.name || ("document_" + i + ".pdf"));
-    const kind = String(descriptor.kind || "report");
+    const kind = String(descriptor.kind || "annual_report");
     const companyIndex = Number(descriptor.company_index || 0);
     const mime = String(file.mimetype || "").toLowerCase();
     let text = "";
@@ -1798,9 +1756,7 @@ function summarizeDummy12FileReadiness(fileEntries, companyIndex) {
   const relevant = (fileEntries || []).filter(function(item) {
     return Number(item.companyIndex) === Number(companyIndex);
   });
-  const reportCount = relevant.filter(function(item) { return item.kind === "report"; }).length;
-  const balanceCount = relevant.filter(function(item) { return item.kind === "balance"; }).length;
-  return "Feltoltott riport PDF: " + reportCount + ", penzugyi PDF: " + balanceCount + ".";
+  return "Feltoltott eves beszamolo PDF: " + relevant.length + ".";
 }
 
 async function buildDummy12CompanyContexts(payload) {
@@ -1810,15 +1766,12 @@ async function buildDummy12CompanyContexts(payload) {
 
   for (let i = 0; i < companies.length; i += 1) {
     const company = companies[i] || {};
-    const reports = fileEntries.filter(function(item) {
-      return Number(item.companyIndex) === i && item.kind === "report";
-    });
-    const balances = fileEntries.filter(function(item) {
-      return Number(item.companyIndex) === i && item.kind === "balance";
+    const annualReports = fileEntries.filter(function(item) {
+      return Number(item.companyIndex) === i && item.kind === "annual_report";
     });
     const websiteSnapshot = company.websiteUrl ? await fetchPublicPageSnapshot(company.websiteUrl) : null;
     const linkedinSnapshot = company.linkedinUrl ? await fetchPublicPageSnapshot(company.linkedinUrl) : null;
-    const financialDataset = extractDummy12FinancialDataset(company.companyName, reports, balances);
+    const financialDataset = extractDummy12FinancialDataset(company.companyName, annualReports);
 
     contexts.push({
       role: i === 0 ? "own" : "competitor",
@@ -1827,14 +1780,7 @@ async function buildDummy12CompanyContexts(payload) {
       linkedin_url: String(company.linkedinUrl || ""),
       website_snapshot: websiteSnapshot,
       linkedin_snapshot: linkedinSnapshot,
-      annual_reports: reports.map(function(item) {
-        return {
-          file_name: item.name,
-          extracted_text_excerpt: String(item.text || "").replace(/\s+/g, " ").trim().slice(0, 5000),
-          preview: item.preview
-        };
-      }),
-      balance_sheets: balances.map(function(item) {
+      annual_reports: annualReports.map(function(item) {
         return {
           file_name: item.name,
           extracted_text_excerpt: String(item.text || "").replace(/\s+/g, " ").trim().slice(0, 5000),
@@ -1882,7 +1828,7 @@ async function generateDummy12CfoSummary(contexts, kpiSummary, marketAnalysis) {
   const systemPrompt = [
     "Te egy senior strategiai es penzugyi tanacsado AI vagy CFO celkozonsegnek.",
     "Keszits tomor, adatvezerelt, uzleti dontest tamogato vezeto osszefoglalot.",
-    "A hangsuly a fo penzugyi trendeken, versenytars osszevetesen, kockazatokon es lehetosegeken legyen.",
+    "A hangsuly a fo penzugyi trendeken, az elozo evhez viszonyitott valtozasokon, versenytars osszevetesen, kockazatokon es lehetosegeken legyen.",
     "Ne talalj ki tenyeket. Ha adat hianyzik, jelezd roviden.",
     "A valaszod CSAK JSON legyen.",
     "{",
@@ -1923,12 +1869,6 @@ function buildDummy12Previews(contexts) {
       previews.push(Object.assign({
         companyName: company.company_name,
         sourceKind: "annual_report"
-      }, report.preview || {}));
-    });
-    (company.balance_sheets || []).forEach(function(report) {
-      previews.push(Object.assign({
-        companyName: company.company_name,
-        sourceKind: "balance_sheet"
       }, report.preview || {}));
     });
   });
@@ -7065,18 +7005,15 @@ app.post("/api/jokers/dummy12/start", oDummy12Upload.array("files", 24), async f
     }
 
     const fileEntries = await extractDummy12CompanyFiles(req.files || [], fileDescriptors);
-    const ownBalanceCount = fileEntries.filter(function(item) {
-      return Number(item.companyIndex) === 0 && item.kind === "balance";
+    const ownAnnualReportCount = fileEntries.filter(function(item) {
+      return Number(item.companyIndex) === 0 && item.kind === "annual_report";
     }).length;
-    const ownReportCount = fileEntries.filter(function(item) {
-      return Number(item.companyIndex) === 0 && item.kind === "report";
-    }).length;
-    if (ownBalanceCount === 0) {
-      res.status(400).json({ error: "A sajat ceghez legalabb egy merleg / eves beszamolo PDF kotelezo." });
+    if (ownAnnualReportCount === 0) {
+      res.status(400).json({ error: "A sajat ceghez egy eves beszamolo PDF kotelezo." });
       return;
     }
-    if (ownReportCount === 0) {
-      res.status(400).json({ error: "A sajat ceghez legalabb egy eves jelentest vagy eredmenykimutatast tartalmazo PDF is kotelezo." });
+    if (ownAnnualReportCount > 1) {
+      res.status(400).json({ error: "A sajat ceghez csak egy eves beszamolo PDF adhato meg." });
       return;
     }
 

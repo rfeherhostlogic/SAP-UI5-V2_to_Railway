@@ -484,19 +484,11 @@ sap.ui.define([
     },
 
     onDummy12ReportFileChange: function(oEvent) {
-      this._appendDummy12Files(oEvent, "reportFiles");
-    },
-
-    onDummy12BalanceFileChange: function(oEvent) {
-      this._appendDummy12Files(oEvent, "balanceFiles");
+      this._appendDummy12Files(oEvent, "annualReportFiles");
     },
 
     onDummy12RemoveReportFile: function(oEvent) {
-      this._removeDummy12FileFromPath(oEvent, "reportFiles");
-    },
-
-    onDummy12RemoveBalanceFile: function(oEvent) {
-      this._removeDummy12FileFromPath(oEvent, "balanceFiles");
+      this._removeDummy12FileFromPath(oEvent, "annualReportFiles");
     },
 
     onRunDummy12Analysis: async function() {
@@ -551,7 +543,7 @@ sap.ui.define([
       oModel.setProperty("/dummy12SelectedPreviewId", sPreviewId);
       oModel.setProperty("/dummy12SelectedPreviewTitle", String((oItem.companyName || "") + " - " + (oItem.fileName || "")).trim());
       oModel.setProperty("/dummy12SelectedPreviewSummary", String(oItem.summary || ""));
-      oModel.setProperty("/dummy12SelectedPreviewRows", oItem.sourceKind === "balance_sheet" ? (oItem.metricRows || []) : ((oItem.metricRows || []).concat(oItem.sectionRows || [])));
+      oModel.setProperty("/dummy12SelectedPreviewRows", (oItem.metricRows || []).concat(oItem.sectionRows || []));
       this._rebindDummy12PreviewTable();
     },
 
@@ -1041,8 +1033,7 @@ sap.ui.define([
         companyName: "",
         websiteUrl: "",
         linkedinUrl: "",
-        reportFiles: [],
-        balanceFiles: []
+        annualReportFiles: []
       };
     },
 
@@ -1089,21 +1080,13 @@ sap.ui.define([
       var oModel = this.getView().getModel("jokers");
       var aCompanies = (oModel.getProperty("/dummy12Companies") || []).slice();
       var oCompany = Object.assign({}, aCompanies[iIndex] || {});
-      var aCurrent = Array.isArray(oCompany[sKey]) ? oCompany[sKey].slice() : [];
-      var mSeen = {};
-      aCurrent.forEach(function(oFile) {
-        mSeen[(oFile.name || "") + "|" + Number(oFile.size || 0)] = true;
-      });
+      var aCurrent = [];
       aFiles.forEach(function(oFile) {
         var sExt = String(oFile.name || "").toLowerCase();
         if (String(oFile.type || "").toLowerCase() !== "application/pdf" && sExt.slice(-4) !== ".pdf") {
           return;
         }
-        var sId = (oFile.name || "") + "|" + Number(oFile.size || 0);
-        if (!mSeen[sId]) {
-          mSeen[sId] = true;
-          aCurrent.push(oFile);
-        }
+        aCurrent = [oFile];
       });
       oCompany[sKey] = aCurrent;
       aCompanies[iIndex] = oCompany;
@@ -1141,16 +1124,19 @@ sap.ui.define([
       if (!String(aCompanies[0].companyName || "").trim()) {
         return { ok: false, message: "A sajat ceg neve kotelezo." };
       }
-      if (!Array.isArray(aCompanies[0].balanceFiles) || aCompanies[0].balanceFiles.length === 0) {
-        return { ok: false, message: "A sajat ceghez legalabb egy eves beszamolo / merleg PDF kotelezo." };
+      if (!Array.isArray(aCompanies[0].annualReportFiles) || aCompanies[0].annualReportFiles.length === 0) {
+        return { ok: false, message: "A sajat ceghez pontosan egy eves beszamolo PDF kotelezo." };
       }
-      if (!Array.isArray(aCompanies[0].reportFiles) || aCompanies[0].reportFiles.length === 0) {
-        return { ok: false, message: "A sajat ceghez legalabb egy eves jelentest vagy eredmenykimutatast tartalmazo PDF-et is tolts fel." };
+      if ((aCompanies[0].annualReportFiles || []).length > 1) {
+        return { ok: false, message: "A sajat ceghez csak egy eves beszamolo PDF adhato meg." };
       }
       for (var i = 0; i < aCompanies.length; i += 1) {
         var oCompany = aCompanies[i] || {};
         if (!String(oCompany.companyName || "").trim()) {
           return { ok: false, message: "Minden cegkartyan add meg a ceg nevet." };
+        }
+        if ((oCompany.annualReportFiles || []).length > 1) {
+          return { ok: false, message: "Cegenkent csak egy eves beszamolo PDF adhato meg." };
         }
         if (oCompany.websiteUrl && !/^https?:\/\/.+/i.test(String(oCompany.websiteUrl || "").trim())) {
           return { ok: false, message: "A weboldal URL csak http:// vagy https:// formatumu lehet." };
@@ -1166,20 +1152,12 @@ sap.ui.define([
       var aFiles = [];
       var aDescriptors = [];
       var aCompaniesPayload = (aCompanies || []).map(function(oCompany, iIndex) {
-        (oCompany.reportFiles || []).forEach(function(oFile) {
+        (oCompany.annualReportFiles || []).forEach(function(oFile) {
           aFiles.push(oFile);
           aDescriptors.push({
             company_index: iIndex,
-            kind: "report",
-            name: oFile.name || "report.pdf"
-          });
-        });
-        (oCompany.balanceFiles || []).forEach(function(oFile) {
-          aFiles.push(oFile);
-          aDescriptors.push({
-            company_index: iIndex,
-            kind: "balance",
-            name: oFile.name || "balance.pdf"
+            kind: "annual_report",
+            name: oFile.name || "annual_report.pdf"
           });
         });
         return {
