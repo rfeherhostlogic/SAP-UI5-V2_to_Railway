@@ -13,6 +13,7 @@ const { PDFParse } = require("pdf-parse");
 const PDFDocument = require("pdfkit");
 const { executeDummy4, SQL_PROMPTS, SUMMARY_PROMPTS } = require("./dummy4Service");
 const { parseSchemaHint, validateSelectSql } = require("./sqlValidator");
+const DUMMY12_KPI_DEFINITIONS = require("./dummy12_kpis.json");
 
 const app = express();
 const PORT = Number(process.env.PORT || process.env.CHAT_PROXY_PORT || 4000);
@@ -46,11 +47,13 @@ const DISCOVERY_JOBS_DIR = path.resolve(
   process.env.DISCOVERY_JOBS_DIR || path.join(__dirname, "jobs")
 );
 const SHIELD_SCHEDULER_INTERVAL_MS = Number(process.env.SHIELD_SCHEDULER_INTERVAL_MS || 30 * 1000);
+const DUMMY12_JOB_TTL_MS = Number(process.env.DUMMY12_JOB_TTL_MS || 30 * 60 * 1000);
 
 let oDummy4ChartCache = null;
 const oDummy5Docs = new Map();
 const oDiscoverySpecSessions = new Map();
 const oDiscoveryJobs = new Map();
+const oDummy12Jobs = new Map();
 const oAuthSessions = new Map();
 let oShieldSchedulerTimer = null;
 const AUTH_USERS = loadAuthUsersFromEnv();
@@ -1291,6 +1294,84 @@ function extractFinancialMetricLine(text, patterns) {
   };
 }
 
+function parseHungarianNumber(value) {
+  const cleaned = String(value || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, "")
+    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
+    .replace(/,(?=\d{1,6}(?:\D|$))/g, ".");
+  const num = Number(cleaned);
+  return isFinite(num) ? num : null;
+}
+
+function extractNumericTokensFromLine(line) {
+  return String(line || "")
+    .match(/-?\d{1,3}(?:[ .]\d{3})*(?:,\d+)?|-?\d+(?:,\d+)?/g) || [];
+}
+
+function extractMetricByCode(text, code) {
+  const matcher = new RegExp("^\\s*" + String(code) + "\\.?\\s+", "i");
+  const lines = String(text || "").split(/\r?\n/);
+  for (let i = 0; i < lines.length; i += 1) {
+    const rawLine = String(lines[i] || "").trim();
+    if (!matcher.test(rawLine)) {
+      continue;
+    }
+    const lineWithoutCode = rawLine.replace(matcher, "");
+    const tokens = extractNumericTokensFromLine(lineWithoutCode)
+      .map(function(token) {
+        return parseHungarianNumber(token);
+      })
+      .filter(function(num) {
+        return num != null;
+      });
+    const current = tokens.length > 0 ? tokens[0] : null;
+    const previous = tokens.length > 1 ? tokens[1] : null;
+    return {
+      code: String(code),
+      line: rawLine,
+      current: current,
+      previous: previous,
+      rawValues: tokens
+    };
+  }
+  return null;
+}
+
+function extractHeadcountValue(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const patterns = [
+    /atlagos statisztikai allomanyi letszam/i,
+    /\bletszam\b/i,
+    /atlagos allomanyi letszam/i
+  ];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = String(lines[i] || "").trim();
+    const normalized = normalizeSearchText(line);
+    if (!patterns.some(function(pattern) { return pattern.test(normalized); })) {
+      continue;
+    }
+    const tokens = extractNumericTokensFromLine(line)
+      .map(function(token) {
+        return parseHungarianNumber(token);
+      })
+      .filter(function(num) {
+        return num != null;
+      });
+    const candidates = tokens.filter(function(num) {
+      return Math.abs(num) <= 100000;
+    });
+    if (candidates.length > 0) {
+      return {
+        line: line,
+        current: candidates[candidates.length - 1],
+        previous: candidates.length > 1 ? candidates[candidates.length - 2] : null
+      };
+    }
+  }
+  return null;
+}
+
 function buildAnnualReportPreview(fileName, rawText) {
   const text = String(rawText || "");
   const compact = text.replace(/\s+/g, " ").trim();
@@ -1325,6 +1406,337 @@ function buildAnnualReportPreview(fileName, rawText) {
     summary: compact.slice(0, 1000),
     metricRows: metrics,
     sectionRows: sections
+  };
+}
+
+const DUMMY12_FINANCIAL_CODE_MAP = [
+  { code: "003", key: "revenue", label: "Arbevetel", sourceType: "profit_loss" },
+  { code: "014", key: "material_costs", label: "Anyagjellegu raforditas", sourceType: "profit_loss" },
+  { code: "015", key: "salary_costs", label: "Berkoltseg", sourceType: "profit_loss" },
+  { code: "018", key: "personnel_costs", label: "Szemelyi jellegu raforditas", sourceType: "profit_loss" },
+  { code: "019", key: "depreciation", label: "Ertekcsokkenes", sourceType: "profit_loss" },
+  { code: "022", key: "operating_profit", label: "Uzemi eredmeny", sourceType: "profit_loss" },
+  { code: "038", key: "interest_costs", label: "Kamatok", sourceType: "profit_loss" },
+  { code: "048", key: "net_income", label: "Adozott eredmeny", sourceType: "profit_loss" },
+  { code: "031", key: "current_assets", label: "Forgoeszkozok", sourceType: "balance_sheet" },
+  { code: "032", key: "inventory", label: "Keszletek", sourceType: "balance_sheet" },
+  { code: "040", key: "receivables", label: "Vevok", sourceType: "balance_sheet" },
+  { code: "055", key: "cash", label: "Penzeszkozok", sourceType: "balance_sheet" },
+  { code: "062", key: "total_assets", label: "Eszkozok osszesen", sourceType: "balance_sheet" },
+  { code: "064", key: "equity", label: "Sajat toke", sourceType: "balance_sheet" },
+  { code: "079", key: "total_liabilities", label: "Kotelezettsegek", sourceType: "balance_sheet" },
+  { code: "085", key: "long_term_liabilities", label: "Hosszu lejaratu kotelezettsegek", sourceType: "balance_sheet" },
+  { code: "096", key: "short_term_liabilities", label: "Rovid lejaratu kotelezettsegek", sourceType: "balance_sheet" },
+  { code: "101", key: "payables", label: "Szallitok", sourceType: "balance_sheet" },
+  { code: "113", key: "total_sources", label: "Forrasok osszesen", sourceType: "balance_sheet" }
+];
+
+function formatMetricDisplay(value, isPercent) {
+  if (value == null || !isFinite(value)) {
+    return "-";
+  }
+  const digits = Math.abs(value) >= 100 ? 0 : 2;
+  const text = Number(value).toLocaleString("hu-HU", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
+  });
+  return isPercent ? (text + "%") : text;
+}
+
+function evaluateKpiStatus(code, ownValue, benchmarkValue) {
+  if (ownValue == null || benchmarkValue == null || !isFinite(ownValue) || !isFinite(benchmarkValue)) {
+    return "Neutral";
+  }
+  const higherIsBetter = {
+    operating_margin: true,
+    net_margin: true,
+    roe: true,
+    roa: true,
+    ebitda_margin: true,
+    revenue_per_employee: true,
+    current_ratio: true,
+    quick_ratio: true,
+    cash_ratio: true,
+    equity_ratio: true,
+    interest_coverage: true,
+    asset_turnover: true,
+    revenue_per_fte: true,
+    operating_profit_per_fte: true,
+    net_profit_per_fte: true
+  };
+  const reverseGood = {
+    material_cost_ratio: true,
+    personnel_cost_ratio: true,
+    debt_ratio: true,
+    long_term_debt_ratio: true,
+    receivables_ratio: true,
+    payables_ratio: false,
+    salary_per_fte: false,
+    personnel_cost_per_fte: false,
+    assets_per_fte: false
+  };
+  if (higherIsBetter[code]) {
+    return ownValue >= benchmarkValue ? "Good" : "Error";
+  }
+  if (reverseGood[code]) {
+    return ownValue <= benchmarkValue ? "Good" : "Error";
+  }
+  return "Neutral";
+}
+
+function safeDivide(numerator, denominator, multiplier) {
+  if (numerator == null || denominator == null || !isFinite(numerator) || !isFinite(denominator) || denominator === 0) {
+    return null;
+  }
+  return (Number(numerator) / Number(denominator)) * Number(multiplier == null ? 1 : multiplier);
+}
+
+function averageNumeric(values) {
+  const filtered = (values || []).filter(function(value) {
+    return value != null && isFinite(value);
+  });
+  if (filtered.length === 0) {
+    return null;
+  }
+  return filtered.reduce(function(sum, value) {
+    return sum + Number(value);
+  }, 0) / filtered.length;
+}
+
+function extractDummy12FinancialDataset(companyName, reportEntries, balanceEntries) {
+  const reportText = (reportEntries || []).map(function(item) {
+    return String(item && item.text ? item.text : "");
+  }).join("\n");
+  const balanceText = (balanceEntries || []).map(function(item) {
+    return String(item && item.text ? item.text : "");
+  }).join("\n");
+  const combinedText = [reportText, balanceText].filter(Boolean).join("\n");
+  const metrics = {};
+
+  DUMMY12_FINANCIAL_CODE_MAP.forEach(function(def) {
+    const sourceText = def.sourceType === "balance_sheet" ? [balanceText, reportText].filter(Boolean).join("\n") : [reportText, balanceText].filter(Boolean).join("\n");
+    const found = extractMetricByCode(sourceText, def.code);
+    metrics[def.key] = {
+      code: def.code,
+      label: def.label,
+      current: found ? found.current : null,
+      previous: found ? found.previous : null,
+      source_line: found ? found.line : ""
+    };
+  });
+
+  const headcount = extractHeadcountValue(combinedText);
+  metrics.headcount = {
+    code: "HEADCOUNT",
+    label: "Letszam",
+    current: headcount ? headcount.current : null,
+    previous: headcount ? headcount.previous : null,
+    source_line: headcount ? headcount.line : ""
+  };
+
+  return {
+    company_name: String(companyName || ""),
+    metrics: metrics,
+    extracted_rows: Object.keys(metrics).map(function(key) {
+      const item = metrics[key] || {};
+      return {
+        key: key,
+        kod: item.code,
+        mutato: item.label,
+        aktualis: item.current,
+        elozo: item.previous,
+        forras: item.source_line || "-"
+      };
+    })
+  };
+}
+
+function buildDummy12KpiItems(financialDatasets) {
+  const ownData = financialDatasets[0] || { metrics: {} };
+  const competitorData = (financialDatasets || []).slice(1);
+
+  function own(key) {
+    return ownData.metrics && ownData.metrics[key] ? ownData.metrics[key].current : null;
+  }
+
+  function competitorAverage(key) {
+    return averageNumeric(competitorData.map(function(item) {
+      return item && item.metrics && item.metrics[key] ? item.metrics[key].current : null;
+    }));
+  }
+
+  const computed = DUMMY12_KPI_DEFINITIONS.map(function(def) {
+    let ownValue = null;
+    let benchmarkValue = null;
+    switch (def.code) {
+      case "operating_margin":
+        ownValue = safeDivide(own("operating_profit"), own("revenue"), 100);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.operating_profit.current, item.metrics.revenue.current, 100);
+        }));
+        break;
+      case "net_margin":
+        ownValue = safeDivide(own("net_income"), own("revenue"), 100);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.net_income.current, item.metrics.revenue.current, 100);
+        }));
+        break;
+      case "roe":
+        ownValue = safeDivide(own("net_income"), own("equity"), 100);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.net_income.current, item.metrics.equity.current, 100);
+        }));
+        break;
+      case "roa":
+        ownValue = safeDivide(own("net_income"), own("total_assets"), 100);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.net_income.current, item.metrics.total_assets.current, 100);
+        }));
+        break;
+      case "ebitda_margin":
+        ownValue = safeDivide((own("operating_profit") || 0) + (own("depreciation") || 0), own("revenue"), 100);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide((item.metrics.operating_profit.current || 0) + (item.metrics.depreciation.current || 0), item.metrics.revenue.current, 100);
+        }));
+        break;
+      case "revenue_per_employee":
+      case "revenue_per_fte":
+        ownValue = safeDivide(own("revenue"), own("headcount"), 1);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.revenue.current, item.metrics.headcount.current, 1);
+        }));
+        break;
+      case "material_cost_ratio":
+        ownValue = safeDivide(own("material_costs"), own("revenue"), 100);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.material_costs.current, item.metrics.revenue.current, 100);
+        }));
+        break;
+      case "personnel_cost_ratio":
+        ownValue = safeDivide(own("personnel_costs"), own("revenue"), 100);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.personnel_costs.current, item.metrics.revenue.current, 100);
+        }));
+        break;
+      case "current_ratio":
+        ownValue = safeDivide(own("current_assets"), own("short_term_liabilities"), 1);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.current_assets.current, item.metrics.short_term_liabilities.current, 1);
+        }));
+        break;
+      case "quick_ratio":
+        ownValue = safeDivide((own("current_assets") || 0) - (own("inventory") || 0), own("short_term_liabilities"), 1);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide((item.metrics.current_assets.current || 0) - (item.metrics.inventory.current || 0), item.metrics.short_term_liabilities.current, 1);
+        }));
+        break;
+      case "cash_ratio":
+        ownValue = safeDivide(own("cash"), own("short_term_liabilities"), 1);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.cash.current, item.metrics.short_term_liabilities.current, 1);
+        }));
+        break;
+      case "equity_ratio":
+        ownValue = safeDivide(own("equity"), own("total_sources"), 100);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.equity.current, item.metrics.total_sources.current, 100);
+        }));
+        break;
+      case "debt_ratio":
+        ownValue = safeDivide(own("total_liabilities"), own("total_sources"), 100);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.total_liabilities.current, item.metrics.total_sources.current, 100);
+        }));
+        break;
+      case "interest_coverage":
+        ownValue = safeDivide(own("operating_profit"), own("interest_costs"), 1);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.operating_profit.current, item.metrics.interest_costs.current, 1);
+        }));
+        break;
+      case "long_term_debt_ratio":
+        ownValue = safeDivide(own("long_term_liabilities"), own("total_sources"), 100);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.long_term_liabilities.current, item.metrics.total_sources.current, 100);
+        }));
+        break;
+      case "asset_turnover":
+        ownValue = safeDivide(own("revenue"), own("total_assets"), 1);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.revenue.current, item.metrics.total_assets.current, 1);
+        }));
+        break;
+      case "receivables_ratio":
+        ownValue = safeDivide(own("receivables"), own("revenue"), 100);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.receivables.current, item.metrics.revenue.current, 100);
+        }));
+        break;
+      case "payables_ratio":
+        ownValue = safeDivide(own("payables"), own("material_costs"), 100);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.payables.current, item.metrics.material_costs.current, 100);
+        }));
+        break;
+      case "operating_profit_per_fte":
+        ownValue = safeDivide(own("operating_profit"), own("headcount"), 1);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.operating_profit.current, item.metrics.headcount.current, 1);
+        }));
+        break;
+      case "net_profit_per_fte":
+        ownValue = safeDivide(own("net_income"), own("headcount"), 1);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.net_income.current, item.metrics.headcount.current, 1);
+        }));
+        break;
+      case "salary_per_fte":
+        ownValue = safeDivide(own("salary_costs"), own("headcount"), 1);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.salary_costs.current, item.metrics.headcount.current, 1);
+        }));
+        break;
+      case "personnel_cost_per_fte":
+        ownValue = safeDivide(own("personnel_costs"), own("headcount"), 1);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.personnel_costs.current, item.metrics.headcount.current, 1);
+        }));
+        break;
+      case "assets_per_fte":
+        ownValue = safeDivide(own("total_assets"), own("headcount"), 1);
+        benchmarkValue = averageNumeric(competitorData.map(function(item) {
+          return safeDivide(item.metrics.total_assets.current, item.metrics.headcount.current, 1);
+        }));
+        break;
+      default:
+        break;
+    }
+
+    const isPercent = /margin|ratio|roe|roa/.test(def.code);
+    return {
+      key: def.code,
+      category: def.category,
+      name: def.name,
+      formulaLabel: def.formulaLabel,
+      source: def.source,
+      ownValue: ownValue,
+      benchmarkValue: benchmarkValue,
+      ownDisplayValue: formatMetricDisplay(ownValue, isPercent),
+      benchmarkDisplayValue: formatMetricDisplay(benchmarkValue, isPercent),
+      deltaDisplayValue: ownValue != null && benchmarkValue != null ? formatMetricDisplay(ownValue - benchmarkValue, isPercent) : "-",
+      color: evaluateKpiStatus(def.code, ownValue, benchmarkValue)
+    };
+  }).filter(function(item) {
+    return item.ownValue != null || item.benchmarkValue != null;
+  });
+
+  const summary = computed.slice(0, 6).map(function(item) {
+    return item.name + ": sajat ceg " + item.ownDisplayValue + ", versenytars atlag " + item.benchmarkDisplayValue;
+  });
+
+  return {
+    items: computed,
+    summary: summary
   };
 }
 
@@ -1382,16 +1794,20 @@ function buildDummy12ExportText(result) {
   return sections.join("\n").trim();
 }
 
-async function analyzeDummy12(payload) {
-  if (!OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY hianyzik");
-  }
+function summarizeDummy12FileReadiness(fileEntries, companyIndex) {
+  const relevant = (fileEntries || []).filter(function(item) {
+    return Number(item.companyIndex) === Number(companyIndex);
+  });
+  const reportCount = relevant.filter(function(item) { return item.kind === "report"; }).length;
+  const balanceCount = relevant.filter(function(item) { return item.kind === "balance"; }).length;
+  return "Feltoltott riport PDF: " + reportCount + ", penzugyi PDF: " + balanceCount + ".";
+}
 
+async function buildDummy12CompanyContexts(payload) {
   const companies = Array.isArray(payload && payload.companies) ? payload.companies : [];
   const fileEntries = Array.isArray(payload && payload.fileEntries) ? payload.fileEntries : [];
-  const promptTemplate = loadDummy12PromptTemplate();
+  const contexts = [];
 
-  const enrichedCompanies = [];
   for (let i = 0; i < companies.length; i += 1) {
     const company = companies[i] || {};
     const reports = fileEntries.filter(function(item) {
@@ -1402,8 +1818,9 @@ async function analyzeDummy12(payload) {
     });
     const websiteSnapshot = company.websiteUrl ? await fetchPublicPageSnapshot(company.websiteUrl) : null;
     const linkedinSnapshot = company.linkedinUrl ? await fetchPublicPageSnapshot(company.linkedinUrl) : null;
+    const financialDataset = extractDummy12FinancialDataset(company.companyName, reports, balances);
 
-    enrichedCompanies.push({
+    contexts.push({
       role: i === 0 ? "own" : "competitor",
       company_name: String(company.companyName || ""),
       website_url: String(company.websiteUrl || ""),
@@ -1423,15 +1840,51 @@ async function analyzeDummy12(payload) {
           extracted_text_excerpt: String(item.text || "").replace(/\s+/g, " ").trim().slice(0, 5000),
           preview: item.preview
         };
-      })
+      }),
+      file_readiness: summarizeDummy12FileReadiness(fileEntries, i),
+      extracted_financials: financialDataset
     });
   }
 
+  return contexts;
+}
+
+async function generateDummy12MarketAnalysis(contexts) {
+  const promptTemplate = loadDummy12PromptTemplate();
   const systemPrompt = [
     promptTemplate,
     "",
     "A valaszod CSAK JSON legyen.",
-    "JSON schema:",
+    "Fokusz: kompetitiv pozicionalas, online jelenlet, hiring jelek, SWOT-szeru kovetkeztetesek.",
+    "Ne irj hosszu narrativat, csak a kert JSON-t add vissza.",
+    "{",
+    '  "competitors": [',
+    '    {"company_name":"string","short_description":"string","website_positioning":"string","linkedin_communication":"string","hiring_signals":"string","strengths":["string"],"weaknesses":["string"]}',
+    "  ],",
+    '  "comparison_table": [',
+    '    {"Ceg":"string","Pozicionalas":"string","FoUzenet":"string","OnlineAktivitas":"string","HiringAktivitas":"string","PenzugyiJelzesek":"string","StrategiaiMegjegyzes":"string"}',
+    "  ],",
+    '  "online_presence_insights": ["string"],',
+    '  "hiring_insights": ["string"],',
+    '  "strategic_takeaways": ["string"]',
+    "}"
+  ].join("\n");
+
+  const userPrompt = "Elemzesi input:\n" + JSON.stringify({ companies: contexts });
+  const raw = await callOpenAiText([
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userPrompt }
+  ], 0.2);
+  return parseLooseJsonObject(raw) || {};
+}
+
+async function generateDummy12CfoSummary(contexts, kpiSummary, marketAnalysis) {
+  const systemPrompt = [
+    "Te egy senior strategiai es penzugyi tanacsado AI vagy CFO celkozonsegnek.",
+    "Keszits tomor, adatvezerelt, uzleti dontest tamogato vezeto osszefoglalot.",
+    "A hangsuly a fo penzugyi trendeken, versenytars osszevetesen, kockazatokon es lehetosegeken legyen.",
+    "Ne talalj ki tenyeket. Ha adat hianyzik, jelezd roviden.",
+    "A valaszod CSAK JSON legyen.",
     "{",
     '  "executive_summary": ["string"],',
     '  "own_company": {',
@@ -1442,35 +1895,30 @@ async function analyzeDummy12(payload) {
     '    "linkedin_communication": "string",',
     '    "hiring_signals": "string"',
     "  },",
-    '  "competitors": [',
-    '    {"company_name":"string","short_description":"string","website_positioning":"string","linkedin_communication":"string","hiring_signals":"string","strengths":["string"],"weaknesses":["string"]}',
-    "  ],",
-    '  "comparison_table": [',
-    '    {"Ceg":"string","Pozicionalas":"string","FoUzenet":"string","OnlineAktivitas":"string","HiringAktivitas":"string","PenzugyiJelzesek":"string","StrategiaiMegjegyzes":"string"}',
-    "  ],",
     '  "financial_insights": ["string"],',
-    '  "online_presence_insights": ["string"],',
-    '  "hiring_insights": ["string"],',
-    '  "strategic_takeaways": ["string"],',
     '  "recommended_actions": ["string"]',
     "}"
   ].join("\n");
 
   const userPrompt = [
-    "Elemzesi input JSON:",
+    "Input JSON:",
     JSON.stringify({
-      companies: enrichedCompanies
+      companies: contexts,
+      kpis: kpiSummary,
+      market_analysis: marketAnalysis
     })
   ].join("\n");
 
   const raw = await callOpenAiText([
     { role: "system", content: systemPrompt },
     { role: "user", content: userPrompt }
-  ], 0.25);
+  ], 0.2);
+  return parseLooseJsonObject(raw) || {};
+}
 
-  const parsed = parseLooseJsonObject(raw) || {};
+function buildDummy12Previews(contexts) {
   const previews = [];
-  enrichedCompanies.forEach(function(company) {
+  (contexts || []).forEach(function(company) {
     (company.annual_reports || []).forEach(function(report) {
       previews.push(Object.assign({
         companyName: company.company_name,
@@ -1484,25 +1932,202 @@ async function analyzeDummy12(payload) {
       }, report.preview || {}));
     });
   });
+  return previews;
+}
+
+async function analyzeDummy12(payload) {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY hianyzik");
+  }
+  const companyContexts = await buildDummy12CompanyContexts(payload);
+  const financialDatasets = companyContexts.map(function(item) {
+    return item.extracted_financials;
+  });
+  const kpiSummary = buildDummy12KpiItems(financialDatasets);
+  const marketAnalysis = await generateDummy12MarketAnalysis(companyContexts);
+  const cfoSummary = await generateDummy12CfoSummary(companyContexts, kpiSummary, marketAnalysis);
+  const previews = buildDummy12Previews(companyContexts);
 
   return {
-    executive_summary: Array.isArray(parsed.executive_summary) ? parsed.executive_summary : [],
-    own_company: parsed.own_company || {},
-    competitors: Array.isArray(parsed.competitors) ? parsed.competitors : [],
-    comparison_table: Array.isArray(parsed.comparison_table) ? parsed.comparison_table : [],
-    financial_insights: Array.isArray(parsed.financial_insights) ? parsed.financial_insights : [],
-    online_presence_insights: Array.isArray(parsed.online_presence_insights) ? parsed.online_presence_insights : [],
-    hiring_insights: Array.isArray(parsed.hiring_insights) ? parsed.hiring_insights : [],
-    strategic_takeaways: Array.isArray(parsed.strategic_takeaways) ? parsed.strategic_takeaways : [],
-    recommended_actions: Array.isArray(parsed.recommended_actions) ? parsed.recommended_actions : [],
+    executive_summary: Array.isArray(cfoSummary.executive_summary) ? cfoSummary.executive_summary : [],
+    own_company: Object.assign({
+      website_positioning: companyContexts[0] && companyContexts[0].website_snapshot
+        ? String(companyContexts[0].website_snapshot.description || companyContexts[0].website_snapshot.title || "")
+        : "",
+      linkedin_communication: companyContexts[0] && companyContexts[0].linkedin_snapshot
+        ? String(companyContexts[0].linkedin_snapshot.description || companyContexts[0].linkedin_snapshot.title || "")
+        : "",
+      hiring_signals: "Nyilvanos allashirdetes adat jelenleg best-effort alapon erheto el."
+    }, cfoSummary.own_company || {}),
+    competitors: Array.isArray(marketAnalysis.competitors) ? marketAnalysis.competitors : [],
+    comparison_table: Array.isArray(marketAnalysis.comparison_table) ? marketAnalysis.comparison_table : [],
+    financial_insights: Array.isArray(cfoSummary.financial_insights) ? cfoSummary.financial_insights : [],
+    online_presence_insights: Array.isArray(marketAnalysis.online_presence_insights) ? marketAnalysis.online_presence_insights : [],
+    hiring_insights: Array.isArray(marketAnalysis.hiring_insights) ? marketAnalysis.hiring_insights : [],
+    strategic_takeaways: Array.isArray(marketAnalysis.strategic_takeaways) ? marketAnalysis.strategic_takeaways : [],
+    recommended_actions: Array.isArray(cfoSummary.recommended_actions) ? cfoSummary.recommended_actions : [],
+    extracted_financials: financialDatasets,
+    kpi_items: kpiSummary.items,
+    kpi_summary: kpiSummary.summary,
     annual_report_previews: previews,
     export_text: buildDummy12ExportText({
-      executive_summary: Array.isArray(parsed.executive_summary) ? parsed.executive_summary : [],
-      own_company: parsed.own_company || {},
-      strategic_takeaways: Array.isArray(parsed.strategic_takeaways) ? parsed.strategic_takeaways : [],
-      recommended_actions: Array.isArray(parsed.recommended_actions) ? parsed.recommended_actions : []
+      executive_summary: Array.isArray(cfoSummary.executive_summary) ? cfoSummary.executive_summary : [],
+      own_company: cfoSummary.own_company || {},
+      strategic_takeaways: Array.isArray(marketAnalysis.strategic_takeaways) ? marketAnalysis.strategic_takeaways : [],
+      recommended_actions: Array.isArray(cfoSummary.recommended_actions) ? cfoSummary.recommended_actions : []
     })
   };
+}
+
+function createDummy12JobSnapshot(job) {
+  return {
+    job_id: job.id,
+    status: job.status,
+    progress_percent: Number(job.progressPercent || 0),
+    progress_text: String(job.progressText || ""),
+    current_step: Number(job.currentStep || 0),
+    steps: Array.isArray(job.steps) ? job.steps : [],
+    result: job.status === "done" ? (job.result || null) : null,
+    error: job.status === "error" ? String(job.error || "Dummy12 hiba") : ""
+  };
+}
+
+function createDummy12Job() {
+  const id = crypto.randomUUID();
+  const job = {
+    id: id,
+    status: "queued",
+    progressPercent: 0,
+    progressText: "Varakozas inditasra...",
+    currentStep: 0,
+    error: "",
+    result: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    steps: [
+      { step: 1, title: "Adatkinyeres", status: "pending", detail: "Merleg, eredmenykimutatas es letszam olvasasa." },
+      { step: 2, title: "KPI szamitas", status: "pending", detail: "Mutatok szamitasa a KPI tabla alapjan." },
+      { step: 3, title: "Vezetoi osszefoglalo", status: "pending", detail: "CFO-szintu osszegzes es versenytars pozicionalas." }
+    ]
+  };
+  oDummy12Jobs.set(id, job);
+  return job;
+}
+
+function touchDummy12Job(job) {
+  job.updatedAt = Date.now();
+}
+
+function updateDummy12Job(job, patch) {
+  Object.assign(job, patch || {});
+  touchDummy12Job(job);
+}
+
+function setDummy12JobStep(job, stepNumber, status, detail, progressPercent) {
+  job.steps = (job.steps || []).map(function(step) {
+    if (step.step < stepNumber && status === "running") {
+      return Object.assign({}, step, { status: "done" });
+    }
+    if (step.step === stepNumber) {
+      return Object.assign({}, step, {
+        status: status,
+        detail: detail || step.detail
+      });
+    }
+    return step;
+  });
+  updateDummy12Job(job, {
+    currentStep: stepNumber,
+    progressPercent: Number(progressPercent || job.progressPercent || 0),
+    progressText: detail || job.progressText
+  });
+}
+
+function cleanupDummy12Jobs() {
+  const now = Date.now();
+  Array.from(oDummy12Jobs.keys()).forEach(function(key) {
+    const job = oDummy12Jobs.get(key);
+    if (!job) {
+      return;
+    }
+    if (now - Number(job.updatedAt || job.createdAt || now) > DUMMY12_JOB_TTL_MS) {
+      oDummy12Jobs.delete(key);
+    }
+  });
+}
+
+async function runDummy12Job(job, payload) {
+  try {
+    cleanupDummy12Jobs();
+    updateDummy12Job(job, {
+      status: "running",
+      progressPercent: 5,
+      progressText: "Elemzes inditasa..."
+    });
+
+    setDummy12JobStep(job, 1, "running", "PDF-ek, weboldalak es letszam adatok feldolgozasa...", 20);
+    const companyContexts = await buildDummy12CompanyContexts(payload);
+    const extractedFinancials = companyContexts.map(function(item) {
+      return item.extracted_financials;
+    });
+    setDummy12JobStep(job, 1, "done", "Adatkinyeres elkeszult.", 40);
+
+    setDummy12JobStep(job, 2, "running", "KPI mutatok szamitasa a feltoltott KPI tabla logikaja szerint...", 55);
+    const kpiSummary = buildDummy12KpiItems(extractedFinancials);
+    setDummy12JobStep(job, 2, "done", "KPI mutatok elkeszultek.", 70);
+
+    setDummy12JobStep(job, 3, "running", "CFO-szintu osszefoglalo es versenytars insightok generalasa...", 82);
+    const marketAnalysis = await generateDummy12MarketAnalysis(companyContexts);
+    const cfoSummary = await generateDummy12CfoSummary(companyContexts, kpiSummary, marketAnalysis);
+    const previews = buildDummy12Previews(companyContexts);
+    const result = {
+      executive_summary: Array.isArray(cfoSummary.executive_summary) ? cfoSummary.executive_summary : [],
+      own_company: Object.assign({
+        website_positioning: companyContexts[0] && companyContexts[0].website_snapshot
+          ? String(companyContexts[0].website_snapshot.description || companyContexts[0].website_snapshot.title || "")
+          : "",
+        linkedin_communication: companyContexts[0] && companyContexts[0].linkedin_snapshot
+          ? String(companyContexts[0].linkedin_snapshot.description || companyContexts[0].linkedin_snapshot.title || "")
+          : "",
+        hiring_signals: "Nyilvanos hiring jelzesek best-effort alapon ellenorizve."
+      }, cfoSummary.own_company || {}),
+      competitors: Array.isArray(marketAnalysis.competitors) ? marketAnalysis.competitors : [],
+      comparison_table: Array.isArray(marketAnalysis.comparison_table) ? marketAnalysis.comparison_table : [],
+      financial_insights: Array.isArray(cfoSummary.financial_insights) ? cfoSummary.financial_insights : [],
+      online_presence_insights: Array.isArray(marketAnalysis.online_presence_insights) ? marketAnalysis.online_presence_insights : [],
+      hiring_insights: Array.isArray(marketAnalysis.hiring_insights) ? marketAnalysis.hiring_insights : [],
+      strategic_takeaways: Array.isArray(marketAnalysis.strategic_takeaways) ? marketAnalysis.strategic_takeaways : [],
+      recommended_actions: Array.isArray(cfoSummary.recommended_actions) ? cfoSummary.recommended_actions : [],
+      extracted_financials: extractedFinancials,
+      kpi_items: kpiSummary.items,
+      kpi_summary: kpiSummary.summary,
+      annual_report_previews: previews,
+      export_text: buildDummy12ExportText({
+        executive_summary: Array.isArray(cfoSummary.executive_summary) ? cfoSummary.executive_summary : [],
+        own_company: cfoSummary.own_company || {},
+        strategic_takeaways: Array.isArray(marketAnalysis.strategic_takeaways) ? marketAnalysis.strategic_takeaways : [],
+        recommended_actions: Array.isArray(cfoSummary.recommended_actions) ? cfoSummary.recommended_actions : []
+      })
+    };
+
+    setDummy12JobStep(job, 3, "done", "Vezetoi osszefoglalo elkeszult.", 100);
+    updateDummy12Job(job, {
+      status: "done",
+      result: result
+    });
+  } catch (err) {
+    updateDummy12Job(job, {
+      status: "error",
+      error: err && err.message ? err.message : String(err),
+      progressText: "Az elemzes megszakadt."
+    });
+    job.steps = (job.steps || []).map(function(step) {
+      if (step.status === "running") {
+        return Object.assign({}, step, { status: "error" });
+      }
+      return step;
+    });
+  }
 }
 
 function tokenizeDummy9(value) {
@@ -6419,7 +7044,7 @@ app.post("/api/jokers/dummy11/run", oDummy11Upload.array("files", 8), async func
   }
 });
 
-app.post("/api/jokers/dummy12/analyze", oDummy12Upload.array("files", 24), async function(req, res) {
+app.post("/api/jokers/dummy12/start", oDummy12Upload.array("files", 24), async function(req, res) {
   try {
     const companies = parseOpenAiReply(String(req.body && req.body.companies ? req.body.companies : "[]")) || [];
     const fileDescriptors = parseOpenAiReply(String(req.body && req.body.file_descriptors ? req.body.file_descriptors : "[]")) || [];
@@ -6443,22 +7068,41 @@ app.post("/api/jokers/dummy12/analyze", oDummy12Upload.array("files", 24), async
     const ownBalanceCount = fileEntries.filter(function(item) {
       return Number(item.companyIndex) === 0 && item.kind === "balance";
     }).length;
+    const ownReportCount = fileEntries.filter(function(item) {
+      return Number(item.companyIndex) === 0 && item.kind === "report";
+    }).length;
     if (ownBalanceCount === 0) {
       res.status(400).json({ error: "A sajat ceghez legalabb egy merleg / eves beszamolo PDF kotelezo." });
       return;
     }
+    if (ownReportCount === 0) {
+      res.status(400).json({ error: "A sajat ceghez legalabb egy eves jelentest vagy eredmenykimutatast tartalmazo PDF is kotelezo." });
+      return;
+    }
 
-    const result = await analyzeDummy12({
+    const job = createDummy12Job();
+    runDummy12Job(job, {
       companies: companies,
       fileEntries: fileEntries
     });
-    res.json(result);
+    res.json(createDummy12JobSnapshot(job));
   } catch (err) {
     res.status(500).json({
       error: "Dummy12 elemzesi hiba",
       details: err && err.message ? err.message : String(err)
     });
   }
+});
+
+app.get("/api/jokers/dummy12/status/:jobId", function(req, res) {
+  cleanupDummy12Jobs();
+  const jobId = String(req.params && req.params.jobId ? req.params.jobId : "").trim();
+  const job = oDummy12Jobs.get(jobId);
+  if (!job) {
+    res.status(404).json({ error: "A Dummy12 feladat mar nem erheto el." });
+    return;
+  }
+  res.json(createDummy12JobSnapshot(job));
 });
 
 app.use(express.static(UI_STATIC_DIR));

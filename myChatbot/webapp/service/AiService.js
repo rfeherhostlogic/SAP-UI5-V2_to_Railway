@@ -172,7 +172,7 @@
     });
   }
 
-  function analyzeDummy12(mPayload) {
+  function startDummy12Analysis(mPayload) {
     var oFormData = new FormData();
     oFormData.append("companies", JSON.stringify(mPayload.companies || []));
     oFormData.append("file_descriptors", JSON.stringify(mPayload.file_descriptors || []));
@@ -180,9 +180,22 @@
       oFormData.append("files", oFile);
     });
 
-    return fetch("/api/jokers/dummy12/analyze", {
+    return fetch("/api/jokers/dummy12/start", {
       method: "POST",
       body: oFormData
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function getDummy12Status(sJobId) {
+    return fetch("/api/jokers/dummy12/status/" + encodeURIComponent(String(sJobId || "")), {
+      method: "GET"
     }).then(function(oResponse) {
       if (!oResponse.ok) {
         return oResponse.text().then(function(sError) {
@@ -773,7 +786,8 @@
     evaluateDummy11: evaluateDummy11,
     saveDummy11Prompt: saveDummy11Prompt,
     runDummy11Prompt: runDummy11Prompt,
-    analyzeDummy12: analyzeDummy12,
+    startDummy12Analysis: startDummy12Analysis,
+    getDummy12Status: getDummy12Status,
     getDummy4SchemaHint: getDummy4SchemaHint,
     uploadDummy5Pdf: uploadDummy5Pdf,
     summarizeDummy5: summarizeDummy5,

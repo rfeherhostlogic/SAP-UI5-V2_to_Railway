@@ -7,6 +7,8 @@ sap.ui.define([
   "sap/m/Column",
   "sap/m/Text",
   "sap/m/ColumnListItem",
+  "sap/suite/ui/microchart/ComparisonMicroChart",
+  "sap/suite/ui/microchart/ComparisonMicroChartData",
   "sap/viz/ui5/controls/VizFrame",
   "sap/viz/ui5/data/FlattenedDataset",
   "sap/viz/ui5/data/DimensionDefinition",
@@ -21,6 +23,8 @@ sap.ui.define([
   Column,
   Text,
   ColumnListItem,
+  ComparisonMicroChart,
+  ComparisonMicroChartData,
   VizFrame,
   FlattenedDataset,
   DimensionDefinition,
@@ -507,12 +511,26 @@ sap.ui.define([
 
       oModel.setProperty("/dummy12Busy", true);
       oModel.setProperty("/dummy12Error", "");
-      oModel.setProperty("/dummy12ProgressText", "Konkurenciaelemzes folyamatban...");
+      oModel.setProperty("/dummy12ProgressPercent", 5);
+      oModel.setProperty("/dummy12ProgressText", "Konkurenciaelemzes inditasa...");
+      oModel.setProperty("/dummy12CurrentStep", 0);
+      oModel.setProperty("/dummy12ExecutiveSummary", []);
+      oModel.setProperty("/dummy12Competitors", []);
+      oModel.setProperty("/dummy12ComparisonRows", []);
+      oModel.setProperty("/dummy12KpiItems", []);
+      oModel.setProperty("/dummy12KpiSummary", []);
+      oModel.setProperty("/dummy12ExtractedFinancials", []);
+      this._resetDummy12KpiCharts();
       try {
         var oPayload = this._buildDummy12AnalyzePayload(aCompanies);
-        var oResp = await AiService.analyzeDummy12(oPayload);
-        this._applyDummy12Result(oResp);
-        oModel.setProperty("/dummy12ProgressText", "Elemzes elkeszult.");
+        var oStart = await AiService.startDummy12Analysis(oPayload);
+        var sJobId = String(oStart && oStart.job_id ? oStart.job_id : "");
+        if (!sJobId) {
+          throw new Error("A Dummy12 feladat azonositoja nem erkezett vissza.");
+        }
+        oModel.setProperty("/dummy12JobId", sJobId);
+        this._applyDummy12Status(oStart);
+        await this._pollDummy12Job(sJobId);
       } catch (oError) {
         oModel.setProperty("/dummy12Error", oError && oError.message ? oError.message : "Dummy12 elemzesi hiba.");
         oModel.setProperty("/dummy12ProgressText", "");
@@ -1034,6 +1052,13 @@ sap.ui.define([
       oModel.setProperty("/dummy12Busy", false);
       oModel.setProperty("/dummy12Error", "");
       oModel.setProperty("/dummy12ProgressText", "");
+      oModel.setProperty("/dummy12ProgressPercent", 0);
+      oModel.setProperty("/dummy12CurrentStep", 0);
+      oModel.setProperty("/dummy12JobId", "");
+      oModel.setProperty("/dummy12StepItems", []);
+      oModel.setProperty("/dummy12KpiItems", []);
+      oModel.setProperty("/dummy12KpiSummary", []);
+      oModel.setProperty("/dummy12ExtractedFinancials", []);
       oModel.setProperty("/dummy12ExecutiveSummary", []);
       oModel.setProperty("/dummy12OwnCompany", {});
       oModel.setProperty("/dummy12Competitors", []);
@@ -1049,6 +1074,7 @@ sap.ui.define([
       oModel.setProperty("/dummy12SelectedPreviewTitle", "");
       oModel.setProperty("/dummy12SelectedPreviewRows", []);
       oModel.setProperty("/dummy12SelectedPreviewSummary", "");
+      this._resetDummy12KpiCharts();
       this._rebindDummy12PreviewTable();
     },
 
@@ -1118,6 +1144,9 @@ sap.ui.define([
       if (!Array.isArray(aCompanies[0].balanceFiles) || aCompanies[0].balanceFiles.length === 0) {
         return { ok: false, message: "A sajat ceghez legalabb egy eves beszamolo / merleg PDF kotelezo." };
       }
+      if (!Array.isArray(aCompanies[0].reportFiles) || aCompanies[0].reportFiles.length === 0) {
+        return { ok: false, message: "A sajat ceghez legalabb egy eves jelentest vagy eredmenykimutatast tartalmazo PDF-et is tolts fel." };
+      }
       for (var i = 0; i < aCompanies.length; i += 1) {
         var oCompany = aCompanies[i] || {};
         if (!String(oCompany.companyName || "").trim()) {
@@ -1168,6 +1197,9 @@ sap.ui.define([
 
     _applyDummy12Result: function(oResp) {
       var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy12ExtractedFinancials", Array.isArray(oResp && oResp.extracted_financials) ? oResp.extracted_financials : []);
+      oModel.setProperty("/dummy12KpiItems", Array.isArray(oResp && oResp.kpi_items) ? oResp.kpi_items : []);
+      oModel.setProperty("/dummy12KpiSummary", Array.isArray(oResp && oResp.kpi_summary) ? oResp.kpi_summary : []);
       oModel.setProperty("/dummy12ExecutiveSummary", Array.isArray(oResp && oResp.executive_summary) ? oResp.executive_summary : []);
       oModel.setProperty("/dummy12OwnCompany", oResp && oResp.own_company ? oResp.own_company : {});
       oModel.setProperty("/dummy12Competitors", Array.isArray(oResp && oResp.competitors) ? oResp.competitors : []);
@@ -1193,7 +1225,43 @@ sap.ui.define([
         oModel.setProperty("/dummy12SelectedPreviewSummary", "");
         oModel.setProperty("/dummy12SelectedPreviewRows", []);
       }
+      this._renderDummy12KpiCharts();
       this._rebindDummy12PreviewTable();
+    },
+
+    _applyDummy12Status: function(oStatus) {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy12ProgressPercent", Number(oStatus && oStatus.progress_percent ? oStatus.progress_percent : 0));
+      oModel.setProperty("/dummy12ProgressText", String(oStatus && oStatus.progress_text ? oStatus.progress_text : ""));
+      oModel.setProperty("/dummy12CurrentStep", Number(oStatus && oStatus.current_step ? oStatus.current_step : 0));
+      oModel.setProperty("/dummy12StepItems", Array.isArray(oStatus && oStatus.steps) ? oStatus.steps : []);
+      if (oStatus && oStatus.status === "done" && oStatus.result) {
+        this._applyDummy12Result(oStatus.result);
+        oModel.setProperty("/dummy12ProgressText", "Elemzes elkeszult.");
+      }
+      if (oStatus && oStatus.status === "error") {
+        oModel.setProperty("/dummy12Error", String(oStatus.error || "Dummy12 elemzesi hiba."));
+      }
+    },
+
+    _pollDummy12Job: async function(sJobId) {
+      var oModel = this.getView().getModel("jokers");
+      var iGuard = 0;
+      while (iGuard < 120) {
+        iGuard += 1;
+        var oStatus = await AiService.getDummy12Status(sJobId);
+        this._applyDummy12Status(oStatus);
+        if (oStatus.status === "done") {
+          return oStatus.result || {};
+        }
+        if (oStatus.status === "error") {
+          throw new Error(oStatus.error || "Dummy12 elemzesi hiba.");
+        }
+        await new Promise(function(resolve) {
+          window.setTimeout(resolve, 1200);
+        });
+      }
+      throw new Error("A konkurenciaelemzes tul sokaig futott. Probald meg ujra.");
     },
 
     _bindDummy9DropZoneEvents: function() {
@@ -1827,6 +1895,69 @@ sap.ui.define([
           cells: aCells
         }),
         templateShareable: false
+      });
+    },
+
+    _resetDummy12KpiCharts: function() {
+      var oHost = this.byId("dummy12KpiChartHost");
+      if (!oHost) {
+        return;
+      }
+      oHost.removeAllItems();
+    },
+
+    _renderDummy12KpiCharts: function() {
+      var oHost = this.byId("dummy12KpiChartHost");
+      var oModel = this.getView().getModel("jokers");
+      var aItems = oModel.getProperty("/dummy12KpiItems") || [];
+
+      this._resetDummy12KpiCharts();
+      if (!oHost || aItems.length === 0) {
+        return;
+      }
+
+      aItems.slice(0, 8).forEach(function(oItem) {
+        var oPanel = new sap.m.Panel({
+          headerText: String(oItem.name || "KPI"),
+          width: "20rem"
+        }).addStyleClass("sapUiTinyMarginEnd sapUiTinyMarginBottom");
+
+        var oVBox = new sap.m.VBox({
+          items: [
+            new sap.m.ObjectStatus({
+              text: String(oItem.category || ""),
+              state: oItem.color === "Good" ? "Success" : (oItem.color === "Error" ? "Error" : "Information")
+            }).addStyleClass("sapUiTinyMarginBottom"),
+            new sap.m.Text({
+              text: "Sajat ceg: " + String(oItem.ownDisplayValue || "-")
+            }),
+            new sap.m.Text({
+              text: "Versenytars atlag: " + String(oItem.benchmarkDisplayValue || "-")
+            }).addStyleClass("sapUiTinyMarginBottom"),
+            new ComparisonMicroChart({
+              size: "M",
+              scale: "",
+              data: [
+                new ComparisonMicroChartData({
+                  title: "Sajat ceg",
+                  value: Number(oItem.ownValue || 0),
+                  color: oItem.color === "Good" ? "Good" : (oItem.color === "Error" ? "Error" : "Neutral")
+                }),
+                new ComparisonMicroChartData({
+                  title: "Versenytars atlag",
+                  value: Number(oItem.benchmarkValue || 0),
+                  color: "Neutral"
+                })
+              ]
+            }),
+            new sap.m.Text({
+              text: String(oItem.formulaLabel || "")
+            }).addStyleClass("sapUiTinyMarginTop")
+          ]
+        }).addStyleClass("sapUiSmallMargin");
+
+        oPanel.addContent(oVBox);
+        oHost.addItem(oPanel);
       });
     },
 

@@ -162,11 +162,11 @@ sap.ui.define([
 					{
 						id: "dummy-12",
 						title: "Konkurencia elemzes",
-						subtitle: "Sajat ceg + versenytarsak",
+						subtitle: "Sajat ceg + versenytars benchmark",
 						primaryTag: "Marketing",
-						tags: ["Marketing"],
+						tags: ["Marketing", "Altalanos"],
 						footer: "AI Joker 12",
-						description: "Legfeljebb 5 ceg osszehasonlito elemzese weboldal, LinkedIn es eves beszamolo PDF alapjan.",
+						description: "Lepeses konkurenciaelemzes PDF-adatkinyeressel, KPI-osszefoglaloval es CFO-szintu vezetoi outputtal.",
 						systemPrompt: "Keszits strukturalt konkurenciaelemzest a megadott cegekrol."
 					}
 				],
@@ -237,6 +237,13 @@ sap.ui.define([
 				dummy12Busy: false,
 				dummy12Error: "",
 				dummy12ProgressText: "",
+				dummy12ProgressPercent: 0,
+				dummy12CurrentStep: 0,
+				dummy12JobId: "",
+				dummy12StepItems: [],
+				dummy12KpiItems: [],
+				dummy12KpiSummary: [],
+				dummy12ExtractedFinancials: [],
 				dummy12ExecutiveSummary: [],
 				dummy12OwnCompany: {},
 				dummy12Competitors: [],

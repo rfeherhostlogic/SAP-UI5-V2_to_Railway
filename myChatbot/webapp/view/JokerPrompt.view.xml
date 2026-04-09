@@ -642,10 +642,34 @@
               <VBox>
                 <Title text="Elemzesi setup" level="H4"/>
                 <Text text="{= 'Ceghelyek szama: ' + ${jokers>/dummy12Companies}.length + ' / 5' }" wrapping="true"/>
+                <Text text="{= 'Meg hozzaadhato versenytarsak: ' + (5 - ${jokers>/dummy12Companies}.length) }" wrapping="true"/>
               </VBox>
-              <Button text="Versenytars hozzaadasa" type="Transparent" press=".onDummy12AddCompetitor" enabled="{= ${jokers>/dummy12Companies}.length &lt; 5 }"/>
+              <Button text="Versenytars hozzaadasa" type="Emphasized" press=".onDummy12AddCompetitor" enabled="{= ${jokers>/dummy12Companies}.length &lt; 5 }"/>
             </HBox>
-            <Text text="Az elso kartya mindig a sajat ceg. Adj meg cegnevet, URL-eket, es tolts fel eves beszamolo PDF-et. A sajat ceghez legalabb egy merleg / beszamolo PDF kotelezo." wrapping="true" class="sapUiSmallMarginTop"/>
+
+            <HBox wrap="Wrap" class="sapUiSmallMarginTop" renderType="Bare">
+              <Panel headerText="Sajat ceg" width="18rem" class="sapUiTinyMarginEnd sapUiTinyMarginBottom">
+                <VBox class="sapUiSmallMargin">
+                  <ObjectStatus text="Mindig kotelezo" state="Success"/>
+                  <Text text="Tolts fel 1 riport PDF-et es 1 merleg / penzugyi PDF-et. Ezekbol jon az adatkinyeres es a KPI-szamitás." wrapping="true" class="sapUiTinyMarginTop"/>
+                </VBox>
+              </Panel>
+              <Panel headerText="Versenytarsak" width="18rem" class="sapUiTinyMarginEnd sapUiTinyMarginBottom">
+                <VBox class="sapUiSmallMargin">
+                  <ObjectStatus text="Maximum 4 versenytars" state="Information"/>
+                  <Text text="A versenytarsakhoz weboldal, LinkedIn es opcionális PDF-ek adhatoak meg benchmark celra." wrapping="true" class="sapUiTinyMarginTop"/>
+                </VBox>
+              </Panel>
+              <Panel headerText="Feldolgozasi lepesek" width="18rem" class="sapUiTinyMarginBottom">
+                <VBox class="sapUiSmallMargin">
+                  <Text text="1. Adatkinyeres" wrapping="true"/>
+                  <Text text="2. KPI-szamitás" wrapping="true"/>
+                  <Text text="3. CFO osszefoglalo" wrapping="true"/>
+                </VBox>
+              </Panel>
+            </HBox>
+
+            <MessageStrip text="A sajat ceg kartya nem torolheto. Az elemzeshez sajat ceg nev, riport PDF es merleg PDF is kotelezo." type="Information" showIcon="true" class="sapUiSmallMarginTop"/>
 
             <List items="{jokers>/dummy12Companies}" showSeparators="All" class="sapUiSmallMarginTop">
               <CustomListItem>
@@ -676,6 +700,7 @@
                       fileType="pdf"
                       buttonText="PDF-k kivalasztasa"
                       change=".onDummy12ReportFileChange"/>
+                    <Text text="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Kotelezo: eves jelentes, eredmenykimutatas vagy vezeto jelentest tartalmazo PDF.' : 'Opcionális benchmark input.' }" wrapping="true" class="sapUiTinyMarginTop"/>
                     <List items="{jokers>reportFiles}" visible="{= ${jokers>reportFiles}.length > 0 }" class="sapUiTinyMarginTop">
                       <CustomListItem>
                         <HBox justifyContent="SpaceBetween" alignItems="Center">
@@ -694,6 +719,7 @@
                       fileType="pdf"
                       buttonText="Merleg PDF-k kivalasztasa"
                       change=".onDummy12BalanceFileChange"/>
+                    <Text text="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Kotelezo: merleg vagy kiegeszito beszamolo PDF a KPI-khoz.' : 'Opcionális penzugyi benchmark input.' }" wrapping="true" class="sapUiTinyMarginTop"/>
                     <List items="{jokers>balanceFiles}" visible="{= ${jokers>balanceFiles}.length > 0 }" class="sapUiTinyMarginTop">
                       <CustomListItem>
                         <HBox justifyContent="SpaceBetween" alignItems="Center">
@@ -712,10 +738,24 @@
               <Button text="Osszefoglalo letoltese" type="Transparent" press=".onDownloadDummy12Summary" class="sapUiTinyMarginBegin" enabled="{= ${jokers>/dummy12ExportText} ? true : false }"/>
             </HBox>
 
-            <HBox visible="{jokers>/dummy12Busy}" class="sapUiSmallMarginTop" alignItems="Center">
-              <BusyIndicator size="1rem"/>
-              <Text text="{= ${jokers>/dummy12ProgressText} ? ${jokers>/dummy12ProgressText} : 'Elemzes fut...' }" class="sapUiTinyMarginBegin"/>
-            </HBox>
+            <VBox visible="{= ${jokers>/dummy12Busy} || ${jokers>/dummy12ProgressPercent} > 0 }" class="sapUiSmallMarginTop">
+              <ProgressIndicator percentValue="{jokers>/dummy12ProgressPercent}" displayValue="{= ${jokers>/dummy12ProgressPercent} + '%' }" state="Success"/>
+              <HBox class="sapUiTinyMarginTop" alignItems="Center">
+                <BusyIndicator size="1rem" visible="{jokers>/dummy12Busy}"/>
+                <Text text="{= ${jokers>/dummy12ProgressText} ? ${jokers>/dummy12ProgressText} : 'Elemzes fut...' }" class="sapUiTinyMarginBegin"/>
+              </HBox>
+              <List items="{jokers>/dummy12StepItems}" class="sapUiTinyMarginTop" visible="{= ${jokers>/dummy12StepItems}.length > 0 }">
+                <CustomListItem>
+                  <HBox justifyContent="SpaceBetween" alignItems="Center">
+                    <VBox>
+                      <Text text="{= ${jokers>step} + '. lepes - ' + ${jokers>title} }" wrapping="true"/>
+                      <Text text="{jokers>detail}" wrapping="true" class="sapUiTinyMarginTop"/>
+                    </VBox>
+                    <ObjectStatus text="{jokers>status}" state="{= ${jokers>status} === 'done' ? 'Success' : (${jokers>status} === 'running' ? 'Information' : (${jokers>status} === 'error' ? 'Error' : 'None')) }"/>
+                  </HBox>
+                </CustomListItem>
+              </List>
+            </VBox>
 
             <MessageStrip text="{jokers>/dummy12Error}" visible="{= ${jokers>/dummy12Error} ? true : false }" type="Error" showIcon="true" class="sapUiSmallMarginTop"/>
           </VBox>
@@ -749,6 +789,47 @@
                 <Title text="Hiring / novekedesi jelek" level="H5" class="sapUiSmallMarginTop"/>
                 <Text text="{jokers>/dummy12OwnCompany/hiring_signals}" wrapping="true"/>
               </VBox>
+            </Panel>
+
+            <Panel headerText="KPI benchmark" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy12KpiItems}.length > 0 }">
+              <VBox class="sapUiSmallMargin">
+                <Text text="A KPI-k a feltoltott KPI tabla logikaja alapjan szamolodnak, es a sajat ceg ertekeit a versenytarsak atlagahoz hasonlitjak." wrapping="true"/>
+                <List items="{jokers>/dummy12KpiSummary}" visible="{= ${jokers>/dummy12KpiSummary}.length > 0 }" class="sapUiTinyMarginTop">
+                  <CustomListItem>
+                    <Text text="{= '- ' + ${jokers>} }" wrapping="true"/>
+                  </CustomListItem>
+                </List>
+                <FlexBox id="dummy12KpiChartHost" wrap="Wrap" renderType="Bare" class="sapUiSmallMarginTop"/>
+              </VBox>
+            </Panel>
+
+            <Panel headerText="Kinyert penzugyi adatok" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy12ExtractedFinancials}.length > 0 }">
+              <List items="{jokers>/dummy12ExtractedFinancials}">
+                <CustomListItem>
+                  <Panel headerText="{jokers>company_name}" class="sapUiTinyMarginBottom">
+                    <Table items="{jokers>extracted_rows}" inset="false" growing="true" growingThreshold="20">
+                      <columns>
+                        <Column><Text text="Kod"/></Column>
+                        <Column><Text text="Mutato"/></Column>
+                        <Column><Text text="Aktualis"/></Column>
+                        <Column><Text text="Elozo"/></Column>
+                        <Column><Text text="Forras sor"/></Column>
+                      </columns>
+                      <items>
+                        <ColumnListItem>
+                          <cells>
+                            <Text text="{jokers>kod}" wrapping="true"/>
+                            <Text text="{jokers>mutato}" wrapping="true"/>
+                            <Text text="{jokers>aktualis}" wrapping="true"/>
+                            <Text text="{jokers>elozo}" wrapping="true"/>
+                            <Text text="{jokers>forras}" wrapping="true"/>
+                          </cells>
+                        </ColumnListItem>
+                      </items>
+                    </Table>
+                  </Panel>
+                </CustomListItem>
+              </List>
             </Panel>
 
             <Panel headerText="Versenytarsak elemzese" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy12Competitors}.length > 0 }">
@@ -839,7 +920,7 @@
 
         <Panel headerText="Eves beszamolo - Adat preview" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy12AnnualReportPreviews}.length > 0 }">
           <VBox class="sapUiSmallMargin">
-            <Text text="A feltoltott beszamolok preview-ja itt nyithato meg, a Riportok Joker adat preview mintajahoz igazodva." wrapping="true"/>
+            <Text text="A feltoltott beszamolok preview-ja itt nyithato meg, a Riportok Joker adat preview mintajahoz igazodva. Nem visz el uj oldalra, hogy az elemzesi kontextus vegig megmaradjon." wrapping="true"/>
             <List items="{jokers>/dummy12AnnualReportPreviews}" class="sapUiSmallMarginTop">
               <CustomListItem>
                 <HBox justifyContent="SpaceBetween" alignItems="Center">

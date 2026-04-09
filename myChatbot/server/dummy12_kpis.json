@@ -1,0 +1,170 @@
+[
+  {
+    "category": "Jovedelmezoseg",
+    "name": "Uzemi margin",
+    "code": "operating_margin",
+    "formulaLabel": "Uzemi eredmeny / Arbevetel * 100",
+    "source": "Eredmenykimutatas 022 / Eredmenykimutatas 003"
+  },
+  {
+    "category": "Jovedelmezoseg",
+    "name": "Netto margin",
+    "code": "net_margin",
+    "formulaLabel": "Adozott eredmeny / Arbevetel * 100",
+    "source": "Eredmenykimutatas 048 / Eredmenykimutatas 003"
+  },
+  {
+    "category": "Jovedelmezoseg",
+    "name": "ROE",
+    "code": "roe",
+    "formulaLabel": "Adozott eredmeny / Sajat toke * 100",
+    "source": "Eredmenykimutatas 048 / Merleg 064"
+  },
+  {
+    "category": "Jovedelmezoseg",
+    "name": "ROA",
+    "code": "roa",
+    "formulaLabel": "Adozott eredmeny / Eszkozok osszesen * 100",
+    "source": "Eredmenykimutatas 048 / Merleg 062"
+  },
+  {
+    "category": "Jovedelmezoseg",
+    "name": "EBITDA-margin",
+    "code": "ebitda_margin",
+    "formulaLabel": "(Uzemi eredmeny + Ertekcsokkenes) / Arbevetel * 100",
+    "source": "Eredmenykimutatas 022+019 / Eredmenykimutatas 003"
+  },
+  {
+    "category": "Jovedelmezoseg",
+    "name": "Arbevetel / fo",
+    "code": "revenue_per_employee",
+    "formulaLabel": "Arbevetel / Letszam",
+    "source": "Eredmenykimutatas 003 / Letszam"
+  },
+  {
+    "category": "Jovedelmezoseg",
+    "name": "Anyagjellegu raforditas arany",
+    "code": "material_cost_ratio",
+    "formulaLabel": "Anyagjellegu raforditas / Arbevetel * 100",
+    "source": "Eredmenykimutatas 014 / Eredmenykimutatas 003"
+  },
+  {
+    "category": "Jovedelmezoseg",
+    "name": "Szemelyi jellegu raforditas arany",
+    "code": "personnel_cost_ratio",
+    "formulaLabel": "Szemelyi jellegu raforditas / Arbevetel * 100",
+    "source": "Eredmenykimutatas 018 / Eredmenykimutatas 003"
+  },
+  {
+    "category": "Likviditas",
+    "name": "Likviditasi rata",
+    "code": "current_ratio",
+    "formulaLabel": "Forgoeszkozok / Rovid lejaratu kotelezettsegek",
+    "source": "Merleg 031 / Merleg 096"
+  },
+  {
+    "category": "Likviditas",
+    "name": "Gyorsrata",
+    "code": "quick_ratio",
+    "formulaLabel": "(Forgoeszkozok - Keszletek) / Rovid lejaratu kotelezettsegek",
+    "source": "Merleg 031-032 / Merleg 096"
+  },
+  {
+    "category": "Likviditas",
+    "name": "Penzeszkoz-rata",
+    "code": "cash_ratio",
+    "formulaLabel": "Penzeszkozok / Rovid lejaratu kotelezettsegek",
+    "source": "Merleg 055 / Merleg 096"
+  },
+  {
+    "category": "Tokeszerkezet",
+    "name": "Sajat toke arany",
+    "code": "equity_ratio",
+    "formulaLabel": "Sajat toke / Forrasok osszesen * 100",
+    "source": "Merleg 064 / Merleg 113"
+  },
+  {
+    "category": "Tokeszerkezet",
+    "name": "Idegen toke arany",
+    "code": "debt_ratio",
+    "formulaLabel": "Kotelezettsegek / Forrasok osszesen * 100",
+    "source": "Merleg 079 / Merleg 113"
+  },
+  {
+    "category": "Tokeszerkezet",
+    "name": "Kamatfedezeti mutato",
+    "code": "interest_coverage",
+    "formulaLabel": "Uzemi eredmeny / Kamatok",
+    "source": "Eredmenykimutatas 022 / Eredmenykimutatas 038"
+  },
+  {
+    "category": "Tokeszerkezet",
+    "name": "Hosszu lejaratu hitel arany",
+    "code": "long_term_debt_ratio",
+    "formulaLabel": "Hosszu lejaratu kotelezettsegek / Forrasok osszesen * 100",
+    "source": "Merleg 085 / Merleg 113"
+  },
+  {
+    "category": "Hatekonysag",
+    "name": "Eszkozhatekonysag",
+    "code": "asset_turnover",
+    "formulaLabel": "Arbevetel / Eszkozok osszesen",
+    "source": "Eredmenykimutatas 003 / Merleg 062"
+  },
+  {
+    "category": "Hatekonysag",
+    "name": "Vevokoveteles arany",
+    "code": "receivables_ratio",
+    "formulaLabel": "Vevok / Arbevetel * 100",
+    "source": "Merleg 040 / Eredmenykimutatas 003"
+  },
+  {
+    "category": "Hatekonysag",
+    "name": "Szallitotartozas arany",
+    "code": "payables_ratio",
+    "formulaLabel": "Szallitok / Anyagjellegu raforditas * 100",
+    "source": "Merleg 101 / Eredmenykimutatas 014"
+  },
+  {
+    "category": "Letszam",
+    "name": "Bevetel egy fore vetitve",
+    "code": "revenue_per_fte",
+    "formulaLabel": "Arbevetel / Letszam",
+    "source": "Eredmenykimutatas 003 / Fedolap letszam"
+  },
+  {
+    "category": "Letszam",
+    "name": "Uzemi eredmeny egy fore vetitve",
+    "code": "operating_profit_per_fte",
+    "formulaLabel": "Uzemi eredmeny / Letszam",
+    "source": "Eredmenykimutatas 022 / Fedolap letszam"
+  },
+  {
+    "category": "Letszam",
+    "name": "Netto eredmeny egy fore vetitve",
+    "code": "net_profit_per_fte",
+    "formulaLabel": "Adozott eredmeny / Letszam",
+    "source": "Eredmenykimutatas 048 / Fedolap letszam"
+  },
+  {
+    "category": "Letszam",
+    "name": "Berkoltseg egy fore vetitve",
+    "code": "salary_per_fte",
+    "formulaLabel": "Berkoltseg / Letszam",
+    "source": "Eredmenykimutatas 015 / Fedolap letszam"
+  },
+  {
+    "category": "Letszam",
+    "name": "Teljes szemelyi jellegu raforditas egy fore vetitve",
+    "code": "personnel_cost_per_fte",
+    "formulaLabel": "Szemelyi jellegu raforditas / Letszam",
+    "source": "Eredmenykimutatas 018 / Fedolap letszam"
+  },
+  {
+    "category": "Letszam",
+    "name": "Eszkozallomany egy fore vetitve",
+    "code": "assets_per_fte",
+    "formulaLabel": "Eszkozok osszesen / Letszam",
+    "source": "Merleg 062 / Fedolap letszam"
+  }
+]
