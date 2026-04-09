@@ -253,6 +253,8 @@ sap.ui.define([
 				dummy12HiringInsights: [],
 				dummy12StrategicTakeaways: [],
 				dummy12RecommendedActions: [],
+				dummy12PressMentions: [],
+				dummy12PressSummary: {},
 				dummy12ExportText: "",
 				dummy12AnnualReportPreviews: [],
 				dummy12SelectedPreviewId: "",

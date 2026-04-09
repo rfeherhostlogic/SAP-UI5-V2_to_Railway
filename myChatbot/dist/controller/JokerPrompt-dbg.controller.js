@@ -1059,6 +1059,8 @@ sap.ui.define([
       oModel.setProperty("/dummy12HiringInsights", []);
       oModel.setProperty("/dummy12StrategicTakeaways", []);
       oModel.setProperty("/dummy12RecommendedActions", []);
+      oModel.setProperty("/dummy12PressMentions", []);
+      oModel.setProperty("/dummy12PressSummary", {});
       oModel.setProperty("/dummy12ExportText", "");
       oModel.setProperty("/dummy12AnnualReportPreviews", []);
       oModel.setProperty("/dummy12SelectedPreviewId", "");
@@ -1187,6 +1189,8 @@ sap.ui.define([
       oModel.setProperty("/dummy12HiringInsights", Array.isArray(oResp && oResp.hiring_insights) ? oResp.hiring_insights : []);
       oModel.setProperty("/dummy12StrategicTakeaways", Array.isArray(oResp && oResp.strategic_takeaways) ? oResp.strategic_takeaways : []);
       oModel.setProperty("/dummy12RecommendedActions", Array.isArray(oResp && oResp.recommended_actions) ? oResp.recommended_actions : []);
+      oModel.setProperty("/dummy12PressMentions", Array.isArray(oResp && oResp.press_mentions) ? oResp.press_mentions : []);
+      oModel.setProperty("/dummy12PressSummary", oResp && oResp.press_summary ? oResp.press_summary : {});
       oModel.setProperty("/dummy12ExportText", String(oResp && oResp.export_text ? oResp.export_text : ""));
       oModel.setProperty("/dummy12AnnualReportPreviews", Array.isArray(oResp && oResp.annual_report_previews) ? oResp.annual_report_previews : []);
 
