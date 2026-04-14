@@ -643,6 +643,18 @@
                 <Title text="Elemzesi setup" level="H4"/>
                 <Text text="{= 'Ceghelyek szama: ' + ${jokers>/dummy12Companies}.length + ' / 5' }" wrapping="true"/>
                 <Text text="{= 'Meg hozzaadhato versenytarsak: ' + (5 - ${jokers>/dummy12Companies}.length) }" wrapping="true"/>
+                <MessageStrip
+                  text="{jokers>/dummy12SessionInfoText}"
+                  visible="{= ${jokers>/dummy12SessionInfoText} ? true : false }"
+                  type="Information"
+                  showIcon="true"
+                  class="sapUiSmallMarginTop"/>
+                <MessageStrip
+                  text="Az elozo session PDF-nevei latszanak, de uj futtatashoz a PDF-eket ujra fel kell tolteni."
+                  visible="{jokers>/dummy12SessionNeedsFiles}"
+                  type="Warning"
+                  showIcon="true"
+                  class="sapUiTinyMarginTop"/>
               </VBox>
             </HBox>
 
@@ -687,9 +699,9 @@
                       <ObjectStatus text="{jokers>slotLabel}" state="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Success' : 'Information' }"/>
                       <Text text="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Kotelezo' : 'Opcionális' }" wrapping="true"/>
                     </VBox>
-                    <Input value="{jokers>companyName}" placeholder="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Pl. Techwave Hungary Zrt.' : 'Pl. Competitor Kft.' }"/>
-                    <Input value="{jokers>websiteUrl}" placeholder="https://www.pelda.hu"/>
-                    <Input value="{jokers>linkedinUrl}" placeholder="https://www.linkedin.com/company/..."/>
+                    <Input value="{jokers>companyName}" liveChange=".onDummy12CompanyFieldChange" placeholder="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Pl. Techwave Hungary Zrt.' : 'Pl. Competitor Kft.' }"/>
+                    <Input value="{jokers>websiteUrl}" liveChange=".onDummy12CompanyFieldChange" placeholder="https://www.pelda.hu"/>
+                    <Input value="{jokers>linkedinUrl}" liveChange=".onDummy12CompanyFieldChange" placeholder="https://www.linkedin.com/company/..."/>
                     <VBox>
                       <unif:FileUploader
                         width="100%"
@@ -703,7 +715,10 @@
                       <List items="{jokers>annualReportFiles}" visible="{= ${jokers>annualReportFiles}.length > 0 }" class="sapUiTinyMarginTop">
                         <CustomListItem>
                           <HBox justifyContent="SpaceBetween" alignItems="Center">
-                            <Text text="{= ${jokers>name} }" wrapping="true"/>
+                            <VBox>
+                              <Text text="{= ${jokers>name} }" wrapping="true"/>
+                              <ObjectStatus text="{= ${jokers>__persistedOnly} ? 'Elozo session PDF-nev' : 'Aktiv PDF' }" state="{= ${jokers>__persistedOnly} ? 'Warning' : 'Success' }"/>
+                            </VBox>
                             <Button icon="sap-icon://decline" type="Transparent" press=".onDummy12RemoveReportFile"/>
                           </HBox>
                         </CustomListItem>
@@ -785,6 +800,60 @@
                   </CustomListItem>
                 </List>
                 <FlexBox id="dummy12KpiChartHost" wrap="Wrap" renderType="Bare" class="sapUiSmallMarginTop"/>
+              </VBox>
+            </Panel>
+
+            <Panel headerText="Penzugyi riport" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy12ExtractedFinancials}.length > 0 }">
+              <VBox class="sapUiSmallMargin">
+                <Text text="A riport a kinyert merleg- es eredmenykimutatas-sorokra epul. A KPI-kartyak a sajat ceg es a versenytarsak atlaga kozotti kulonbseget mutatjak, a chartoknal atvalthatsz fo- es alsorok kozott." wrapping="true"/>
+
+                <FlexBox items="{jokers>/dummy12HeadlineMetrics}" wrap="Wrap" renderType="Bare" class="sapUiSmallMarginTop">
+                  <items>
+                    <Panel width="15rem" headerText="{jokers>label}" class="sapUiTinyMarginEnd sapUiTinyMarginBottom">
+                      <VBox class="sapUiSmallMargin">
+                        <ObjectStatus text="{= 'Sajat ceg: ' + ${jokers>ownDisplayValue} }" state="Success"/>
+                        <ObjectStatus text="{= 'Versenytars atlag: ' + ${jokers>benchmarkDisplayValue} }" state="Information" class="sapUiTinyMarginTop"/>
+                      </VBox>
+                    </Panel>
+                  </items>
+                </FlexBox>
+
+                <HBox wrap="Wrap" alignItems="Center" class="sapUiSmallMarginTop">
+                  <Label text="Szint" class="sapUiTinyMarginEnd"/>
+                  <SegmentedButton selectedKey="{jokers>/dummy12ReportGranularity}" selectionChange=".onDummy12ReportViewChange">
+                    <items>
+                      <SegmentedButtonItem key="summary" text="Fosorok"/>
+                      <SegmentedButtonItem key="details" text="Alsorok"/>
+                    </items>
+                  </SegmentedButton>
+                  <Label text="Idoszak" class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
+                  <SegmentedButton selectedKey="{jokers>/dummy12ReportPeriod}" selectionChange=".onDummy12ReportViewChange">
+                    <items>
+                      <SegmentedButtonItem key="current" text="Targyevi"/>
+                      <SegmentedButtonItem key="previous" text="Elozo ev"/>
+                    </items>
+                  </SegmentedButton>
+                  <Label text="Waterfall ceg" class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
+                  <Select width="16rem" selectedKey="{jokers>/dummy12SelectedReportCompany}" change=".onDummy12ReportViewChange" items="{jokers>/dummy12ReportCompanyOptions}">
+                    <items>
+                      <core:Item key="{jokers>key}" text="{jokers>text}"/>
+                    </items>
+                  </Select>
+                </HBox>
+
+                <Panel headerText="Merleg osszehasonlito chart" class="sapUiSmallMarginTop">
+                  <VBox class="sapUiSmallMargin">
+                    <Text text="Stacked oszlopdiagram a sajat ceg es a versenytarsak merlegsoraihoz. A Fosorok / Alsorok gombbal drilldown jelleggel valthatsz a reszletekre." wrapping="true"/>
+                    <VBox id="dummy12BalanceChartHost" class="sapUiSmallMarginTop"/>
+                  </VBox>
+                </Panel>
+
+                <Panel headerText="Eredmenykimutatas waterfall" class="sapUiSmallMarginTop">
+                  <VBox class="sapUiSmallMargin">
+                    <Text text="A waterfall a kivalasztott ceg eredmenykimutatasanak fo vagy reszletes sorait mutatja az aktualisan valasztott evre." wrapping="true"/>
+                    <VBox id="dummy12IncomeChartHost" class="sapUiSmallMarginTop"/>
+                  </VBox>
+                </Panel>
               </VBox>
             </Panel>
 
@@ -924,29 +993,6 @@
           </VBox>
         </Panel>
 
-        <Panel headerText="Eves beszamolo - Adat preview" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy12AnnualReportPreviews}.length > 0 }">
-          <VBox class="sapUiSmallMargin">
-            <Text text="A feltoltott beszamolok preview-ja itt nyithato meg, a Riportok Joker adat preview mintajahoz igazodva. Nem visz el uj oldalra, hogy az elemzesi kontextus vegig megmaradjon." wrapping="true"/>
-            <List items="{jokers>/dummy12AnnualReportPreviews}" class="sapUiSmallMarginTop">
-              <CustomListItem>
-                <HBox justifyContent="SpaceBetween" alignItems="Center">
-                  <VBox>
-                    <Text text="{= (${jokers>companyName} || 'Ismeretlen ceg') + ' - ' + (${jokers>fileName} || 'PDF') }" wrapping="true"/>
-                    <ObjectStatus text="Eves beszamolo preview" state="Information"/>
-                  </VBox>
-                  <Button text="Preview megnyitasa" type="Transparent" press=".onDummy12OpenPreview"/>
-                </HBox>
-              </CustomListItem>
-            </List>
-
-            <Panel headerText="{= ${jokers>/dummy12SelectedPreviewTitle} ? ${jokers>/dummy12SelectedPreviewTitle} : 'Valassz egy riportot' }" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy12SelectedPreviewId} ? true : false }">
-              <VBox class="sapUiSmallMargin">
-                <Text text="{jokers>/dummy12SelectedPreviewSummary}" wrapping="true"/>
-                <Table id="dummy12PreviewTable" growing="true" growingThreshold="50" inset="false" class="sapUiSmallMarginTop"/>
-              </VBox>
-            </Panel>
-          </VBox>
-        </Panel>
       </VBox>
 
       <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-11' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-12' }" width="100%">

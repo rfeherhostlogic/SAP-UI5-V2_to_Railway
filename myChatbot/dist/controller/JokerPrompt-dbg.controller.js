@@ -36,6 +36,7 @@ sap.ui.define([
   return Controller.extend("sap.suite.ui.commons.demo.tutorial.controller.JokerPrompt", {
     onInit: function() {
       this._dummy9DropZoneBound = false;
+      this._dummy12SessionStorageKey = "ai_joker_12_session_v2";
       this.getOwnerComponent().getRouter().getRoute("jokerPrompt").attachPatternMatched(this._onRouteMatched, this);
     },
 
@@ -460,6 +461,7 @@ sap.ui.define([
       }
       aCompanies.push(this._createDummy12Company(false, aCompanies.length));
       oModel.setProperty("/dummy12Companies", aCompanies);
+      this._persistDummy12Session();
     },
 
     onDummy12RemoveCompany: function(oEvent) {
@@ -481,6 +483,11 @@ sap.ui.define([
         });
       });
       oModel.setProperty("/dummy12Companies", aCompanies);
+      this._persistDummy12Session();
+    },
+
+    onDummy12CompanyFieldChange: function() {
+      this._persistDummy12Session();
     },
 
     onDummy12ReportFileChange: function(oEvent) {
@@ -489,6 +496,11 @@ sap.ui.define([
 
     onDummy12RemoveReportFile: function(oEvent) {
       this._removeDummy12FileFromPath(oEvent, "annualReportFiles");
+    },
+
+    onDummy12ReportViewChange: function() {
+      this._updateDummy12FinancialReportState();
+      this._persistDummy12Session();
     },
 
     onRunDummy12Analysis: async function() {
@@ -506,6 +518,9 @@ sap.ui.define([
       oModel.setProperty("/dummy12ProgressPercent", 5);
       oModel.setProperty("/dummy12ProgressText", "Konkurenciaelemzes inditasa...");
       oModel.setProperty("/dummy12CurrentStep", 0);
+      oModel.setProperty("/dummy12SessionRestored", false);
+      oModel.setProperty("/dummy12SessionInfoText", "");
+      oModel.setProperty("/dummy12SessionNeedsFiles", false);
       oModel.setProperty("/dummy12ExecutiveSummary", []);
       oModel.setProperty("/dummy12Competitors", []);
       oModel.setProperty("/dummy12ComparisonRows", []);
@@ -513,6 +528,7 @@ sap.ui.define([
       oModel.setProperty("/dummy12KpiSummary", []);
       oModel.setProperty("/dummy12ExtractedFinancials", []);
       this._resetDummy12KpiCharts();
+      this._resetDummy12ReportCharts();
       try {
         var oPayload = this._buildDummy12AnalyzePayload(aCompanies);
         var oStart = await AiService.startDummy12Analysis(oPayload);
@@ -761,6 +777,7 @@ sap.ui.define([
           this._loadJokerSchedule("dummy-11", "dummy11");
         } else if (oSelected.id === "dummy-12") {
           this._resetDummy12State();
+          this._loadDummy12Session();
         } else if (oSelected.id === "dummy-5") {
           this._resetDummy5State();
         } else if (oSelected.id === "dummy-7") {
@@ -1062,13 +1079,23 @@ sap.ui.define([
       oModel.setProperty("/dummy12PressMentions", []);
       oModel.setProperty("/dummy12PressSummary", {});
       oModel.setProperty("/dummy12ExportText", "");
+      oModel.setProperty("/dummy12SessionRestored", false);
+      oModel.setProperty("/dummy12SessionInfoText", "");
+      oModel.setProperty("/dummy12SessionNeedsFiles", false);
+      oModel.setProperty("/dummy12ReportGranularity", "summary");
+      oModel.setProperty("/dummy12ReportPeriod", "current");
+      oModel.setProperty("/dummy12SelectedReportCompany", "");
+      oModel.setProperty("/dummy12ReportCompanyOptions", []);
+      oModel.setProperty("/dummy12HeadlineMetrics", []);
+      oModel.setProperty("/dummy12BalanceChartRows", []);
+      oModel.setProperty("/dummy12IncomeChartRows", []);
       oModel.setProperty("/dummy12AnnualReportPreviews", []);
       oModel.setProperty("/dummy12SelectedPreviewId", "");
       oModel.setProperty("/dummy12SelectedPreviewTitle", "");
       oModel.setProperty("/dummy12SelectedPreviewRows", []);
       oModel.setProperty("/dummy12SelectedPreviewSummary", "");
       this._resetDummy12KpiCharts();
-      this._rebindDummy12PreviewTable();
+      this._resetDummy12ReportCharts();
     },
 
     _appendDummy12Files: function(oEvent, sKey) {
@@ -1093,6 +1120,7 @@ sap.ui.define([
       oCompany[sKey] = aCurrent;
       aCompanies[iIndex] = oCompany;
       oModel.setProperty("/dummy12Companies", aCompanies);
+      this._persistDummy12Session();
     },
 
     _removeDummy12FileFromPath: function(oEvent, sKey) {
@@ -1114,6 +1142,17 @@ sap.ui.define([
       oCompany[sKey] = aFiles;
       aCompanies[iCompanyIndex] = oCompany;
       oModel.setProperty("/dummy12Companies", aCompanies);
+      this._persistDummy12Session();
+    },
+
+    _isDummy12PersistedOnlyFile: function(oFile) {
+      return !!(oFile && oFile.__persistedOnly);
+    },
+
+    _hasDummy12LiveFile: function(aFiles) {
+      return (aFiles || []).some(function(oFile) {
+        return !!oFile && !oFile.__persistedOnly;
+      });
     },
 
     _validateDummy12Companies: function(aCompanies) {
@@ -1132,6 +1171,9 @@ sap.ui.define([
       if ((aCompanies[0].annualReportFiles || []).length > 1) {
         return { ok: false, message: "A sajat ceghez csak egy eves beszamolo PDF adhato meg." };
       }
+      if (!this._hasDummy12LiveFile(aCompanies[0].annualReportFiles || [])) {
+        return { ok: false, message: "Az elozo session PDF-neve visszatoltodott, de uj elemzeshez toltsd fel ujra a sajat ceg eves beszamolo PDF-et." };
+      }
       for (var i = 0; i < aCompanies.length; i += 1) {
         var oCompany = aCompanies[i] || {};
         if (!String(oCompany.companyName || "").trim()) {
@@ -1139,6 +1181,9 @@ sap.ui.define([
         }
         if ((oCompany.annualReportFiles || []).length > 1) {
           return { ok: false, message: "Cegenkent csak egy eves beszamolo PDF adhato meg." };
+        }
+        if ((oCompany.annualReportFiles || []).length > 0 && !this._hasDummy12LiveFile(oCompany.annualReportFiles || [])) {
+          return { ok: false, message: "A visszatoltott PDF-nevek tajekoztato jelleguek. Uj futtatas elott toltsd fel ujra az eves beszamolo PDF-eket." };
         }
         if (oCompany.websiteUrl && !/^https?:\/\/.+/i.test(String(oCompany.websiteUrl || "").trim())) {
           return { ok: false, message: "A weboldal URL csak http:// vagy https:// formatumu lehet." };
@@ -1155,6 +1200,9 @@ sap.ui.define([
       var aDescriptors = [];
       var aCompaniesPayload = (aCompanies || []).map(function(oCompany, iIndex) {
         (oCompany.annualReportFiles || []).forEach(function(oFile) {
+          if (oFile && oFile.__persistedOnly) {
+            return;
+          }
           aFiles.push(oFile);
           aDescriptors.push({
             company_index: iIndex,
@@ -1175,6 +1223,238 @@ sap.ui.define([
       };
     },
 
+    _createDummy12FilePlaceholder: function(oFile) {
+      return {
+        name: String(oFile && oFile.name ? oFile.name : "eves_beszamolo.pdf"),
+        size: Number(oFile && oFile.size ? oFile.size : 0),
+        type: String(oFile && oFile.type ? oFile.type : "application/pdf"),
+        __persistedOnly: true
+      };
+    },
+
+    _buildDummy12SessionSnapshot: function(oResultOverride) {
+      var oModel = this.getView().getModel("jokers");
+      return {
+        savedAt: new Date().toISOString(),
+        companies: (oModel.getProperty("/dummy12Companies") || []).map(function(oCompany, iIndex) {
+          return {
+            slotLabel: iIndex === 0 ? "Sajat ceg" : ("Versenytars " + iIndex),
+            companyName: String(oCompany && oCompany.companyName ? oCompany.companyName : ""),
+            websiteUrl: String(oCompany && oCompany.websiteUrl ? oCompany.websiteUrl : ""),
+            linkedinUrl: String(oCompany && oCompany.linkedinUrl ? oCompany.linkedinUrl : ""),
+            annualReportFiles: (oCompany && oCompany.annualReportFiles ? oCompany.annualReportFiles : []).map(function(oFile) {
+              return {
+                name: String(oFile && oFile.name ? oFile.name : "eves_beszamolo.pdf"),
+                size: Number(oFile && oFile.size ? oFile.size : 0),
+                type: String(oFile && oFile.type ? oFile.type : "application/pdf")
+              };
+            })
+          };
+        }),
+        reportGranularity: String(oModel.getProperty("/dummy12ReportGranularity") || "summary"),
+        reportPeriod: String(oModel.getProperty("/dummy12ReportPeriod") || "current"),
+        selectedReportCompany: String(oModel.getProperty("/dummy12SelectedReportCompany") || ""),
+        result: oResultOverride || {
+          extracted_financials: oModel.getProperty("/dummy12ExtractedFinancials") || [],
+          kpi_items: oModel.getProperty("/dummy12KpiItems") || [],
+          kpi_summary: oModel.getProperty("/dummy12KpiSummary") || [],
+          executive_summary: oModel.getProperty("/dummy12ExecutiveSummary") || [],
+          own_company: oModel.getProperty("/dummy12OwnCompany") || {},
+          competitors: oModel.getProperty("/dummy12Competitors") || [],
+          comparison_table: oModel.getProperty("/dummy12ComparisonRows") || [],
+          financial_insights: oModel.getProperty("/dummy12FinancialInsights") || [],
+          online_presence_insights: oModel.getProperty("/dummy12OnlineInsights") || [],
+          hiring_insights: oModel.getProperty("/dummy12HiringInsights") || [],
+          strategic_takeaways: oModel.getProperty("/dummy12StrategicTakeaways") || [],
+          recommended_actions: oModel.getProperty("/dummy12RecommendedActions") || [],
+          press_mentions: oModel.getProperty("/dummy12PressMentions") || [],
+          press_summary: oModel.getProperty("/dummy12PressSummary") || {},
+          export_text: oModel.getProperty("/dummy12ExportText") || ""
+        }
+      };
+    },
+
+    _persistDummy12Session: function(oResultOverride) {
+      try {
+        window.localStorage.setItem(this._dummy12SessionStorageKey, JSON.stringify(this._buildDummy12SessionSnapshot(oResultOverride)));
+      } catch (_e) {
+        // best-effort local session persistence
+      }
+    },
+
+    _loadDummy12Session: function() {
+      var oModel = this.getView().getModel("jokers");
+      var oStored = null;
+      try {
+        oStored = JSON.parse(window.localStorage.getItem(this._dummy12SessionStorageKey) || "null");
+      } catch (_e) {
+        oStored = null;
+      }
+      if (!oStored) {
+        return;
+      }
+
+      var aCompanies = Array.isArray(oStored.companies) && oStored.companies.length > 0 ? oStored.companies : [this._createDummy12Company(true, 0)];
+      aCompanies = aCompanies.map(function(oCompany, iIndex) {
+        return {
+          slotLabel: iIndex === 0 ? "Sajat ceg" : ("Versenytars " + iIndex),
+          companyName: String(oCompany && oCompany.companyName ? oCompany.companyName : ""),
+          websiteUrl: String(oCompany && oCompany.websiteUrl ? oCompany.websiteUrl : ""),
+          linkedinUrl: String(oCompany && oCompany.linkedinUrl ? oCompany.linkedinUrl : ""),
+          annualReportFiles: (oCompany && oCompany.annualReportFiles ? oCompany.annualReportFiles : []).map(function(oFile) {
+            return this._createDummy12FilePlaceholder(oFile);
+          }.bind(this))
+        };
+      }.bind(this));
+
+      oModel.setProperty("/dummy12Companies", aCompanies);
+      oModel.setProperty("/dummy12ReportGranularity", String(oStored.reportGranularity || "summary"));
+      oModel.setProperty("/dummy12ReportPeriod", String(oStored.reportPeriod || "current"));
+      oModel.setProperty("/dummy12SelectedReportCompany", String(oStored.selectedReportCompany || ""));
+      if (oStored.result) {
+        this._applyDummy12Result(oStored.result);
+      } else {
+        this._updateDummy12FinancialReportState();
+      }
+      oModel.setProperty("/dummy12SessionRestored", true);
+      oModel.setProperty("/dummy12SessionNeedsFiles", aCompanies.some(function(oCompany) {
+        return (oCompany.annualReportFiles || []).length > 0;
+      }));
+      oModel.setProperty("/dummy12SessionInfoText", "Visszatoltottuk az elozo session cegadatait, versenytarsait es PDF-neveit. Uj elemzeshez a PDF-eket ujra fel kell tolteni.");
+    },
+
+    _pickDummy12Metric: function(oDataset, sKey, sPeriod) {
+      var oMetrics = oDataset && oDataset.metrics ? oDataset.metrics : {};
+      var oMetric = oMetrics[sKey] || {};
+      return sPeriod === "previous" ? oMetric.previous : oMetric.current;
+    },
+
+    _formatDummy12MetricValue: function(vValue) {
+      if (vValue == null || !isFinite(vValue)) {
+        return "-";
+      }
+      return Number(vValue).toLocaleString("hu-HU", { maximumFractionDigits: 0 });
+    },
+
+    _updateDummy12FinancialReportState: function() {
+      var oModel = this.getView().getModel("jokers");
+      var aDatasets = oModel.getProperty("/dummy12ExtractedFinancials") || [];
+      var sGranularity = String(oModel.getProperty("/dummy12ReportGranularity") || "summary");
+      var sPeriod = String(oModel.getProperty("/dummy12ReportPeriod") || "current");
+      var aCompanyOptions = aDatasets.map(function(oDataset) {
+        return {
+          key: String(oDataset && oDataset.company_name ? oDataset.company_name : ""),
+          text: String(oDataset && oDataset.company_name ? oDataset.company_name : "")
+        };
+      }).filter(function(oItem) {
+        return !!oItem.key;
+      });
+      var sSelectedCompany = String(oModel.getProperty("/dummy12SelectedReportCompany") || "");
+
+      if (!sSelectedCompany && aCompanyOptions.length > 0) {
+        sSelectedCompany = aCompanyOptions[0].key;
+      }
+      if (aCompanyOptions.length > 0 && !aCompanyOptions.some(function(oItem) { return oItem.key === sSelectedCompany; })) {
+        sSelectedCompany = aCompanyOptions[0].key;
+      }
+
+      var aHeadlineDefs = [
+        { key: "total_assets", label: "Eszkozok osszesen" },
+        { key: "equity", label: "Sajat toke" },
+        { key: "total_liabilities", label: "Kotelezettsegek" },
+        { key: "revenue", label: "Arbevetel" },
+        { key: "operating_profit", label: "Uzemi eredmeny" }
+      ];
+      var oOwnDataset = aDatasets[0] || null;
+      var aBenchmarkDatasets = aDatasets.slice(1);
+      var aHeadlineMetrics = aHeadlineDefs.map(function(oDef) {
+        var nOwn = this._pickDummy12Metric(oOwnDataset, oDef.key, sPeriod);
+        var aValues = aBenchmarkDatasets.map(function(oDataset) {
+          return this._pickDummy12Metric(oDataset, oDef.key, sPeriod);
+        }.bind(this)).filter(function(vValue) {
+          return vValue != null && isFinite(vValue);
+        });
+        var nBenchmark = aValues.length ? aValues.reduce(function(sum, value) { return sum + Number(value); }, 0) / aValues.length : null;
+        return {
+          label: oDef.label,
+          ownDisplayValue: this._formatDummy12MetricValue(nOwn),
+          benchmarkDisplayValue: this._formatDummy12MetricValue(nBenchmark),
+          ownValue: nOwn,
+          benchmarkValue: nBenchmark
+        };
+      }.bind(this));
+
+      var aBalanceSummary = [
+        { key: "total_assets", label: "Eszkozok osszesen" },
+        { key: "equity", label: "Sajat toke" },
+        { key: "total_liabilities", label: "Kotelezettsegek" }
+      ];
+      var aBalanceDetails = [
+        { key: "current_assets", label: "Forgoeszkozok" },
+        { key: "inventory", label: "Keszletek" },
+        { key: "receivables", label: "Vevok" },
+        { key: "cash", label: "Penzeszkozok" },
+        { key: "equity", label: "Sajat toke" },
+        { key: "long_term_liabilities", label: "Hosszu lejaratu kotelezettsegek" },
+        { key: "short_term_liabilities", label: "Rovid lejaratu kotelezettsegek" }
+      ];
+      var aBalanceDefs = sGranularity === "details" ? aBalanceDetails : aBalanceSummary;
+      var aBalanceRows = [];
+
+      aDatasets.forEach(function(oDataset) {
+        aBalanceDefs.forEach(function(oDef) {
+          var nValue = this._pickDummy12Metric(oDataset, oDef.key, sPeriod);
+          if (nValue == null || !isFinite(nValue)) {
+            return;
+          }
+          aBalanceRows.push({
+            company: String(oDataset && oDataset.company_name ? oDataset.company_name : ""),
+            category: oDef.label,
+            value: Number(nValue)
+          });
+        }.bind(this));
+      }.bind(this));
+
+      var oIncomeDataset = aDatasets.find(function(oDataset) {
+        return String(oDataset && oDataset.company_name ? oDataset.company_name : "") === sSelectedCompany;
+      }) || aDatasets[0] || null;
+      var aIncomeSummary = [
+        { key: "revenue", label: "Arbevetel", sign: 1 },
+        { key: "material_costs", label: "Anyagjellegu raforditas", sign: -1 },
+        { key: "personnel_costs", label: "Szemelyi jellegu raforditas", sign: -1 },
+        { key: "depreciation", label: "Ertekcsokkenes", sign: -1 },
+        { key: "operating_profit", label: "Uzemi eredmeny", sign: 1 }
+      ];
+      var aIncomeDetails = [
+        { key: "revenue", label: "Arbevetel", sign: 1 },
+        { key: "material_costs", label: "Anyagjellegu raforditas", sign: -1 },
+        { key: "personnel_costs", label: "Szemelyi jellegu raforditas", sign: -1 },
+        { key: "salary_costs", label: "Berkoltseg", sign: -1 },
+        { key: "depreciation", label: "Ertekcsokkenes", sign: -1 },
+        { key: "operating_profit", label: "Uzemi eredmeny", sign: 1 }
+      ];
+      var aIncomeDefs = sGranularity === "details" ? aIncomeDetails : aIncomeSummary;
+      var aIncomeRows = [];
+
+      aIncomeDefs.forEach(function(oDef) {
+        var nValue = this._pickDummy12Metric(oIncomeDataset, oDef.key, sPeriod);
+        if (nValue == null || !isFinite(nValue)) {
+          return;
+        }
+        aIncomeRows.push({
+          step: oDef.label,
+          value: Number(nValue) * Number(oDef.sign || 1)
+        });
+      }.bind(this));
+
+      oModel.setProperty("/dummy12ReportCompanyOptions", aCompanyOptions);
+      oModel.setProperty("/dummy12SelectedReportCompany", sSelectedCompany);
+      oModel.setProperty("/dummy12HeadlineMetrics", aHeadlineMetrics);
+      oModel.setProperty("/dummy12BalanceChartRows", aBalanceRows);
+      oModel.setProperty("/dummy12IncomeChartRows", aIncomeRows);
+      this._renderDummy12ReportCharts();
+    },
+
     _applyDummy12Result: function(oResp) {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/dummy12ExtractedFinancials", Array.isArray(oResp && oResp.extracted_financials) ? oResp.extracted_financials : []);
@@ -1193,22 +1473,9 @@ sap.ui.define([
       oModel.setProperty("/dummy12PressSummary", oResp && oResp.press_summary ? oResp.press_summary : {});
       oModel.setProperty("/dummy12ExportText", String(oResp && oResp.export_text ? oResp.export_text : ""));
       oModel.setProperty("/dummy12AnnualReportPreviews", Array.isArray(oResp && oResp.annual_report_previews) ? oResp.annual_report_previews : []);
-
-      var aPreviews = oModel.getProperty("/dummy12AnnualReportPreviews") || [];
-      if (aPreviews.length > 0) {
-        var oFirst = aPreviews[0];
-        oModel.setProperty("/dummy12SelectedPreviewId", String(oFirst.previewId || ""));
-        oModel.setProperty("/dummy12SelectedPreviewTitle", String((oFirst.companyName || "") + " - " + (oFirst.fileName || "")).trim());
-        oModel.setProperty("/dummy12SelectedPreviewSummary", String(oFirst.summary || ""));
-        oModel.setProperty("/dummy12SelectedPreviewRows", (oFirst.metricRows || []).concat(oFirst.sectionRows || []));
-      } else {
-        oModel.setProperty("/dummy12SelectedPreviewId", "");
-        oModel.setProperty("/dummy12SelectedPreviewTitle", "");
-        oModel.setProperty("/dummy12SelectedPreviewSummary", "");
-        oModel.setProperty("/dummy12SelectedPreviewRows", []);
-      }
+      this._updateDummy12FinancialReportState();
+      this._persistDummy12Session(oResp);
       this._renderDummy12KpiCharts();
-      this._rebindDummy12PreviewTable();
     },
 
     _applyDummy12Status: function(oStatus) {
@@ -1942,6 +2209,114 @@ sap.ui.define([
         oPanel.addContent(oVBox);
         oHost.addItem(oPanel);
       });
+    },
+
+    _resetDummy12ReportCharts: function() {
+      var oBalanceHost = this.byId("dummy12BalanceChartHost");
+      var oIncomeHost = this.byId("dummy12IncomeChartHost");
+      if (oBalanceHost) {
+        oBalanceHost.removeAllItems();
+      }
+      if (oIncomeHost) {
+        oIncomeHost.removeAllItems();
+      }
+    },
+
+    _renderDummy12ReportCharts: function() {
+      var oModel = this.getView().getModel("jokers");
+      var aBalanceRows = oModel.getProperty("/dummy12BalanceChartRows") || [];
+      var aIncomeRows = oModel.getProperty("/dummy12IncomeChartRows") || [];
+      var oBalanceHost = this.byId("dummy12BalanceChartHost");
+      var oIncomeHost = this.byId("dummy12IncomeChartHost");
+
+      this._resetDummy12ReportCharts();
+      if (oBalanceHost && aBalanceRows.length > 0) {
+        oBalanceHost.addItem(this._createDummy12VizFrame({
+          vizType: "stacked_column",
+          width: "100%",
+          height: "420px",
+          rows: aBalanceRows,
+          dimensions: [
+            { name: "Ceg", value: "{company}" },
+            { name: "Mutato", value: "{category}" }
+          ],
+          measures: [
+            { name: "Ertek", value: "{value}" }
+          ],
+          feedItems: [
+            { uid: "categoryAxis", type: "Dimension", values: ["Ceg"] },
+            { uid: "color", type: "Dimension", values: ["Mutato"] },
+            { uid: "valueAxis", type: "Measure", values: ["Ertek"] }
+          ],
+          vizProperties: {
+            title: { visible: false },
+            plotArea: { dataLabel: { visible: true } },
+            legend: { visible: true }
+          }
+        }));
+      }
+      if (oIncomeHost && aIncomeRows.length > 0) {
+        oIncomeHost.addItem(this._createDummy12VizFrame({
+          vizType: "waterfall",
+          width: "100%",
+          height: "360px",
+          rows: aIncomeRows,
+          dimensions: [
+            { name: "Lepes", value: "{step}" }
+          ],
+          measures: [
+            { name: "Ertek", value: "{value}" }
+          ],
+          feedItems: [
+            { uid: "categoryAxis", type: "Dimension", values: ["Lepes"] },
+            { uid: "valueAxis", type: "Measure", values: ["Ertek"] }
+          ],
+          vizProperties: {
+            title: { visible: false },
+            plotArea: { dataLabel: { visible: true } },
+            legend: { visible: false }
+          }
+        }));
+      }
+    },
+
+    _createDummy12VizFrame: function(oConfig) {
+      var oDataset = new FlattenedDataset({
+        dimensions: (oConfig.dimensions || []).map(function(oItem) {
+          return new DimensionDefinition({
+            name: oItem.name,
+            value: oItem.value
+          });
+        }),
+        measures: (oConfig.measures || []).map(function(oItem) {
+          return new MeasureDefinition({
+            name: oItem.name,
+            value: oItem.value
+          });
+        }),
+        data: {
+          path: "/rows"
+        }
+      });
+
+      var oViz = new VizFrame({
+        width: oConfig.width || "100%",
+        height: oConfig.height || "320px",
+        vizType: oConfig.vizType,
+        dataset: oDataset
+      });
+      oViz.setModel(new JSONModel({ rows: oConfig.rows || [] }));
+      (oConfig.feedItems || []).forEach(function(oFeed) {
+        oViz.addFeed(new FeedItem({
+          uid: oFeed.uid,
+          type: oFeed.type,
+          values: oFeed.values
+        }));
+      });
+      oViz.setVizProperties(oConfig.vizProperties || {
+        title: { visible: false }
+      });
+      return oViz;
     },
 
     _extractDummy4Columns: function(aRows) {
