@@ -1091,7 +1091,7 @@
                         <core:Item key="{jokers>key}" text="{jokers>text}"/>
                       </items>
                     </MultiComboBox>
-                    <ObjectStatus text="{= 'Automatikus mapping confidence: ' + Math.round(${jokers>/dummy13MappingConfidence} * 100) + '%' }" state="Information" class="sapUiTinyMarginTop"/>
+                    <ObjectStatus text="{jokers>/dummy13MappingConfidenceText}" state="Information" class="sapUiTinyMarginTop"/>
                   </VBox>
                 </Panel>
 
@@ -1220,7 +1220,7 @@
                             <Text text="{jokers>variance}" wrapping="true"/>
                             <Text text="{jokers>variancePct}" wrapping="true"/>
                             <Text text="{jokers>zscore}" wrapping="true"/>
-                            <Text text="{= (${jokers>flags} || []).join(', ') }" wrapping="true"/>
+                            <Text text="{jokers>flags}" wrapping="true"/>
                           </cells>
                         </ColumnListItem>
                       </items>

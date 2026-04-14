@@ -1261,6 +1261,7 @@ sap.ui.define([
       oModel.setProperty("/dummy13CompareKeyOptions", []);
       oModel.setProperty("/dummy13CompareKeys", []);
       oModel.setProperty("/dummy13MappingConfidence", 0);
+      oModel.setProperty("/dummy13MappingConfidenceText", "");
       oModel.setProperty("/dummy13QualitySummary", null);
       oModel.setProperty("/dummy13QualityItems", []);
       oModel.setProperty("/dummy13Granularity", "monthly");
@@ -1316,6 +1317,7 @@ sap.ui.define([
       oModel.setProperty("/dummy13CompareKeys", Array.isArray(oSuggested.compare_keys) ? oSuggested.compare_keys : []);
       oModel.setProperty("/dummy13GroupingKeys", Array.isArray(oSuggested.compare_keys) ? oSuggested.compare_keys : []);
       oModel.setProperty("/dummy13MappingConfidence", Number(oSuggested.mapping_confidence || 0));
+      oModel.setProperty("/dummy13MappingConfidenceText", "Automatikus mapping confidence: " + Math.round(Number(oSuggested.mapping_confidence || 0) * 100) + "%");
       this._rebindDummy13PreviewTable("dummy13PlanPreviewTable", "/dummy13PlanPreviewRows");
       this._rebindDummy13PreviewTable("dummy13ActualPreviewTable", "/dummy13ActualPreviewRows");
     },

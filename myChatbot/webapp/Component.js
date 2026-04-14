@@ -300,6 +300,7 @@ sap.ui.define([
 				dummy13CompareKeyOptions: [],
 				dummy13CompareKeys: [],
 				dummy13MappingConfidence: 0,
+				dummy13MappingConfidenceText: "",
 				dummy13QualitySummary: null,
 				dummy13QualityItems: [],
 				dummy13Granularity: "monthly",
