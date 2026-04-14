@@ -170,7 +170,7 @@
 
       <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-8' }" width="100%">
         <HBox wrap="Wrap" renderType="Bare" width="100%" justifyContent="SpaceBetween" alignItems="Start">
-          <VBox width="100%" class="sapUiTinyMarginEnd" layoutData="{= undefined }">
+          <VBox width="100%" class="sapUiTinyMarginEnd">
             <layoutData>
               <FlexItemData growFactor="2" baseSize="42rem"/>
             </layoutData>
@@ -1028,7 +1028,7 @@
                     change=".onDummy13ActualFileChange"/>
                   <ObjectStatus text="{= ${jokers>/dummy13ActualFileName} ? 'Actual fajl: ' + ${jokers>/dummy13ActualFileName} : 'Nincs kivalasztott Actual CSV' }" state="{= ${jokers>/dummy13ActualFileName} ? 'Success' : 'Information' }" class="sapUiTinyMarginTop"/>
 
-                  <Button text="Preview es mapping inditasa" type="Emphasized" press=".onDummy13StartPreview" busy="{jokers>/dummy13Busy}" enabled="{= ${jokers>/dummy13Busy} ? false : (${jokers>/dummy13PlanFileName} &amp;&amp; ${jokers>/dummy13ActualFileName}) }" class="sapUiSmallMarginTop"/>
+                  <Button text="Preview es mapping inditasa" type="Emphasized" press=".onDummy13StartPreview" busy="{jokers>/dummy13Busy}" enabled="{= ${jokers>/dummy13Busy} ? false : (${jokers>/dummy13PlanFileName} &amp;&amp; ${jokers>/dummy13ActualFileName} ? true : false) }" class="sapUiSmallMarginTop"/>
                 </VBox>
               </WizardStep>
 
