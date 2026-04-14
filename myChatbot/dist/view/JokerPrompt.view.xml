@@ -995,7 +995,270 @@
 
       </VBox>
 
-      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-11' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-12' }" width="100%">
+      <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-13' }" width="100%">
+        <Panel headerText="Terv-teny osszehasonlitas - Wizard">
+          <VBox class="sapUiSmallMargin">
+            <Text text="A wizard ket CSV-bol programozott terv-teny osszevetest keszit. A mapping javaslat automatizalt, de minden fontos mezot felulirhatsz. Az elemzes bizonyitek-alapu es nem LLM-szamitason alapul." wrapping="true"/>
+            <MessageStrip text="{jokers>/dummy13Error}" visible="{= ${jokers>/dummy13Error} ? true : false }" type="Error" showIcon="true" class="sapUiSmallMarginTop"/>
+
+            <Wizard id="dummy13Wizard" class="sapUiSmallMarginTop" showNextButton="false">
+              <WizardStep id="dummy13UploadStep" title="1. Upload Files" validated="true">
+                <VBox class="sapUiSmallMarginTop">
+                  <Label text="Plan CSV"/>
+                  <unif:FileUploader
+                    id="dummy13PlanUploader"
+                    width="100%"
+                    sameFilenameAllowed="true"
+                    multiple="false"
+                    uploadOnChange="false"
+                    fileType="csv"
+                    buttonText="Plan CSV kivalasztasa"
+                    change=".onDummy13PlanFileChange"/>
+                  <ObjectStatus text="{= ${jokers>/dummy13PlanFileName} ? 'Plan fajl: ' + ${jokers>/dummy13PlanFileName} : 'Nincs kivalasztott Plan CSV' }" state="{= ${jokers>/dummy13PlanFileName} ? 'Success' : 'Information' }" class="sapUiTinyMarginTop"/>
+
+                  <Label text="Actual CSV" class="sapUiSmallMarginTop"/>
+                  <unif:FileUploader
+                    id="dummy13ActualUploader"
+                    width="100%"
+                    sameFilenameAllowed="true"
+                    multiple="false"
+                    uploadOnChange="false"
+                    fileType="csv"
+                    buttonText="Actual CSV kivalasztasa"
+                    change=".onDummy13ActualFileChange"/>
+                  <ObjectStatus text="{= ${jokers>/dummy13ActualFileName} ? 'Actual fajl: ' + ${jokers>/dummy13ActualFileName} : 'Nincs kivalasztott Actual CSV' }" state="{= ${jokers>/dummy13ActualFileName} ? 'Success' : 'Information' }" class="sapUiTinyMarginTop"/>
+
+                  <Button text="Preview es mapping inditasa" type="Emphasized" press=".onDummy13StartPreview" busy="{jokers>/dummy13Busy}" enabled="{= ${jokers>/dummy13Busy} ? false : (${jokers>/dummy13PlanFileName} &amp;&amp; ${jokers>/dummy13ActualFileName}) }" class="sapUiSmallMarginTop"/>
+                </VBox>
+              </WizardStep>
+
+              <WizardStep id="dummy13MapStep" title="2. Preview &amp; Map Columns" validated="true">
+                <HBox wrap="Wrap" renderType="Bare" width="100%" justifyContent="SpaceBetween" alignItems="Start">
+                  <VBox width="100%">
+                    <layoutData><FlexItemData growFactor="1" baseSize="28rem"/></layoutData>
+                    <Panel headerText="Plan preview">
+                      <VBox class="sapUiSmallMargin">
+                        <Text text="{= 'Plan oszlopok: ' + ${jokers>/dummy13PlanColumns}.length }" wrapping="true"/>
+                        <Table id="dummy13PlanPreviewTable" growing="true" growingThreshold="10" inset="false" class="sapUiSmallMarginTop"/>
+                      </VBox>
+                    </Panel>
+                  </VBox>
+                  <VBox width="100%">
+                    <layoutData><FlexItemData growFactor="1" baseSize="28rem"/></layoutData>
+                    <Panel headerText="Actual preview" class="sapUiTinyMarginBegin">
+                      <VBox class="sapUiSmallMargin">
+                        <Text text="{= 'Actual oszlopok: ' + ${jokers>/dummy13ActualColumns}.length }" wrapping="true"/>
+                        <Table id="dummy13ActualPreviewTable" growing="true" growingThreshold="10" inset="false" class="sapUiSmallMarginTop"/>
+                      </VBox>
+                    </Panel>
+                  </VBox>
+                </HBox>
+
+                <Panel headerText="Szemantikus mezomapping" class="sapUiSmallMarginTop">
+                  <Table items="{jokers>/dummy13SemanticMappings}" inset="false">
+                    <columns>
+                      <Column width="12rem"><Text text="Mezo"/></Column>
+                      <Column width="14rem"><Text text="Plan oszlop"/></Column>
+                      <Column width="14rem"><Text text="Actual oszlop"/></Column>
+                    </columns>
+                    <items>
+                      <ColumnListItem>
+                        <cells>
+                          <VBox>
+                            <Text text="{jokers>label}"/>
+                            <ObjectStatus text="{= ${jokers>required} ? 'Kotelezo' : 'Opcionális' }" state="{= ${jokers>required} ? 'Warning' : 'Information' }"/>
+                          </VBox>
+                          <Select selectedKey="{jokers>planColumn}" width="100%" items="{jokers>/dummy13PlanColumns}">
+                            <items>
+                              <core:Item key="{jokers>}" text="{jokers>}"/>
+                            </items>
+                          </Select>
+                          <Select selectedKey="{jokers>actualColumn}" width="100%" items="{jokers>/dummy13ActualColumns}">
+                            <items>
+                              <core:Item key="{jokers>}" text="{jokers>}"/>
+                            </items>
+                          </Select>
+                        </cells>
+                      </ColumnListItem>
+                    </items>
+                  </Table>
+                </Panel>
+
+                <Panel headerText="Compare key mezok" class="sapUiSmallMarginTop">
+                  <VBox class="sapUiSmallMargin">
+                    <MultiComboBox selectedKeys="{jokers>/dummy13CompareKeys}" items="{jokers>/dummy13CompareKeyOptions}" width="100%">
+                      <items>
+                        <core:Item key="{jokers>key}" text="{jokers>text}"/>
+                      </items>
+                    </MultiComboBox>
+                    <ObjectStatus text="{= 'Automatikus mapping confidence: ' + Math.round(${jokers>/dummy13MappingConfidence} * 100) + '%' }" state="Information" class="sapUiTinyMarginTop"/>
+                  </VBox>
+                </Panel>
+
+                <Button text="Normalizalas es minosegellenorzes" type="Emphasized" press=".onDummy13Normalize" busy="{jokers>/dummy13Busy}" enabled="{= ${jokers>/dummy13Busy} ? false : (${jokers>/dummy13AnalysisRunId} ? true : false) }" class="sapUiSmallMarginTop"/>
+              </WizardStep>
+
+              <WizardStep id="dummy13NormalizeStep" title="3. Validate &amp; Normalize Data" validated="true">
+                <VBox class="sapUiSmallMarginTop">
+                  <List items="{jokers>/dummy13QualityItems}" visible="{= ${jokers>/dummy13QualityItems}.length > 0 }">
+                    <CustomListItem><Text text="{= '- ' + ${jokers>} }" wrapping="true"/></CustomListItem>
+                  </List>
+                  <MessageStrip text="A Python normalizalas kezeli a datumokat, szamokat, hianyzo kulcsokat es a duplikatumgyanus csoportokat. Ha az ervenyes coverage alacsony, azt a vegso eredmeny is jelzi." type="Information" showIcon="true" class="sapUiSmallMarginTop"/>
+                  <Button text="Tovabb a szabalyokhoz" type="Transparent" press=".onDummy13GoToRules" class="sapUiSmallMarginTop"/>
+                </VBox>
+              </WizardStep>
+
+              <WizardStep id="dummy13RulesStep" title="4. Define Comparison Rules" validated="true">
+                <VBox class="sapUiSmallMarginTop">
+                  <HBox wrap="Wrap" alignItems="Center">
+                    <Label text="Idoszak granularitas" class="sapUiTinyMarginEnd"/>
+                    <Select width="10rem" selectedKey="{jokers>/dummy13Granularity}">
+                      <items>
+                        <core:Item key="monthly" text="Havi"/>
+                        <core:Item key="daily" text="Napi"/>
+                      </items>
+                    </Select>
+                    <Label text="Metrika" class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
+                    <Select width="12rem" selectedKey="{jokers>/dummy13MetricMode}">
+                      <items>
+                        <core:Item key="sum_amount" text="sum(amount)"/>
+                      </items>
+                    </Select>
+                  </HBox>
+
+                  <Label text="Grouping keys" class="sapUiSmallMarginTop"/>
+                  <MultiComboBox selectedKeys="{jokers>/dummy13GroupingKeys}" items="{jokers>/dummy13CompareKeyOptions}" width="100%">
+                    <items>
+                      <core:Item key="{jokers>key}" text="{jokers>text}"/>
+                    </items>
+                  </MultiComboBox>
+
+                  <HBox wrap="Wrap" alignItems="Center" class="sapUiSmallMarginTop">
+                    <Label text="Variance threshold %" class="sapUiTinyMarginEnd"/>
+                    <Input width="8rem" value="{jokers>/dummy13ThresholdPct}"/>
+                    <Label text="Absolute threshold" class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
+                    <Input width="10rem" value="{jokers>/dummy13AbsoluteThreshold}"/>
+                    <Label text="Z-score cutoff" class="sapUiTinyMarginBegin sapUiTinyMarginEnd"/>
+                    <Input width="8rem" value="{jokers>/dummy13ZscoreCutoff}"/>
+                  </HBox>
+
+                  <Button text="Elemzes inditasa" type="Emphasized" press=".onDummy13RunAnalysis" busy="{jokers>/dummy13Busy}" enabled="{= ${jokers>/dummy13Busy} ? false : (${jokers>/dummy13AnalysisRunId} ? true : false) }" class="sapUiSmallMarginTop"/>
+                </VBox>
+              </WizardStep>
+
+              <WizardStep id="dummy13RunStep" title="5. Run Analysis" validated="true">
+                <VBox class="sapUiSmallMarginTop">
+                  <ProgressIndicator percentValue="{jokers>/dummy13ProgressPercent}" displayValue="{= ${jokers>/dummy13ProgressPercent} + '%' }" state="Success"/>
+                  <HBox alignItems="Center" class="sapUiTinyMarginTop">
+                    <BusyIndicator size="1rem" visible="{jokers>/dummy13Busy}"/>
+                    <Text text="{= ${jokers>/dummy13ProgressText} ? ${jokers>/dummy13ProgressText} : 'Elemzes fut...' }" class="sapUiTinyMarginBegin"/>
+                  </HBox>
+                  <List items="{jokers>/dummy13StepItems}" visible="{= ${jokers>/dummy13StepItems}.length > 0 }" class="sapUiSmallMarginTop">
+                    <CustomListItem>
+                      <HBox justifyContent="SpaceBetween" alignItems="Center">
+                        <VBox>
+                          <Text text="{= ${jokers>step} + '. lepes - ' + ${jokers>title} }" wrapping="true"/>
+                          <Text text="{jokers>detail}" wrapping="true" class="sapUiTinyMarginTop"/>
+                        </VBox>
+                        <ObjectStatus text="{jokers>status}" state="{= ${jokers>status} === 'done' ? 'Success' : (${jokers>status} === 'running' ? 'Information' : (${jokers>status} === 'error' ? 'Error' : 'None')) }"/>
+                      </HBox>
+                    </CustomListItem>
+                  </List>
+                </VBox>
+              </WizardStep>
+
+              <WizardStep id="dummy13ResultsStep" title="6. Results &amp; Explanation" validated="true">
+                <VBox class="sapUiSmallMarginTop">
+                  <Panel headerText="Vezetoi osszefoglalo">
+                    <VBox class="sapUiSmallMargin">
+                      <ObjectStatus text="{= ${jokers>/dummy13QualitySummary/confidence_label} ? 'Confidence: ' + ${jokers>/dummy13QualitySummary/confidence_label} : 'Confidence meg nincs kiszamolva' }" state="{= ${jokers>/dummy13QualitySummary/confidence_label} === 'magas' ? 'Success' : (${jokers>/dummy13QualitySummary/confidence_label} === 'kozepes' ? 'Information' : 'Warning') }"/>
+                      <List items="{jokers>/dummy13NarrativeBullets}" visible="{= ${jokers>/dummy13NarrativeBullets}.length > 0 }" class="sapUiTinyMarginTop">
+                        <CustomListItem><Text text="{= '- ' + ${jokers>} }" wrapping="true"/></CustomListItem>
+                      </List>
+                      <List items="{jokers>/dummy13NarrativeLimitations}" visible="{= ${jokers>/dummy13NarrativeLimitations}.length > 0 }" class="sapUiTinyMarginTop">
+                        <CustomListItem><Text text="{= 'Korlatozas: ' + ${jokers>} }" wrapping="true"/></CustomListItem>
+                      </List>
+                    </VBox>
+                  </Panel>
+
+                  <Panel headerText="Osszesitett szamok" class="sapUiSmallMarginTop">
+                    <HBox wrap="Wrap" class="sapUiSmallMargin">
+                      <ObjectStatus text="{= 'Plan total: ' + (${jokers>/dummy13SummaryTotals/plan_total} || 0) }" state="Information" class="sapUiTinyMarginEnd sapUiTinyMarginBottom"/>
+                      <ObjectStatus text="{= 'Actual total: ' + (${jokers>/dummy13SummaryTotals/actual_total} || 0) }" state="Information" class="sapUiTinyMarginEnd sapUiTinyMarginBottom"/>
+                      <ObjectStatus text="{= 'Variance: ' + (${jokers>/dummy13SummaryTotals/variance_total} || 0) }" state="Warning" class="sapUiTinyMarginEnd sapUiTinyMarginBottom"/>
+                      <ObjectStatus text="{= 'Variance %: ' + (${jokers>/dummy13SummaryTotals/variance_pct_total} || 0) }" state="Warning" class="sapUiTinyMarginBottom"/>
+                    </HBox>
+                  </Panel>
+
+                  <Panel headerText="Top driverek" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy13TopDrivers}.length > 0 }">
+                    <List items="{jokers>/dummy13TopDrivers}">
+                      <CustomListItem>
+                        <Text text="{= (${jokers>groupLabel} || '') + ' | plan=' + (${jokers>plan} || 0) + ' | actual=' + (${jokers>actual} || 0) + ' | variance=' + (${jokers>variance} || 0) }" wrapping="true"/>
+                      </CustomListItem>
+                    </List>
+                  </Panel>
+
+                  <Panel headerText="Bizonyitekok" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy13EvidenceRows}.length > 0 }">
+                    <Table items="{jokers>/dummy13EvidenceRows}" growing="true" growingThreshold="20" inset="false">
+                      <columns>
+                        <Column><Text text="Idoszak"/></Column>
+                        <Column><Text text="Kulcs"/></Column>
+                        <Column><Text text="Plan"/></Column>
+                        <Column><Text text="Actual"/></Column>
+                        <Column><Text text="Variance"/></Column>
+                        <Column><Text text="Variance %"/></Column>
+                        <Column><Text text="Z-score"/></Column>
+                        <Column><Text text="Flag-ek"/></Column>
+                      </columns>
+                      <items>
+                        <ColumnListItem>
+                          <cells>
+                            <Text text="{jokers>period}" wrapping="true"/>
+                            <Text text="{jokers>groupLabel}" wrapping="true"/>
+                            <Text text="{jokers>plan}" wrapping="true"/>
+                            <Text text="{jokers>actual}" wrapping="true"/>
+                            <Text text="{jokers>variance}" wrapping="true"/>
+                            <Text text="{jokers>variancePct}" wrapping="true"/>
+                            <Text text="{jokers>zscore}" wrapping="true"/>
+                            <Text text="{= (${jokers>flags} || []).join(', ') }" wrapping="true"/>
+                          </cells>
+                        </ColumnListItem>
+                      </items>
+                    </Table>
+                  </Panel>
+
+                  <Panel headerText="Teljes aggregalt eredmeny" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy13ResultRows}.length > 0 }">
+                    <Table items="{jokers>/dummy13ResultRows}" growing="true" growingThreshold="30" inset="false">
+                      <columns>
+                        <Column><Text text="Idoszak"/></Column>
+                        <Column><Text text="Kulcs"/></Column>
+                        <Column><Text text="Plan"/></Column>
+                        <Column><Text text="Actual"/></Column>
+                        <Column><Text text="Variance"/></Column>
+                        <Column><Text text="Variance %"/></Column>
+                      </columns>
+                      <items>
+                        <ColumnListItem>
+                          <cells>
+                            <Text text="{jokers>period}" wrapping="true"/>
+                            <Text text="{jokers>groupLabel}" wrapping="true"/>
+                            <Text text="{jokers>plan}" wrapping="true"/>
+                            <Text text="{jokers>actual}" wrapping="true"/>
+                            <Text text="{jokers>variance}" wrapping="true"/>
+                            <Text text="{jokers>variancePct}" wrapping="true"/>
+                          </cells>
+                        </ColumnListItem>
+                      </items>
+                    </Table>
+                  </Panel>
+                </VBox>
+              </WizardStep>
+            </Wizard>
+          </VBox>
+        </Panel>
+      </VBox>
+
+      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-11' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-12' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-13' }" width="100%">
         <TextArea value="{jokers>/promptInput}" rows="10" growing="true" growingMaxLines="16" width="100%" placeholder="Ide ird a feldolgozando szoveget..."/>
 
         <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">

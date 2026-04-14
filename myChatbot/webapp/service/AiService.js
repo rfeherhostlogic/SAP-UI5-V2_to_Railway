@@ -206,6 +206,74 @@
     });
   }
 
+  function startDummy13AnalysisRun(mPayload) {
+    var oFormData = new FormData();
+    if (mPayload.planFile) {
+      oFormData.append("planFile", mPayload.planFile);
+    }
+    if (mPayload.actualFile) {
+      oFormData.append("actualFile", mPayload.actualFile);
+    }
+    return fetch("/api/jokers/dummy13/start", {
+      method: "POST",
+      body: oFormData
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function normalizeDummy13(mPayload) {
+    return fetch("/api/jokers/dummy13/normalize", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(mPayload || {})
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function runDummy13Analysis(mPayload) {
+    return fetch("/api/jokers/dummy13/analyze", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(mPayload || {})
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function getDummy13Status(sJobId) {
+    return fetch("/api/jokers/dummy13/status/" + encodeURIComponent(String(sJobId || "")), {
+      method: "GET"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function getDummy4SchemaHint() {
     return fetch("/api/jokers/dummy4/schema-hint", {
       method: "GET"
@@ -788,6 +856,10 @@
     runDummy11Prompt: runDummy11Prompt,
     startDummy12Analysis: startDummy12Analysis,
     getDummy12Status: getDummy12Status,
+    startDummy13AnalysisRun: startDummy13AnalysisRun,
+    normalizeDummy13: normalizeDummy13,
+    runDummy13Analysis: runDummy13Analysis,
+    getDummy13Status: getDummy13Status,
     getDummy4SchemaHint: getDummy4SchemaHint,
     uploadDummy5Pdf: uploadDummy5Pdf,
     summarizeDummy5: summarizeDummy5,

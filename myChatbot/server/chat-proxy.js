@@ -41,6 +41,9 @@ const DUMMY9_RUNNER_PY = path.resolve(
 const DUMMY10_RUNNER_PY = path.resolve(
   process.env.DUMMY10_RUNNER_PY || path.join(__dirname, "dummy10_rfm_runner.py")
 );
+const DUMMY13_RUNNER_PY = path.resolve(
+  process.env.DUMMY13_RUNNER_PY || path.join(__dirname, "dummy13_plan_actual_runner.py")
+);
 const DUMMY12_PROMPT_PATH = path.resolve(
   process.env.DUMMY12_PROMPT_PATH || path.join(__dirname, "competition_analysis_prompt.txt")
 );
@@ -55,6 +58,8 @@ const oDummy5Docs = new Map();
 const oDiscoverySpecSessions = new Map();
 const oDiscoveryJobs = new Map();
 const oDummy12Jobs = new Map();
+const oDummy13Runs = new Map();
+const oDummy13Jobs = new Map();
 const oAuthSessions = new Map();
 let oShieldSchedulerTimer = null;
 const AUTH_USERS = loadAuthUsersFromEnv();
@@ -90,6 +95,13 @@ const oDummy12Upload = multer({
   limits: {
     fileSize: 15 * 1024 * 1024,
     files: 24
+  }
+});
+const oDummy13Upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 2
   }
 });
 
@@ -2279,6 +2291,226 @@ function runDummy9CsvRunner(files) {
       }
     });
   });
+}
+
+function runDummy13Python(mode, planPath, actualPath, configObject) {
+  return new Promise(function(resolve, reject) {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "dummy13-"));
+    const outputPath = path.join(tempDir, "output.json");
+    const configPath = path.join(tempDir, "config.json");
+    const args = [
+      DUMMY13_RUNNER_PY,
+      "--mode", String(mode || "preview"),
+      "--plan", String(planPath || ""),
+      "--actual", String(actualPath || ""),
+      "--output", outputPath
+    ];
+
+    try {
+      if (configObject) {
+        fs.writeFileSync(configPath, JSON.stringify(configObject || {}, null, 2), "utf8");
+        args.push("--config", configPath);
+      }
+    } catch (writeErr) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      reject(writeErr);
+      return;
+    }
+
+    const pyExec = process.env.PYTHON_BIN || (process.platform === "win32" ? "python" : "python3");
+    const child = spawn(pyExec, args);
+    let stderr = "";
+
+    child.stderr.on("data", function(chunk) {
+      stderr += String(chunk || "");
+    });
+
+    child.on("error", function(err) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      reject(err);
+    });
+
+    child.on("close", function(code) {
+      try {
+        if (Number(code) !== 0) {
+          throw new Error(stderr.trim() || ("Dummy13 python hiba (exit code: " + code + ")"));
+        }
+        const raw = fs.readFileSync(outputPath, "utf8");
+        resolve(parseOpenAiReply(raw) || {});
+      } catch (err) {
+        reject(err);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+  });
+}
+
+function createDummy13Run(planFile, actualFile) {
+  const id = crypto.randomUUID();
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "dummy13-run-"));
+  const planName = sanitizeUploadFileName(planFile && planFile.originalname, "plan", 0);
+  const actualName = sanitizeUploadFileName(actualFile && actualFile.originalname, "actual", 1);
+  const planPath = path.join(tempDir, planName);
+  const actualPath = path.join(tempDir, actualName);
+  fs.writeFileSync(planPath, planFile && planFile.buffer ? planFile.buffer : Buffer.from(""));
+  fs.writeFileSync(actualPath, actualFile && actualFile.buffer ? actualFile.buffer : Buffer.from(""));
+  const run = {
+    id: id,
+    tempDir: tempDir,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    planPath: planPath,
+    actualPath: actualPath,
+    planName: planName,
+    actualName: actualName,
+    mapping: null,
+    normalizeResult: null,
+    analysisResult: null
+  };
+  oDummy13Runs.set(id, run);
+  return run;
+}
+
+function touchDummy13Run(run) {
+  if (run) {
+    run.updatedAt = Date.now();
+  }
+}
+
+function getDummy13Run(runId) {
+  const run = oDummy13Runs.get(String(runId || "").trim());
+  if (run) {
+    touchDummy13Run(run);
+  }
+  return run;
+}
+
+function cleanupDummy13Runs() {
+  const now = Date.now();
+  Array.from(oDummy13Runs.entries()).forEach(function(entry) {
+    const runId = entry[0];
+    const run = entry[1];
+    if (!run || now - Number(run.updatedAt || run.createdAt || now) > DUMMY12_JOB_TTL_MS) {
+      if (run && run.tempDir) {
+        fs.rmSync(run.tempDir, { recursive: true, force: true });
+      }
+      oDummy13Runs.delete(runId);
+    }
+  });
+}
+
+function createDummy13Job(runId) {
+  const id = crypto.randomUUID();
+  const job = {
+    id: id,
+    runId: String(runId || ""),
+    status: "queued",
+    progressPercent: 0,
+    progressText: "Varakozas inditasra...",
+    currentStep: 0,
+    error: "",
+    result: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    steps: [
+      { step: 1, title: "Normalizalas", status: "pending", detail: "Canonical record format es adatminoseg ellenorzes." },
+      { step: 2, title: "Aggregalas", status: "pending", detail: "Terv es teny aggregalt osszevetese compare key menten." },
+      { step: 3, title: "Anomalia es driverek", status: "pending", detail: "Threshold, z-score, top contributork es bizonyitekok." },
+      { step: 4, title: "Vezetoi osszegzes", status: "pending", detail: "Template-based, bizonyitek alapu output." }
+    ]
+  };
+  oDummy13Jobs.set(id, job);
+  return job;
+}
+
+function createDummy13JobSnapshot(job) {
+  return {
+    job_id: job.id,
+    run_id: job.runId,
+    status: job.status,
+    progress_percent: Number(job.progressPercent || 0),
+    progress_text: String(job.progressText || ""),
+    current_step: Number(job.currentStep || 0),
+    steps: Array.isArray(job.steps) ? job.steps : [],
+    result: job.status === "done" ? (job.result || null) : null,
+    error: job.status === "error" ? String(job.error || "Dummy13 hiba") : ""
+  };
+}
+
+function updateDummy13Job(job, patch) {
+  Object.assign(job, patch || {});
+  job.updatedAt = Date.now();
+}
+
+function setDummy13JobStep(job, stepNumber, status, detail, progressPercent) {
+  job.steps = (job.steps || []).map(function(step) {
+    if (step.step < stepNumber && status === "running") {
+      return Object.assign({}, step, { status: "done" });
+    }
+    if (step.step === stepNumber) {
+      return Object.assign({}, step, {
+        status: status,
+        detail: detail || step.detail
+      });
+    }
+    return step;
+  });
+  updateDummy13Job(job, {
+    currentStep: stepNumber,
+    progressPercent: Number(progressPercent == null ? job.progressPercent : progressPercent),
+    progressText: detail || job.progressText
+  });
+}
+
+function cleanupDummy13Jobs() {
+  const now = Date.now();
+  Array.from(oDummy13Jobs.entries()).forEach(function(entry) {
+    const jobId = entry[0];
+    const job = entry[1];
+    if (!job || now - Number(job.updatedAt || job.createdAt || now) > DUMMY12_JOB_TTL_MS) {
+      oDummy13Jobs.delete(jobId);
+    }
+  });
+}
+
+async function runDummy13Job(job, run, configObject) {
+  try {
+    updateDummy13Job(job, {
+      status: "running",
+      progressPercent: 5,
+      progressText: "Dummy13 elemzes inditasa..."
+    });
+    setDummy13JobStep(job, 1, "running", "Adatok normalizalasa es minosegellenorzese...", 20);
+    const normalizeResult = await runDummy13Python("normalize", run.planPath, run.actualPath, configObject);
+    run.normalizeResult = normalizeResult;
+    touchDummy13Run(run);
+    setDummy13JobStep(job, 1, "done", "Normalizalas elkeszult.", 30);
+    setDummy13JobStep(job, 2, "running", "Aggregalt terv-teny osszevetes fut...", 55);
+    setDummy13JobStep(job, 2, "done", "Aggregalas elkeszult.", 65);
+    setDummy13JobStep(job, 3, "running", "Anomaliak, driverek es bizonyitekok szamitasa...", 82);
+    const analysisResult = await runDummy13Python("analyze", run.planPath, run.actualPath, configObject);
+    run.analysisResult = analysisResult;
+    touchDummy13Run(run);
+    setDummy13JobStep(job, 3, "done", "Anomaliak es driverek elkeszultek.", 92);
+    setDummy13JobStep(job, 4, "running", "Vezetoi osszegzes formalasa...", 97);
+    updateDummy13Job(job, {
+      status: "done",
+      progressPercent: 100,
+      progressText: "Terv-teny elemzes elkeszult.",
+      result: analysisResult
+    });
+    setDummy13JobStep(job, 4, "done", "Vezetoi osszegzes elkeszult.", 100);
+  } catch (err) {
+    updateDummy13Job(job, {
+      status: "error",
+      error: err && err.message ? err.message : String(err),
+      progressText: "Dummy13 elemzesi hiba."
+    });
+    if (job.currentStep) {
+      setDummy13JobStep(job, job.currentStep, "error", err && err.message ? err.message : String(err), job.progressPercent);
+    }
+  }
 }
 
 function scoreDummy9File(file, questionTokens) {
@@ -7185,6 +7417,110 @@ app.get("/api/jokers/dummy12/status/:jobId", function(req, res) {
     return;
   }
   res.json(createDummy12JobSnapshot(job));
+});
+
+app.post("/api/jokers/dummy13/start", oDummy13Upload.fields([
+  { name: "planFile", maxCount: 1 },
+  { name: "actualFile", maxCount: 1 }
+]), async function(req, res) {
+  try {
+    cleanupDummy13Runs();
+    const planFile = req.files && req.files.planFile ? req.files.planFile[0] : null;
+    const actualFile = req.files && req.files.actualFile ? req.files.actualFile[0] : null;
+    if (!planFile || !actualFile) {
+      res.status(400).json({ error: "A plan CSV es az actual CSV is kotelezo." });
+      return;
+    }
+    const run = createDummy13Run(planFile, actualFile);
+    const preview = await runDummy13Python("preview", run.planPath, run.actualPath, null);
+    run.preview = preview;
+    touchDummy13Run(run);
+    res.json({
+      analysis_run_id: run.id,
+      plan_file_name: run.planName,
+      actual_file_name: run.actualName,
+      preview: preview
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Dummy13 inditasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/dummy13/normalize", express.json({ limit: "2mb" }), async function(req, res) {
+  try {
+    cleanupDummy13Runs();
+    const runId = String(req.body && req.body.analysis_run_id ? req.body.analysis_run_id : "").trim();
+    const mapping = req.body && req.body.mapping ? req.body.mapping : {};
+    const compareKeys = Array.isArray(req.body && req.body.compare_keys) ? req.body.compare_keys : [];
+    const mappingConfidence = Number(req.body && req.body.mapping_confidence ? req.body.mapping_confidence : 0);
+    const run = getDummy13Run(runId);
+    if (!run) {
+      res.status(404).json({ error: "A Joker 13 session mar nem erheto el." });
+      return;
+    }
+    const result = await runDummy13Python("normalize", run.planPath, run.actualPath, {
+      mapping: mapping,
+      compare_keys: compareKeys,
+      mapping_confidence: mappingConfidence
+    });
+    run.mapping = {
+      mapping: mapping,
+      compare_keys: compareKeys,
+      mapping_confidence: mappingConfidence
+    };
+    run.normalizeResult = result;
+    touchDummy13Run(run);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      error: "Dummy13 normalizalasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/dummy13/analyze", express.json({ limit: "2mb" }), async function(req, res) {
+  try {
+    cleanupDummy13Runs();
+    cleanupDummy13Jobs();
+    const runId = String(req.body && req.body.analysis_run_id ? req.body.analysis_run_id : "").trim();
+    const run = getDummy13Run(runId);
+    if (!run) {
+      res.status(404).json({ error: "A Joker 13 session mar nem erheto el." });
+      return;
+    }
+    const mapping = req.body && req.body.mapping ? req.body.mapping : (run.mapping && run.mapping.mapping ? run.mapping.mapping : {});
+    const compareKeys = Array.isArray(req.body && req.body.compare_keys) ? req.body.compare_keys : (run.mapping && run.mapping.compare_keys ? run.mapping.compare_keys : []);
+    const rules = req.body && req.body.rules ? req.body.rules : {};
+    const mappingConfidence = Number(req.body && req.body.mapping_confidence ? req.body.mapping_confidence : (run.mapping && run.mapping.mapping_confidence ? run.mapping.mapping_confidence : 0));
+    const job = createDummy13Job(runId);
+    runDummy13Job(job, run, {
+      mapping: mapping,
+      compare_keys: compareKeys,
+      rules: rules,
+      mapping_confidence: mappingConfidence
+    });
+    res.json(createDummy13JobSnapshot(job));
+  } catch (err) {
+    res.status(500).json({
+      error: "Dummy13 elemzesi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.get("/api/jokers/dummy13/status/:jobId", function(req, res) {
+  cleanupDummy13Jobs();
+  const jobId = String(req.params && req.params.jobId ? req.params.jobId : "").trim();
+  const job = oDummy13Jobs.get(jobId);
+  if (!job) {
+    res.status(404).json({ error: "A Dummy13 feladat mar nem erheto el." });
+    return;
+  }
+  res.json(createDummy13JobSnapshot(job));
 });
 
 app.use(express.static(UI_STATIC_DIR));
