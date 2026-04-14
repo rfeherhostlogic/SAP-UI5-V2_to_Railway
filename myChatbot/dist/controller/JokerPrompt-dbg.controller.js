@@ -583,19 +583,19 @@ sap.ui.define([
     },
 
     onDummy13PlanFileChange: function(oEvent) {
-      var aFiles = oEvent && oEvent.getParameter ? oEvent.getParameter("files") : [];
+      var aFiles = this._extractUploaderFiles(oEvent);
       var oFile = aFiles && aFiles[0] ? aFiles[0] : null;
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/dummy13PlanFile", oFile || null);
-      oModel.setProperty("/dummy13PlanFileName", oFile ? String(oFile.name || "") : "");
+      oModel.setProperty("/dummy13PlanFileName", oFile ? String(oFile.name || "") : String(oEvent && oEvent.getParameter ? oEvent.getParameter("newValue") || "" : ""));
     },
 
     onDummy13ActualFileChange: function(oEvent) {
-      var aFiles = oEvent && oEvent.getParameter ? oEvent.getParameter("files") : [];
+      var aFiles = this._extractUploaderFiles(oEvent);
       var oFile = aFiles && aFiles[0] ? aFiles[0] : null;
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/dummy13ActualFile", oFile || null);
-      oModel.setProperty("/dummy13ActualFileName", oFile ? String(oFile.name || "") : "");
+      oModel.setProperty("/dummy13ActualFileName", oFile ? String(oFile.name || "") : String(oEvent && oEvent.getParameter ? oEvent.getParameter("newValue") || "" : ""));
     },
 
     onDummy13StartPreview: async function() {
@@ -616,6 +616,7 @@ sap.ui.define([
         });
         oModel.setProperty("/dummy13AnalysisRunId", String(oResp && oResp.analysis_run_id ? oResp.analysis_run_id : ""));
         this._applyDummy13Preview(oResp && oResp.preview ? oResp.preview : {});
+        MessageToast.show("A CSV preview es mapping javaslat elkeszult.");
         this._goToDummy13Step("dummy13MapStep");
       } catch (oError) {
         oModel.setProperty("/dummy13Error", oError && oError.message ? oError.message : "Dummy13 inditasi hiba.");
@@ -1428,6 +1429,22 @@ sap.ui.define([
       if (oWizard && oStep && oWizard.goToStep) {
         oWizard.goToStep(oStep, true);
       }
+    },
+
+    _extractUploaderFiles: function(oEvent) {
+      var aFiles = oEvent && oEvent.getParameter ? oEvent.getParameter("files") : null;
+      if (aFiles && aFiles.length) {
+        return Array.prototype.slice.call(aFiles);
+      }
+      var oSource = oEvent && oEvent.getSource ? oEvent.getSource() : null;
+      var oDomRef = oSource && oSource.getFocusDomRef ? oSource.getFocusDomRef() : null;
+      if (oDomRef && oDomRef.files && oDomRef.files.length) {
+        return Array.prototype.slice.call(oDomRef.files);
+      }
+      if (oSource && oSource.FUEl && oSource.FUEl.files && oSource.FUEl.files.length) {
+        return Array.prototype.slice.call(oSource.FUEl.files);
+      }
+      return [];
     },
 
     _appendDummy12Files: function(oEvent, sKey) {

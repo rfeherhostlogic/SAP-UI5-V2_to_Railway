@@ -5,6 +5,7 @@ import json
 import math
 import os
 import sys
+import unicodedata
 from datetime import datetime
 
 
@@ -20,7 +21,7 @@ SEMANTIC_FIELDS = [
 ]
 HEADER_SYNONYMS = {
     "date": ["date", "datum", "period", "posting", "book", "month", "honap"],
-    "amount": ["amount", "osszeg", "ertek", "value", "teny", "actual", "plan", "sum", "net", "egyenleg"],
+    "amount": ["amount", "osszeg", "ertek", "value", "teny", "actual", "plan", "sum", "net", "egyenleg", "bevetel", "kolt", "eredmeny", "marzs"],
     "metric": ["metric", "mutato", "measure", "sor", "line", "kategori", "category", "megnevezes"],
     "project": ["project", "projekt", "job", "program"],
     "cost_center": ["costcenter", "cost_center", "koltseghely", "cc", "cost centre"],
@@ -41,7 +42,9 @@ DATE_FORMATS = [
 
 
 def normalize_header(value):
-    return "".join(ch.lower() for ch in str(value or "").strip() if ch.isalnum())
+    normalized = unicodedata.normalize("NFKD", str(value or "").strip())
+    ascii_text = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return "".join(ch.lower() for ch in ascii_text if ch.isalnum())
 
 
 def detect_dialect(file_path):
@@ -97,6 +100,10 @@ def suggest_semantic_mapping(columns):
                   score = max(score, 70)
           if key == "amount" and any(token in normalized_col for token in ["terv", "teny", "actual", "plan"]):
               score = max(score, 60)
+          if key == "date" and any(token in normalized_col for token in ["kezdes", "befejezes", "idoszak", "period"]):
+              score = max(score, 65)
+          if key == "project" and "projekt" in normalized_col:
+              score = max(score, 85)
           if score > best_score:
               best_score = score
               best_col = col
