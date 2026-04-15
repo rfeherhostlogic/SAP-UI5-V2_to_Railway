@@ -1035,6 +1035,229 @@ async function callOpenAiText(messages, temperature) {
   return String(text || "").trim();
 }
 
+async function callOpenAiJsonObject(messages, temperature) {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + OPENAI_API_KEY
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      temperature: typeof temperature === "number" ? temperature : 0.1,
+      response_format: { type: "json_object" },
+      messages: messages
+    })
+  });
+
+  const raw = await response.text();
+  const json = parseOpenAiReply(raw);
+
+  if (!response.ok) {
+    throw new Error("OpenAI hiba: " + (json ? JSON.stringify(json) : raw));
+  }
+
+  const content =
+    json &&
+    json.choices &&
+    json.choices[0] &&
+    json.choices[0].message &&
+    json.choices[0].message.content;
+
+  const parsed = parseLooseJsonObject(String(content || "{}"));
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("OpenAI ervenytelen JSON valaszt adott.");
+  }
+  return parsed;
+}
+
+function normalizeDummy13AiMapping(preview, aiMapping) {
+  const suggested = preview && preview.suggested_mapping ? preview.suggested_mapping : {};
+  const semanticFields = Array.isArray(preview && preview.semantic_fields) ? preview.semantic_fields : [];
+  const planColumns = new Set(Array.isArray(preview && preview.plan_preview && preview.plan_preview.columns) ? preview.plan_preview.columns : []);
+  const actualColumns = new Set(Array.isArray(preview && preview.actual_preview && preview.actual_preview.columns) ? preview.actual_preview.columns : []);
+  const fallbackPlan = suggested.plan || {};
+  const fallbackActual = suggested.actual || {};
+  const fallbackCompareKeys = Array.isArray(suggested.compare_keys) ? suggested.compare_keys : [];
+  const allowedCompareKeys = new Set(semanticFields.map(function(field) {
+    return String(field && field.key ? field.key : "");
+  }).filter(function(key) {
+    return key && key !== "date" && key !== "amount";
+  }));
+  const out = {
+    plan: {},
+    actual: {},
+    compare_keys: [],
+    mapping_confidence: clampNumber(aiMapping && aiMapping.mapping_confidence, 0, 1),
+    rationale_short: String(aiMapping && aiMapping.rationale_short ? aiMapping.rationale_short : "").trim(),
+    compare_key_reason: String(aiMapping && aiMapping.compare_key_reason ? aiMapping.compare_key_reason : "").trim(),
+    field_reasons: Array.isArray(aiMapping && aiMapping.field_reasons) ? aiMapping.field_reasons : []
+  };
+
+  semanticFields.forEach(function(field) {
+    const key = String(field && field.key ? field.key : "");
+    const aiPlan = aiMapping && aiMapping.plan ? String(aiMapping.plan[key] || "") : "";
+    const aiActual = aiMapping && aiMapping.actual ? String(aiMapping.actual[key] || "") : "";
+    out.plan[key] = planColumns.has(aiPlan) ? aiPlan : String(fallbackPlan[key] || "");
+    out.actual[key] = actualColumns.has(aiActual) ? aiActual : String(fallbackActual[key] || "");
+  });
+
+  out.compare_keys = (Array.isArray(aiMapping && aiMapping.compare_keys) ? aiMapping.compare_keys : fallbackCompareKeys).map(function(key) {
+    return String(key || "").trim();
+  }).filter(function(key, index, items) {
+    return key && allowedCompareKeys.has(key) && items.indexOf(key) === index && out.plan[key] && out.actual[key];
+  });
+
+  if (!out.compare_keys.length) {
+    out.compare_keys = fallbackCompareKeys.filter(function(key) {
+      const sKey = String(key || "").trim();
+      return sKey && out.plan[sKey] && out.actual[sKey];
+    });
+  }
+
+  if (!Number.isFinite(out.mapping_confidence) || out.mapping_confidence <= 0) {
+    out.mapping_confidence = Number(suggested.mapping_confidence || 0);
+  }
+
+  return out;
+}
+
+async function maybeGenerateDummy13AiMapping(preview, planFileName, actualFileName) {
+  if (!OPENAI_API_KEY) {
+    return preview;
+  }
+
+  const aiMapping = await callOpenAiJsonObject([
+    {
+      role: "system",
+      content: [
+        "Te egy senior controller es adatmigracios szakerto vagy.",
+        "Feladatod ket CSV fajl mezomappingjanak es compare key mezoinek javaslata.",
+        "Mindig magyarul gondolkodj, de CSAK JSON-t adj vissza.",
+        "Ne talalj ki nem letezo oszlopneveket.",
+        "Csak a megadott oszlopnevek kozul valaszthatsz.",
+        "A compare_keys mezobe csak olyan semantic field kerulhet, amely mindket oldalon jo es stabil uzleti azonosito vagy csoportosito mezo.",
+        "A date es amount nem lehet compare key.",
+        "Ha bizonytalan vagy, hagyd uresen a mezot ahelyett, hogy rosszat valasztanal."
+      ].join("\n")
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        task: "Valassz jo Plan/Actual mezomappinget es compare key mezoket egy terv-teny osszehasonlitashoz.",
+        output_schema: {
+          plan: {
+            date: "string",
+            amount: "string",
+            metric: "string",
+            project: "string",
+            cost_center: "string",
+            account: "string",
+            region: "string"
+          },
+          actual: {
+            date: "string",
+            amount: "string",
+            metric: "string",
+            project: "string",
+            cost_center: "string",
+            account: "string",
+            region: "string"
+          },
+          compare_keys: ["string"],
+          mapping_confidence: "0..1 szam",
+          rationale_short: "rovid magyar magyarazat",
+          compare_key_reason: "rovid magyar magyarazat",
+          field_reasons: [
+            { field_key: "date", why: "string" }
+          ]
+        },
+        plan_file_name: String(planFileName || ""),
+        actual_file_name: String(actualFileName || ""),
+        semantic_fields: preview && preview.semantic_fields ? preview.semantic_fields : [],
+        deterministic_suggestion: preview && preview.suggested_mapping ? preview.suggested_mapping : {},
+        plan_preview: {
+          columns: preview && preview.plan_preview ? preview.plan_preview.columns : [],
+          sample_rows: preview && preview.plan_preview ? (preview.plan_preview.sample_rows || []).slice(0, 5) : []
+        },
+        actual_preview: {
+          columns: preview && preview.actual_preview ? preview.actual_preview.columns : [],
+          sample_rows: preview && preview.actual_preview ? (preview.actual_preview.sample_rows || []).slice(0, 5) : []
+        }
+      }, null, 2)
+    }
+  ], 0.1);
+
+  return Object.assign({}, preview, {
+    suggested_mapping: normalizeDummy13AiMapping(preview, aiMapping)
+  });
+}
+
+function buildDummy13FallbackExecutiveNarrative(analysisResult) {
+  const narrative = analysisResult && analysisResult.narrative ? analysisResult.narrative : {};
+  return {
+    headline: String(narrative.headline || "Terv-teny osszevetes elkeszult"),
+    summary: "",
+    bullets: Array.isArray(narrative.bullets) ? narrative.bullets : [],
+    limitations: Array.isArray(narrative.limitations) ? narrative.limitations : [],
+    recommended_actions: []
+  };
+}
+
+async function maybeGenerateDummy13ExecutiveNarrative(analysisResult, configObject) {
+  if (!OPENAI_API_KEY) {
+    return buildDummy13FallbackExecutiveNarrative(analysisResult);
+  }
+
+  const aiNarrative = await callOpenAiJsonObject([
+    {
+      role: "system",
+      content: [
+        "Te egy CFO-szintu, de projektmenedzser szamara is ertheto elemzo asszisztens vagy.",
+        "A terv-teny osszehasonlitas determinisztikus eredmenyeibol kell rovid, ertheto vezetoi osszefoglalot irnod.",
+        "Mindig magyarul irj.",
+        "Csak a kapott adatokra tamaszkodj. Ne talalj ki okokat, adatokat vagy uzleti kontextust.",
+        "Legyen tomor, vezetoileg hasznos, de ne technokrata.",
+        "Csak JSON-t adj vissza."
+      ].join("\n")
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        task: "Keszits rovid, ertheto vezetoi osszefoglalot a terv-teny elemzesrol.",
+        output_schema: {
+          headline: "1 mondatos cim",
+          summary: "2-4 mondatos vezetoileg ertheto osszefoglalo",
+          bullets: ["3-5 rovid pont"],
+          limitations: ["0-3 rovid korlatozas"],
+          recommended_actions: ["0-3 konkret kovetkezo lepes"]
+        },
+        rules: configObject && configObject.rules ? configObject.rules : {},
+        compare_keys: configObject && configObject.compare_keys ? configObject.compare_keys : [],
+        quality_summary: analysisResult && analysisResult.quality_summary ? analysisResult.quality_summary : {},
+        summary_totals: analysisResult && analysisResult.summary_totals ? analysisResult.summary_totals : {},
+        top_drivers: Array.isArray(analysisResult && analysisResult.top_drivers) ? analysisResult.top_drivers.slice(0, 5) : [],
+        evidence_rows: Array.isArray(analysisResult && analysisResult.evidence_rows) ? analysisResult.evidence_rows.slice(0, 8) : [],
+        fallback_narrative: analysisResult && analysisResult.narrative ? analysisResult.narrative : {}
+      }, null, 2)
+    }
+  ], 0.2);
+
+  return {
+    headline: String(aiNarrative && aiNarrative.headline ? aiNarrative.headline : "Terv-teny osszevetes elkeszult").trim(),
+    summary: String(aiNarrative && aiNarrative.summary ? aiNarrative.summary : "").trim(),
+    bullets: Array.isArray(aiNarrative && aiNarrative.bullets) ? aiNarrative.bullets.map(function(item) {
+      return String(item || "").trim();
+    }).filter(Boolean).slice(0, 5) : [],
+    limitations: Array.isArray(aiNarrative && aiNarrative.limitations) ? aiNarrative.limitations.map(function(item) {
+      return String(item || "").trim();
+    }).filter(Boolean).slice(0, 3) : [],
+    recommended_actions: Array.isArray(aiNarrative && aiNarrative.recommended_actions) ? aiNarrative.recommended_actions.map(function(item) {
+      return String(item || "").trim();
+    }).filter(Boolean).slice(0, 3) : []
+  };
+}
+
 async function callOpenAiResponsesWebSearch(prompt, model) {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -2417,7 +2640,7 @@ function createDummy13Job(runId) {
       { step: 1, title: "Normalizalas", status: "pending", detail: "Canonical record format es adatminoseg ellenorzes." },
       { step: 2, title: "Aggregalas", status: "pending", detail: "Terv es teny aggregalt osszevetese compare key menten." },
       { step: 3, title: "Anomalia es driverek", status: "pending", detail: "Threshold, z-score, top contributork es bizonyitekok." },
-      { step: 4, title: "Vezetoi osszegzes", status: "pending", detail: "Template-based, bizonyitek alapu output." }
+      { step: 4, title: "Vezetoi osszegzes", status: "pending", detail: "AI-val formalmazott, de bizonyitek-alapu vezetoi output." }
     ]
   };
   oDummy13Jobs.set(id, job);
@@ -2490,10 +2713,21 @@ async function runDummy13Job(job, run, configObject) {
     setDummy13JobStep(job, 2, "done", "Aggregalas elkeszult.", 65);
     setDummy13JobStep(job, 3, "running", "Anomaliak, driverek es bizonyitekok szamitasa...", 82);
     const analysisResult = await runDummy13Python("analyze", run.planPath, run.actualPath, configObject);
+    let aiNarrative = buildDummy13FallbackExecutiveNarrative(analysisResult);
+    let bAiNarrativeGenerated = false;
+    try {
+      aiNarrative = await maybeGenerateDummy13ExecutiveNarrative(analysisResult, configObject);
+      bAiNarrativeGenerated = !!OPENAI_API_KEY;
+    } catch (_aiNarrativeErr) {
+      aiNarrative = buildDummy13FallbackExecutiveNarrative(analysisResult);
+    }
+    analysisResult.narrative = Object.assign({}, analysisResult && analysisResult.narrative ? analysisResult.narrative : {}, aiNarrative, {
+      ai_generated: bAiNarrativeGenerated
+    });
     run.analysisResult = analysisResult;
     touchDummy13Run(run);
     setDummy13JobStep(job, 3, "done", "Anomaliak es driverek elkeszultek.", 92);
-    setDummy13JobStep(job, 4, "running", "Vezetoi osszegzes formalasa...", 97);
+    setDummy13JobStep(job, 4, "running", "Vezetoi osszegzes AI formalazassal keszul...", 97);
     updateDummy13Job(job, {
       status: "done",
       progressPercent: 100,
@@ -7432,7 +7666,12 @@ app.post("/api/jokers/dummy13/start", oDummy13Upload.fields([
       return;
     }
     const run = createDummy13Run(planFile, actualFile);
-    const preview = await runDummy13Python("preview", run.planPath, run.actualPath, null);
+    let preview = await runDummy13Python("preview", run.planPath, run.actualPath, null);
+    try {
+      preview = await maybeGenerateDummy13AiMapping(preview, run.planName, run.actualName);
+    } catch (_mappingErr) {
+      preview = preview || {};
+    }
     run.preview = preview;
     touchDummy13Run(run);
     res.json({

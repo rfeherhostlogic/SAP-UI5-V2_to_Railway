@@ -708,6 +708,10 @@ sap.ui.define([
       this._goToDummy13Step("dummy13RulesStep");
     },
 
+    onDummy13MappingSelectionChange: function() {
+      this._refreshDummy13CompareKeyOptions();
+    },
+
     onRefreshDummy4SchemaHint: async function() {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/generating", true);
@@ -1258,11 +1262,17 @@ sap.ui.define([
       oModel.setProperty("/dummy13ActualColumns", []);
       oModel.setProperty("/dummy13PlanPreviewRows", []);
       oModel.setProperty("/dummy13ActualPreviewRows", []);
+      oModel.setProperty("/dummy13PlanColumnsText", "");
+      oModel.setProperty("/dummy13ActualColumnsText", "");
+      oModel.setProperty("/dummy13PlanPreviewText", "");
+      oModel.setProperty("/dummy13ActualPreviewText", "");
       oModel.setProperty("/dummy13SemanticMappings", this._createDummy13SemanticMappings());
       oModel.setProperty("/dummy13CompareKeyOptions", []);
       oModel.setProperty("/dummy13CompareKeys", []);
       oModel.setProperty("/dummy13MappingConfidence", 0);
       oModel.setProperty("/dummy13MappingConfidenceText", "");
+      oModel.setProperty("/dummy13MappingAiSummary", "");
+      oModel.setProperty("/dummy13CompareKeyHelpText", "");
       oModel.setProperty("/dummy13QualitySummary", null);
       oModel.setProperty("/dummy13QualityItems", []);
       oModel.setProperty("/dummy13Granularity", "monthly");
@@ -1275,8 +1285,11 @@ sap.ui.define([
       oModel.setProperty("/dummy13ResultRows", []);
       oModel.setProperty("/dummy13EvidenceRows", []);
       oModel.setProperty("/dummy13TopDrivers", []);
+      oModel.setProperty("/dummy13NarrativeHeadline", "");
+      oModel.setProperty("/dummy13NarrativeSummary", "");
       oModel.setProperty("/dummy13NarrativeBullets", []);
       oModel.setProperty("/dummy13NarrativeLimitations", []);
+      oModel.setProperty("/dummy13RecommendedActions", []);
       this._rebindDummy13PreviewTable("dummy13PlanPreviewTable", "/dummy13PlanPreviewRows");
       this._rebindDummy13PreviewTable("dummy13ActualPreviewTable", "/dummy13ActualPreviewRows");
       var oWizard = this.byId("dummy13Wizard");
@@ -1304,23 +1317,67 @@ sap.ui.define([
           actualColumn: String(oSuggested.actual && oSuggested.actual[oItem.key] ? oSuggested.actual[oItem.key] : "")
         });
       });
-      var aCompareOptions = aMappings.filter(function(oItem) {
-        return oItem.planColumn && oItem.actualColumn && oItem.key !== "date" && oItem.key !== "amount";
-      }).map(function(oItem) {
-        return { key: oItem.key, text: oItem.label };
-      });
       oModel.setProperty("/dummy13PlanColumns", Array.isArray(oPlan.columns) ? oPlan.columns : []);
       oModel.setProperty("/dummy13ActualColumns", Array.isArray(oActual.columns) ? oActual.columns : []);
       oModel.setProperty("/dummy13PlanPreviewRows", Array.isArray(oPlan.sample_rows) ? oPlan.sample_rows : []);
       oModel.setProperty("/dummy13ActualPreviewRows", Array.isArray(oActual.sample_rows) ? oActual.sample_rows : []);
+      oModel.setProperty("/dummy13PlanColumnsText", this._formatDummy13ColumnsText(oPlan.columns));
+      oModel.setProperty("/dummy13ActualColumnsText", this._formatDummy13ColumnsText(oActual.columns));
+      oModel.setProperty("/dummy13PlanPreviewText", this._formatDummy13PreviewText(oPlan.sample_rows));
+      oModel.setProperty("/dummy13ActualPreviewText", this._formatDummy13PreviewText(oActual.sample_rows));
       oModel.setProperty("/dummy13SemanticMappings", aMappings);
-      oModel.setProperty("/dummy13CompareKeyOptions", aCompareOptions);
-      oModel.setProperty("/dummy13CompareKeys", Array.isArray(oSuggested.compare_keys) ? oSuggested.compare_keys : []);
-      oModel.setProperty("/dummy13GroupingKeys", Array.isArray(oSuggested.compare_keys) ? oSuggested.compare_keys : []);
       oModel.setProperty("/dummy13MappingConfidence", Number(oSuggested.mapping_confidence || 0));
-      oModel.setProperty("/dummy13MappingConfidenceText", "Automatikus mapping confidence: " + Math.round(Number(oSuggested.mapping_confidence || 0) * 100) + "%");
+      oModel.setProperty("/dummy13MappingConfidenceText", "AI mapping confidence: " + Math.round(Number(oSuggested.mapping_confidence || 0) * 100) + "%");
+      oModel.setProperty("/dummy13MappingAiSummary", String(oSuggested.rationale_short || "Az AI a mezonevek es a mintaadatok alapjan tett javaslatot a mappingre."));
+      oModel.setProperty("/dummy13CompareKeyHelpText", String(oSuggested.compare_key_reason || "A compare key azoknak a mezoknek a halmaza, amelyek menten a rendszer osszepaarositja a Plan es Actual adatokat."));
+      this._refreshDummy13CompareKeyOptions(Array.isArray(oSuggested.compare_keys) ? oSuggested.compare_keys : []);
       this._rebindDummy13PreviewTable("dummy13PlanPreviewTable", "/dummy13PlanPreviewRows");
       this._rebindDummy13PreviewTable("dummy13ActualPreviewTable", "/dummy13ActualPreviewRows");
+    },
+
+    _formatDummy13ColumnsText: function(aColumns) {
+      return (Array.isArray(aColumns) ? aColumns : []).map(function(sColumn, iIndex) {
+        return (iIndex + 1) + ". " + String(sColumn || "");
+      }).join("\n");
+    },
+
+    _formatDummy13PreviewText: function(aRows) {
+      return (Array.isArray(aRows) ? aRows : []).slice(0, 5).map(function(oRow, iIndex) {
+        var aLines = Object.keys(oRow || {}).map(function(sKey) {
+          return sKey + ": " + String(oRow[sKey] == null ? "" : oRow[sKey]);
+        });
+        return "Sor " + (iIndex + 1) + "\n" + aLines.join("\n");
+      }).join("\n\n");
+    },
+
+    _refreshDummy13CompareKeyOptions: function(aPreferredKeys) {
+      var oModel = this.getView().getModel("jokers");
+      var aMappings = oModel.getProperty("/dummy13SemanticMappings") || [];
+      var aOptions = aMappings.filter(function(oItem) {
+        return oItem.planColumn && oItem.actualColumn && oItem.key !== "date" && oItem.key !== "amount";
+      }).map(function(oItem) {
+        return { key: oItem.key, text: oItem.label };
+      });
+      var aAllowedKeys = aOptions.map(function(oItem) { return oItem.key; });
+      var aBaseCompare = Array.isArray(aPreferredKeys) ? aPreferredKeys : (oModel.getProperty("/dummy13CompareKeys") || []);
+      var aBaseGrouping = oModel.getProperty("/dummy13GroupingKeys") || [];
+      var aCompare = aBaseCompare.filter(function(sKey, iIndex, aItems) {
+        return aAllowedKeys.indexOf(sKey) >= 0 && aItems.indexOf(sKey) === iIndex;
+      });
+      var aGrouping = aBaseGrouping.filter(function(sKey, iIndex, aItems) {
+        return aAllowedKeys.indexOf(sKey) >= 0 && aItems.indexOf(sKey) === iIndex;
+      });
+
+      if (!aCompare.length && aOptions.length > 0) {
+        aCompare = [aOptions[0].key];
+      }
+      if (!aGrouping.length) {
+        aGrouping = aCompare.slice();
+      }
+
+      oModel.setProperty("/dummy13CompareKeyOptions", aOptions);
+      oModel.setProperty("/dummy13CompareKeys", aCompare);
+      oModel.setProperty("/dummy13GroupingKeys", aGrouping);
     },
 
     _buildDummy13MappingPayload: function() {
@@ -1382,13 +1439,17 @@ sap.ui.define([
     _applyDummy13Result: function(oResp) {
       var oModel = this.getView().getModel("jokers");
       var oQuality = oResp && oResp.quality_summary ? oResp.quality_summary : {};
+      var oNarrative = oResp && oResp.narrative ? oResp.narrative : {};
       oModel.setProperty("/dummy13QualitySummary", oQuality);
       oModel.setProperty("/dummy13SummaryTotals", oResp && oResp.summary_totals ? oResp.summary_totals : {});
       oModel.setProperty("/dummy13ResultRows", Array.isArray(oResp && oResp.result_rows) ? oResp.result_rows : []);
       oModel.setProperty("/dummy13EvidenceRows", Array.isArray(oResp && oResp.evidence_rows) ? oResp.evidence_rows : []);
       oModel.setProperty("/dummy13TopDrivers", Array.isArray(oResp && oResp.top_drivers) ? oResp.top_drivers : []);
-      oModel.setProperty("/dummy13NarrativeBullets", Array.isArray(oResp && oResp.narrative && oResp.narrative.bullets) ? oResp.narrative.bullets : []);
-      oModel.setProperty("/dummy13NarrativeLimitations", Array.isArray(oResp && oResp.narrative && oResp.narrative.limitations) ? oResp.narrative.limitations : []);
+      oModel.setProperty("/dummy13NarrativeHeadline", String(oNarrative.headline || "Terv-teny osszehasonlitas eredmenye"));
+      oModel.setProperty("/dummy13NarrativeSummary", String(oNarrative.summary || ""));
+      oModel.setProperty("/dummy13NarrativeBullets", Array.isArray(oNarrative.bullets) ? oNarrative.bullets : []);
+      oModel.setProperty("/dummy13NarrativeLimitations", Array.isArray(oNarrative.limitations) ? oNarrative.limitations : []);
+      oModel.setProperty("/dummy13RecommendedActions", Array.isArray(oNarrative.recommended_actions) ? oNarrative.recommended_actions : []);
     },
 
     _applyDummy13Status: function(oStatus) {
