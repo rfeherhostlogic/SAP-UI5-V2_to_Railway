@@ -1426,7 +1426,36 @@ sap.ui.define([
     _goToDummy13Step: function(sStepId) {
       var oWizard = this.byId("dummy13Wizard");
       var oStep = this.byId(sStepId);
-      if (oWizard && oStep && oWizard.goToStep) {
+      var aSteps;
+      var iTargetIndex;
+      var iStepIndex;
+      var oProgressStep;
+      var iProgressIndex;
+
+      if (!oWizard || !oStep) {
+        return;
+      }
+
+      aSteps = oWizard.getSteps ? oWizard.getSteps() : [];
+      iTargetIndex = aSteps.indexOf(oStep);
+
+      if (iTargetIndex >= 0 && oWizard.validateStep) {
+        for (iStepIndex = 0; iStepIndex <= iTargetIndex; iStepIndex += 1) {
+          oWizard.validateStep(aSteps[iStepIndex]);
+        }
+      }
+
+      oProgressStep = oWizard.getProgressStep ? oWizard.getProgressStep() : null;
+      iProgressIndex = aSteps.indexOf(oProgressStep);
+
+      if (iTargetIndex >= 0 && iProgressIndex >= 0 && oWizard.nextStep) {
+        while (iProgressIndex < iTargetIndex) {
+          oWizard.nextStep();
+          iProgressIndex += 1;
+        }
+      }
+
+      if (oWizard.goToStep) {
         oWizard.goToStep(oStep, true);
       }
     },
