@@ -44,6 +44,9 @@ const DUMMY10_RUNNER_PY = path.resolve(
 const DUMMY13_RUNNER_PY = path.resolve(
   process.env.DUMMY13_RUNNER_PY || path.join(__dirname, "dummy13_plan_actual_runner.py")
 );
+const DUMMY14_RUNNER_PY = path.resolve(
+  process.env.DUMMY14_RUNNER_PY || path.join(__dirname, "dummy14_plan_actual_runner.py")
+);
 const DUMMY12_PROMPT_PATH = path.resolve(
   process.env.DUMMY12_PROMPT_PATH || path.join(__dirname, "competition_analysis_prompt.txt")
 );
@@ -60,6 +63,8 @@ const oDiscoveryJobs = new Map();
 const oDummy12Jobs = new Map();
 const oDummy13Runs = new Map();
 const oDummy13Jobs = new Map();
+const oDummy14Runs = new Map();
+const oDummy14Jobs = new Map();
 const oAuthSessions = new Map();
 let oShieldSchedulerTimer = null;
 const AUTH_USERS = loadAuthUsersFromEnv();
@@ -98,6 +103,13 @@ const oDummy12Upload = multer({
   }
 });
 const oDummy13Upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 2
+  }
+});
+const oDummy14Upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024,
@@ -2746,6 +2758,269 @@ async function runDummy13Job(job, run, configObject) {
     }
   }
 }
+
+// ─── DUMMY 14 ────────────────────────────────────────────────────────────────
+
+function runDummy14Python(mode, planPath, actualPath, configObject) {
+  return new Promise(function(resolve, reject) {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "dummy14-"));
+    const outputPath = path.join(tempDir, "output.json");
+    const configPath = path.join(tempDir, "config.json");
+    const args = [
+      DUMMY14_RUNNER_PY,
+      "--mode", String(mode || "preview"),
+      "--plan", String(planPath || ""),
+      "--actual", String(actualPath || ""),
+      "--output", outputPath
+    ];
+    try {
+      if (configObject) {
+        fs.writeFileSync(configPath, JSON.stringify(configObject || {}, null, 2), "utf8");
+        args.push("--config", configPath);
+      }
+    } catch (writeErr) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      reject(writeErr);
+      return;
+    }
+    const pyExec = process.env.PYTHON_BIN || (process.platform === "win32" ? "python" : "python3");
+    const child = spawn(pyExec, args);
+    let stderr = "";
+    child.stderr.on("data", function(chunk) { stderr += String(chunk || ""); });
+    child.on("error", function(err) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      reject(err);
+    });
+    child.on("close", function(code) {
+      try {
+        if (Number(code) !== 0) {
+          throw new Error(stderr.trim() || ("Dummy14 python hiba (exit code: " + code + ")"));
+        }
+        const raw = fs.readFileSync(outputPath, "utf8");
+        resolve(parseOpenAiReply(raw) || {});
+      } catch (err) {
+        reject(err);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+  });
+}
+
+function createDummy14Run(planFile, actualFile) {
+  const id = crypto.randomUUID();
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "dummy14-run-"));
+  const planName = sanitizeUploadFileName(planFile && planFile.originalname, "plan", 0);
+  const actualName = sanitizeUploadFileName(actualFile && actualFile.originalname, "actual", 1);
+  const planPath = path.join(tempDir, planName);
+  const actualPath = path.join(tempDir, actualName);
+  fs.writeFileSync(planPath, planFile && planFile.buffer ? planFile.buffer : Buffer.from(""));
+  fs.writeFileSync(actualPath, actualFile && actualFile.buffer ? actualFile.buffer : Buffer.from(""));
+  const run = {
+    id: id, tempDir: tempDir, createdAt: Date.now(), updatedAt: Date.now(),
+    planPath: planPath, actualPath: actualPath, planName: planName, actualName: actualName,
+    mapping: null, normalizeResult: null, analysisResult: null
+  };
+  oDummy14Runs.set(id, run);
+  return run;
+}
+
+function touchDummy14Run(run) { if (run) { run.updatedAt = Date.now(); } }
+
+function getDummy14Run(runId) {
+  const run = oDummy14Runs.get(String(runId || "").trim());
+  if (run) { touchDummy14Run(run); }
+  return run;
+}
+
+function cleanupDummy14Runs() {
+  const now = Date.now();
+  Array.from(oDummy14Runs.entries()).forEach(function(entry) {
+    const runId = entry[0]; const run = entry[1];
+    if (!run || now - Number(run.updatedAt || run.createdAt || now) > DUMMY12_JOB_TTL_MS) {
+      if (run && run.tempDir) { fs.rmSync(run.tempDir, { recursive: true, force: true }); }
+      oDummy14Runs.delete(runId);
+    }
+  });
+}
+
+function createDummy14Job(runId) {
+  const id = crypto.randomUUID();
+  const job = {
+    id: id, runId: String(runId || ""), status: "queued",
+    progressPercent: 0, progressText: "Varakozas inditasra...",
+    currentStep: 0, error: "", result: null,
+    createdAt: Date.now(), updatedAt: Date.now(),
+    steps: [
+      { step: 1, title: "Normalizalas", status: "pending", detail: "Canonical record format es adatminoseg ellenorzes." },
+      { step: 2, title: "Aggregalas", status: "pending", detail: "Terv es teny aggregalt osszevetese compare key menten." },
+      { step: 3, title: "Anomalia, kategorizalas, projekt-elemzesek", status: "pending", detail: "Threshold, z-score, mintaazonositas, projekt-szintu javaslatok." },
+      { step: 4, title: "Vezetoi osszegzes", status: "pending", detail: "AI-val formalmazott, de bizonyitek-alapu vezetoi output." }
+    ]
+  };
+  oDummy14Jobs.set(id, job);
+  return job;
+}
+
+function createDummy14JobSnapshot(job) {
+  return {
+    job_id: job.id, run_id: job.runId, status: job.status,
+    progress_percent: Number(job.progressPercent || 0),
+    progress_text: String(job.progressText || ""),
+    current_step: Number(job.currentStep || 0),
+    steps: Array.isArray(job.steps) ? job.steps : [],
+    result: job.status === "done" ? (job.result || null) : null,
+    error: job.status === "error" ? String(job.error || "Dummy14 hiba") : ""
+  };
+}
+
+function updateDummy14Job(job, patch) {
+  Object.assign(job, patch || {});
+  job.updatedAt = Date.now();
+}
+
+function setDummy14JobStep(job, stepNumber, status, detail, progressPercent) {
+  job.steps = (job.steps || []).map(function(step) {
+    if (step.step < stepNumber && status === "running") {
+      return Object.assign({}, step, { status: "done" });
+    }
+    if (step.step === stepNumber) {
+      return Object.assign({}, step, { status: status, detail: detail || step.detail });
+    }
+    return step;
+  });
+  updateDummy14Job(job, {
+    currentStep: stepNumber,
+    progressPercent: Number(progressPercent == null ? job.progressPercent : progressPercent),
+    progressText: detail || job.progressText
+  });
+}
+
+function cleanupDummy14Jobs() {
+  const now = Date.now();
+  Array.from(oDummy14Jobs.entries()).forEach(function(entry) {
+    const jobId = entry[0]; const job = entry[1];
+    if (!job || now - Number(job.updatedAt || job.createdAt || now) > DUMMY12_JOB_TTL_MS) {
+      oDummy14Jobs.delete(jobId);
+    }
+  });
+}
+
+function buildDummy14FallbackExecutiveNarrative(analysisResult) {
+  const narrative = analysisResult && analysisResult.narrative ? analysisResult.narrative : {};
+  return {
+    headline: String(narrative.headline || "Terv-teny osszevetes elkeszult"),
+    summary: "",
+    bullets: Array.isArray(narrative.bullets) ? narrative.bullets : [],
+    limitations: Array.isArray(narrative.limitations) ? narrative.limitations : [],
+    recommended_actions: []
+  };
+}
+
+async function maybeGenerateDummy14ExecutiveNarrative(analysisResult, configObject) {
+  if (!OPENAI_API_KEY) {
+    return buildDummy14FallbackExecutiveNarrative(analysisResult);
+  }
+  const projectInsights = Array.isArray(analysisResult && analysisResult.project_insights)
+    ? analysisResult.project_insights.slice(0, 6) : [];
+  const aiNarrative = await callOpenAiJsonObject([
+    {
+      role: "system",
+      content: [
+        "Te egy CFO-szintu, de projektmenedzser szamara is ertheto elemzo asszisztens vagy.",
+        "A terv-teny osszehasonlitas determinisztikus eredmenyeibol kell rovid, ertheto vezetoi osszefoglalot irnod.",
+        "Mindig magyarul irj.",
+        "Csak a kapott adatokra tamaszkodj. Ne talalj ki okokat, adatokat vagy uzleti kontextust.",
+        "Fokuszsz arra, hogy MIERT nem sikerult az eredmenyt elerni, nem csak arra, hogy mekkora az elteres.",
+        "Nevezd meg a konkret projekteket/csoportokat, ahol a legnagyobb gond van.",
+        "Ha szisztematikus mintazat van (tobb periodus azonos iranyba), emeld ki.",
+        "Legyen tomor, vezetoileg hasznos. Csak JSON-t adj vissza."
+      ].join("\n")
+    },
+    {
+      role: "user",
+      content: JSON.stringify({
+        task: "Keszits rovid, ertheto vezetoi osszefoglalot a terv-teny elemzesrol. Miert nem sikerult az eredmeny? Hol erdemes vizsgalni?",
+        output_schema: {
+          headline: "1 mondatos cim",
+          summary: "2-4 mondatos, konkret csoportneveket (projekteket, koltsegelyeket) megemlito osszefoglalo",
+          bullets: ["3-5 rovid, konkret pont, ahol az elso mindig a legfontosabb problemat nevezi meg"],
+          limitations: ["0-3 rovid korlatozas"],
+          recommended_actions: ["0-3 konkret, vizsgalatra javasolhato lepes"]
+        },
+        rules: configObject && configObject.rules ? configObject.rules : {},
+        compare_keys: configObject && configObject.compare_keys ? configObject.compare_keys : [],
+        quality_summary: analysisResult && analysisResult.quality_summary ? analysisResult.quality_summary : {},
+        summary_totals: analysisResult && analysisResult.summary_totals ? analysisResult.summary_totals : {},
+        top_drivers: Array.isArray(analysisResult && analysisResult.top_drivers) ? analysisResult.top_drivers.slice(0, 5) : [],
+        evidence_rows: Array.isArray(analysisResult && analysisResult.evidence_rows) ? analysisResult.evidence_rows.slice(0, 8) : [],
+        project_insights: projectInsights,
+        fallback_narrative: analysisResult && analysisResult.narrative ? analysisResult.narrative : {}
+      }, null, 2)
+    }
+  ], 0.2);
+
+  return {
+    headline: String(aiNarrative && aiNarrative.headline ? aiNarrative.headline : "Terv-teny osszevetes elkeszult").trim(),
+    summary: String(aiNarrative && aiNarrative.summary ? aiNarrative.summary : "").trim(),
+    bullets: Array.isArray(aiNarrative && aiNarrative.bullets) ? aiNarrative.bullets.map(function(item) {
+      return String(item || "").trim();
+    }).filter(Boolean).slice(0, 5) : [],
+    limitations: Array.isArray(aiNarrative && aiNarrative.limitations) ? aiNarrative.limitations.map(function(item) {
+      return String(item || "").trim();
+    }).filter(Boolean).slice(0, 3) : [],
+    recommended_actions: Array.isArray(aiNarrative && aiNarrative.recommended_actions) ? aiNarrative.recommended_actions.map(function(item) {
+      return String(item || "").trim();
+    }).filter(Boolean).slice(0, 3) : []
+  };
+}
+
+async function runDummy14Job(job, run, configObject) {
+  try {
+    updateDummy14Job(job, { status: "running", progressPercent: 5, progressText: "Dummy14 elemzes inditasa..." });
+    setDummy14JobStep(job, 1, "running", "Adatok normalizalasa es minosegellenorzese...", 20);
+    const normalizeResult = await runDummy14Python("normalize", run.planPath, run.actualPath, configObject);
+    run.normalizeResult = normalizeResult;
+    touchDummy14Run(run);
+    setDummy14JobStep(job, 1, "done", "Normalizalas elkeszult.", 30);
+    setDummy14JobStep(job, 2, "running", "Aggregalt terv-teny osszevetes fut...", 50);
+    setDummy14JobStep(job, 2, "done", "Aggregalas elkeszult.", 60);
+    setDummy14JobStep(job, 3, "running", "Anomaliak, kategorizalas es projekt-elemzesek...", 80);
+    const analysisResult = await runDummy14Python("analyze", run.planPath, run.actualPath, configObject);
+    let aiNarrative = buildDummy14FallbackExecutiveNarrative(analysisResult);
+    let bAiNarrativeGenerated = false;
+    try {
+      aiNarrative = await maybeGenerateDummy14ExecutiveNarrative(analysisResult, configObject);
+      bAiNarrativeGenerated = !!OPENAI_API_KEY;
+    } catch (_aiErr) {
+      aiNarrative = buildDummy14FallbackExecutiveNarrative(analysisResult);
+    }
+    analysisResult.narrative = Object.assign({}, analysisResult && analysisResult.narrative ? analysisResult.narrative : {}, aiNarrative, {
+      ai_generated: bAiNarrativeGenerated
+    });
+    run.analysisResult = analysisResult;
+    touchDummy14Run(run);
+    setDummy14JobStep(job, 3, "done", "Anomaliak es projekt-elemzesek elkeszultek.", 92);
+    setDummy14JobStep(job, 4, "running", "Vezetoi osszegzes AI formalazassal keszul...", 97);
+    updateDummy14Job(job, {
+      status: "done", progressPercent: 100,
+      progressText: "Terv-teny elemzes (v2) elkeszult.", result: analysisResult
+    });
+    setDummy14JobStep(job, 4, "done", "Vezetoi osszegzes elkeszult.", 100);
+  } catch (err) {
+    updateDummy14Job(job, {
+      status: "error",
+      error: err && err.message ? err.message : String(err),
+      progressText: "Dummy14 elemzesi hiba."
+    });
+    if (job.currentStep) {
+      setDummy14JobStep(job, job.currentStep, "error",
+        err && err.message ? err.message : String(err), job.progressPercent);
+    }
+  }
+}
+
+// ─── DUMMY 14 END ─────────────────────────────────────────────────────────────
 
 function scoreDummy9File(file, questionTokens) {
   const columns = Array.isArray(file && file.columns) ? file.columns : [];
@@ -7761,6 +8036,108 @@ app.get("/api/jokers/dummy13/status/:jobId", function(req, res) {
   }
   res.json(createDummy13JobSnapshot(job));
 });
+
+// ─── DUMMY 14 ROUTES ─────────────────────────────────────────────────────────
+
+app.post("/api/jokers/dummy14/start", oDummy14Upload.fields([
+  { name: "planFile", maxCount: 1 },
+  { name: "actualFile", maxCount: 1 }
+]), async function(req, res) {
+  try {
+    cleanupDummy14Runs();
+    const planFile = req.files && req.files.planFile ? req.files.planFile[0] : null;
+    const actualFile = req.files && req.files.actualFile ? req.files.actualFile[0] : null;
+    if (!planFile || !actualFile) {
+      res.status(400).json({ error: "A plan CSV es az actual CSV is kotelezo." });
+      return;
+    }
+    const run = createDummy14Run(planFile, actualFile);
+    let preview = await runDummy14Python("preview", run.planPath, run.actualPath, null);
+    try {
+      preview = await maybeGenerateDummy13AiMapping(preview, run.planName, run.actualName);
+    } catch (_mappingErr) {
+      preview = preview || {};
+    }
+    run.preview = preview;
+    touchDummy14Run(run);
+    res.json({
+      analysis_run_id: run.id,
+      plan_file_name: run.planName,
+      actual_file_name: run.actualName,
+      preview: preview
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Dummy14 inditasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/dummy14/normalize", express.json({ limit: "2mb" }), async function(req, res) {
+  try {
+    cleanupDummy14Runs();
+    const runId = String(req.body && req.body.analysis_run_id ? req.body.analysis_run_id : "").trim();
+    const mapping = req.body && req.body.mapping ? req.body.mapping : {};
+    const compareKeys = Array.isArray(req.body && req.body.compare_keys) ? req.body.compare_keys : [];
+    const mappingConfidence = Number(req.body && req.body.mapping_confidence ? req.body.mapping_confidence : 0);
+    const run = getDummy14Run(runId);
+    if (!run) {
+      res.status(404).json({ error: "A Joker 14 session mar nem erheto el." });
+      return;
+    }
+    const result = await runDummy14Python("normalize", run.planPath, run.actualPath, {
+      mapping: mapping, compare_keys: compareKeys, mapping_confidence: mappingConfidence
+    });
+    run.mapping = { mapping: mapping, compare_keys: compareKeys, mapping_confidence: mappingConfidence };
+    run.normalizeResult = result;
+    touchDummy14Run(run);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      error: "Dummy14 normalizalasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/dummy14/analyze", express.json({ limit: "2mb" }), async function(req, res) {
+  try {
+    cleanupDummy14Runs();
+    cleanupDummy14Jobs();
+    const runId = String(req.body && req.body.analysis_run_id ? req.body.analysis_run_id : "").trim();
+    const run = getDummy14Run(runId);
+    if (!run) {
+      res.status(404).json({ error: "A Joker 14 session mar nem erheto el." });
+      return;
+    }
+    const mapping = req.body && req.body.mapping ? req.body.mapping : (run.mapping && run.mapping.mapping ? run.mapping.mapping : {});
+    const compareKeys = Array.isArray(req.body && req.body.compare_keys) ? req.body.compare_keys : (run.mapping && run.mapping.compare_keys ? run.mapping.compare_keys : []);
+    const rules = req.body && req.body.rules ? req.body.rules : {};
+    const mappingConfidence = Number(req.body && req.body.mapping_confidence ? req.body.mapping_confidence : (run.mapping && run.mapping.mapping_confidence ? run.mapping.mapping_confidence : 0));
+    const job = createDummy14Job(runId);
+    runDummy14Job(job, run, { mapping: mapping, compare_keys: compareKeys, rules: rules, mapping_confidence: mappingConfidence });
+    res.json(createDummy14JobSnapshot(job));
+  } catch (err) {
+    res.status(500).json({
+      error: "Dummy14 elemzesi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.get("/api/jokers/dummy14/status/:jobId", function(req, res) {
+  cleanupDummy14Jobs();
+  const jobId = String(req.params && req.params.jobId ? req.params.jobId : "").trim();
+  const job = oDummy14Jobs.get(jobId);
+  if (!job) {
+    res.status(404).json({ error: "A Dummy14 feladat mar nem erheto el." });
+    return;
+  }
+  res.json(createDummy14JobSnapshot(job));
+});
+
+// ─── DUMMY 14 ROUTES END ──────────────────────────────────────────────────────
 
 app.use(express.static(UI_STATIC_DIR));
 
