@@ -75,6 +75,40 @@
           </VBox>
         </HBox>
 
+        <HBox
+          width="100%"
+          justifyContent="Start"
+          visible="{= !!${noah2>/dummy9Summary} || ${noah2>/dummy9PreviewRows}.length > 0 }"
+          class="sapUiTinyMarginTop">
+          <Avatar initials="AI" displaySize="XS" class="chatAvatar noahAvatar"/>
+          <VBox class="chatBubble chatBubbleAi noahBubbleAi" width="100%">
+            <HBox justifyContent="SpaceBetween" alignItems="Center">
+              <Text text="AI" class="chatBubbleMeta"/>
+              <Text text="[CSV Riport Asszisztens]" class="chatBubbleMeta"/>
+            </HBox>
+            <Text
+              text="{= ${noah2>/dummy9Summary} ? 'Osszegzes:\n' + ${noah2>/dummy9Summary} : 'Osszegzes nem elerheto.' }"
+              wrapping="true"
+              class="sapUiSmallMarginBottom"/>
+            <Text
+              text="{= ${noah2>/dummy9SelectedSource} ? 'Forras: ' + ${noah2>/dummy9SelectedSource} : '' }"
+              visible="{= !!${noah2>/dummy9SelectedSource} }"
+              wrapping="true"
+              class="sapUiTinyMarginBottom"/>
+            <Text
+              text="{= ${noah2>/dummy9ChartAvailable} ? '' : 'Chart nem elerheto.' }"
+              visible="{= !${noah2>/dummy9ChartAvailable} }"
+              wrapping="true"
+              class="sapUiTinyMarginBottom"/>
+            <Panel
+              headerText="Adat preview (max 50 sor)"
+              visible="{= ${noah2>/dummy9PreviewRows}.length > 0 }">
+              <VBox id="noah2Dummy9ChartHost" class="sapUiSmallMarginBottom"/>
+              <Table id="noah2Dummy9PreviewTable" growing="true" growingThreshold="50" inset="false"/>
+            </Panel>
+          </VBox>
+        </HBox>
+
         <!-- Uzenetiro komponens -->
         <VBox class="noahComposer sapUiSmallMarginTop">
           <VBox id="noah2DropZone" class="noahDropZone sapUiTinyMarginBottom">

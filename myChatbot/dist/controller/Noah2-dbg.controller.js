@@ -524,9 +524,15 @@ sap.ui.define([
         oModel.setProperty("/dummy4GeneratedSql", "");
         oModel.setProperty("/dummy4Summary", "");
         oModel.setProperty("/dummy4ChartAvailable", false);
+        oModel.setProperty("/dummy9PreviewRows", []);
+        oModel.setProperty("/dummy9Summary", "");
+        oModel.setProperty("/dummy9ChartAvailable", false);
+        oModel.setProperty("/dummy9SelectedSource", "");
         oModel.setProperty("/schemaHintExpanded", false);
         this._rebindNoah2Dummy4PreviewTable();
         this._resetNoah2Dummy4Chart();
+        this._rebindNoah2Dummy9PreviewTable();
+        this._resetNoah2Dummy9Chart();
         this._setState2(STATE.IDLE, "Automatikus router mod.");
         return;
       }
@@ -714,16 +720,21 @@ sap.ui.define([
 
       try {
         this._activeAbortController = new AbortController();
-        var oResp = await AiService.noahRunCard({
-          card_id: sCardId,
-          user_message: sMessage || "",
-          field_values: mFieldValues || {},
-          attachments: aAttachments || []
-        }, this._activeAbortController.signal);
+        var oResp;
+        if (sCardId === "dummy-9") {
+          oResp = await this._runDummy9Card2(sMessage, mFieldValues || {});
+        } else {
+          oResp = await AiService.noahRunCard({
+            card_id: sCardId,
+            user_message: sMessage || "",
+            field_values: mFieldValues || {},
+            attachments: aAttachments || []
+          }, this._activeAbortController.signal);
+        }
 
         // dummy-4 eseten chart betoltese, SQL nelkul
         this._applyCard2SpecificPayload(sCardId, oResp && oResp.payload ? oResp.payload : null);
-        if (sCardId !== "dummy-4") {
+        if (sCardId !== "dummy-4" && sCardId !== "dummy-9") {
           this._appendNoah2Message("assistant",
             "[" + (oResp.card_name || sCardId) + "]\n" + (oResp.result || "Nincs valasz."));
         }
@@ -756,12 +767,27 @@ sap.ui.define([
         this._renderNoah2Dummy4Chart(aRows);
         return;
       }
+      if (sCardId === "dummy-9" && oPayload) {
+        var aCsvRows = Array.isArray(oPayload.rows) ? oPayload.rows : [];
+        oModel.setProperty("/dummy9PreviewRows", aCsvRows);
+        oModel.setProperty("/dummy9Summary", String(oPayload.summary || ""));
+        oModel.setProperty("/dummy9SelectedSource", String(oPayload.selectedSource || ""));
+        this._rebindNoah2Dummy9PreviewTable();
+        this._renderNoah2Dummy9Chart(aCsvRows);
+        return;
+      }
       oModel.setProperty("/dummy4PreviewRows", []);
       oModel.setProperty("/dummy4GeneratedSql", "");
       oModel.setProperty("/dummy4Summary", "");
       oModel.setProperty("/dummy4ChartAvailable", false);
+      oModel.setProperty("/dummy9PreviewRows", []);
+      oModel.setProperty("/dummy9Summary", "");
+      oModel.setProperty("/dummy9ChartAvailable", false);
+      oModel.setProperty("/dummy9SelectedSource", "");
       this._rebindNoah2Dummy4PreviewTable();
       this._resetNoah2Dummy4Chart();
+      this._rebindNoah2Dummy9PreviewTable();
+      this._resetNoah2Dummy9Chart();
     },
 
     _renderNoah2Dummy4Chart: function(aRows) {
@@ -830,6 +856,71 @@ sap.ui.define([
       this.getView().getModel("noah2").setProperty("/dummy4ChartAvailable", false);
     },
 
+    _renderNoah2Dummy9Chart: function(aRows) {
+      var oHost = this.byId("noah2Dummy9ChartHost");
+      var aColumns = this._extractNoah2Columns(aRows);
+      var aNumericCols = this._findNoah2NumericColumns(aRows, aColumns);
+      var sMeasure = aNumericCols[0] || "";
+      var sDimension = aColumns.find(function(sCol) {
+        return sCol !== sMeasure;
+      }) || aColumns[0] || "";
+
+      this._resetNoah2Dummy9Chart();
+
+      if (!oHost || !sDimension || !sMeasure || aRows.length === 0) {
+        this.getView().getModel("noah2").setProperty("/dummy9ChartAvailable", false);
+        return;
+      }
+
+      var aChartRows = (aRows || []).map(function(oRow) {
+        var oCopy = Object.assign({}, oRow || {});
+        oCopy[sMeasure] = this._toNoah2Number(oCopy[sMeasure]);
+        return oCopy;
+      }.bind(this));
+
+      var oChartModel = new JSONModel({ rows: aChartRows });
+      var oDataset = new FlattenedDataset({
+        dimensions: [new DimensionDefinition({ name: sDimension, value: "{" + sDimension + "}" })],
+        measures: [new MeasureDefinition({ name: sMeasure, value: "{" + sMeasure + "}" })],
+        data: { path: "/rows" }
+      });
+
+      var oViz = new VizFrame({
+        width: "100%",
+        height: "280px",
+        vizType: "column",
+        dataset: oDataset
+      });
+
+      oViz.setModel(oChartModel);
+      oViz.addFeed(new FeedItem({
+        uid: "categoryAxis",
+        type: "Dimension",
+        values: [sDimension]
+      }));
+      oViz.addFeed(new FeedItem({
+        uid: "valueAxis",
+        type: "Measure",
+        values: [sMeasure]
+      }));
+      oViz.setVizProperties({
+        title: { visible: false },
+        legend: { visible: false },
+        plotArea: { dataLabel: { visible: true } }
+      });
+
+      oHost.addItem(oViz);
+      this.getView().getModel("noah2").setProperty("/dummy9ChartAvailable", true);
+    },
+
+    _resetNoah2Dummy9Chart: function() {
+      var oHost = this.byId("noah2Dummy9ChartHost");
+      if (oHost) {
+        oHost.removeAllItems();
+      }
+      this.getView().getModel("noah2").setProperty("/dummy9ChartAvailable", false);
+    },
+
     _rebindNoah2Dummy4PreviewTable: function() {
       var oTable = this.byId("noah2Dummy4PreviewTable");
       var oModel = this.getView().getModel("noah2");
@@ -857,6 +948,38 @@ sap.ui.define([
 
       oTable.bindItems({
         path: "noah2>/dummy4PreviewRows",
+        template: new ColumnListItem({ cells: aCells }),
+        templateShareable: false
+      });
+    },
+
+    _rebindNoah2Dummy9PreviewTable: function() {
+      var oTable = this.byId("noah2Dummy9PreviewTable");
+      var oModel = this.getView().getModel("noah2");
+      var aRows = oModel ? (oModel.getProperty("/dummy9PreviewRows") || []) : [];
+
+      if (!oTable) {
+        return;
+      }
+
+      oTable.unbindItems();
+      oTable.removeAllColumns();
+
+      var aColumns = this._extractNoah2Columns(aRows);
+      if (aColumns.length === 0) {
+        return;
+      }
+
+      aColumns.forEach(function(sName) {
+        oTable.addColumn(new Column({ header: new Text({ text: sName }) }));
+      });
+
+      var aCells = aColumns.map(function(sName) {
+        return new Text({ text: "{noah2>" + sName + "}", wrapping: true });
+      });
+
+      oTable.bindItems({
+        path: "noah2>/dummy9PreviewRows",
         template: new ColumnListItem({ cells: aCells }),
         templateShareable: false
       });
@@ -1001,7 +1124,8 @@ sap.ui.define([
         var oMeta = {
           name: oFile.name || "unknown",
           type: oFile.type || "application/octet-stream",
-          size: Number(oFile.size || 0)
+          size: Number(oFile.size || 0),
+          rawFile: oFile
         };
         var sKey = oMeta.name + "|" + oMeta.size + "|" + oMeta.type;
         if (!mSeen[sKey]) {
@@ -1067,6 +1191,32 @@ sap.ui.define([
       return (oModel.getProperty("/attachments") || []).map(function(file) {
         return { name: file.name, type: file.type, size: Number(file.size || 0) };
       });
+    },
+
+    _getAttachment2Files: function() {
+      var oModel = this.getView().getModel("noah2");
+      return (oModel.getProperty("/attachments") || []).map(function(file) {
+        return file && file.rawFile ? file.rawFile : null;
+      }).filter(Boolean);
+    },
+
+    _runDummy9Card2: async function(sMessage, mFieldValues) {
+      var sQuestion = String(mFieldValues && mFieldValues.question ? mFieldValues.question : (sMessage || "")).trim();
+      var aFiles = this._getAttachment2Files();
+      var oResp = await AiService.runDummy9({
+        question: sQuestion,
+        files: aFiles
+      });
+      return {
+        card_id: "dummy-9",
+        card_name: "CSV Riport Asszisztens",
+        result: String(oResp && oResp.summary ? oResp.summary : ""),
+        payload: {
+          summary: String(oResp && oResp.summary ? oResp.summary : ""),
+          rows: Array.isArray(oResp && oResp.rows) ? oResp.rows : [],
+          selectedSource: String(oResp && oResp.selectedSource ? oResp.selectedSource : "")
+        }
+      };
     },
 
     _buildUserMsg2WithAttachments: function(sMessage, aAttachments) {
