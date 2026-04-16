@@ -723,8 +723,10 @@ sap.ui.define([
 
         // dummy-4 eseten chart betoltese, SQL nelkul
         this._applyCard2SpecificPayload(sCardId, oResp && oResp.payload ? oResp.payload : null);
-        this._appendNoah2Message("assistant",
-          "[" + (oResp.card_name || sCardId) + "]\n" + (oResp.result || "Nincs valasz."));
+        if (sCardId !== "dummy-4") {
+          this._appendNoah2Message("assistant",
+            "[" + (oResp.card_name || sCardId) + "]\n" + (oResp.result || "Nincs valasz."));
+        }
 
         if (!bPreserveComposer) {
           this._clearComposer2AfterRun();

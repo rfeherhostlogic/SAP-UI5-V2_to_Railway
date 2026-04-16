@@ -46,17 +46,24 @@
           </List>
         </VBox>
 
-        <Panel
-          headerText="Riport eredmeny"
-          class="sapUiSmallMarginTop"
-          visible="{= !!${noah2>/dummy4Summary} || ${noah2>/dummy4PreviewRows}.length > 0 }">
-          <VBox>
+        <HBox
+          width="100%"
+          justifyContent="Start"
+          visible="{= !!${noah2>/dummy4Summary} || ${noah2>/dummy4PreviewRows}.length > 0 }"
+          class="sapUiTinyMarginTop">
+          <Avatar initials="AI" displaySize="XS" class="chatAvatar noahAvatar"/>
+          <VBox class="chatBubble chatBubbleAi noahBubbleAi" width="100%">
+            <HBox justifyContent="SpaceBetween" alignItems="Center">
+              <Text text="AI" class="chatBubbleMeta"/>
+              <Text text="[Riportok]" class="chatBubbleMeta"/>
+            </HBox>
             <Text
-              text="{= ${noah2>/dummy4Summary} ? 'Osszegzes: ' + ${noah2>/dummy4Summary} : 'Osszegzes nem elerheto.' }"
+              text="{= ${noah2>/dummy4Summary} ? 'Osszegzes:\n' + ${noah2>/dummy4Summary} : 'Osszegzes nem elerheto.' }"
               wrapping="true"
               class="sapUiSmallMarginBottom"/>
             <Text
-              text="{= ${noah2>/dummy4ChartAvailable} ? 'Chart betoltve.' : 'Chart nem elerheto.' }"
+              text="{= ${noah2>/dummy4ChartAvailable} ? '' : 'Chart nem elerheto.' }"
+              visible="{= !${noah2>/dummy4ChartAvailable} }"
               wrapping="true"
               class="sapUiTinyMarginBottom"/>
             <Panel
@@ -66,7 +73,7 @@
               <Table id="noah2Dummy4PreviewTable" growing="true" growingThreshold="50" inset="false"/>
             </Panel>
           </VBox>
-        </Panel>
+        </HBox>
 
         <!-- Uzenetiro komponens -->
         <VBox class="noahComposer sapUiSmallMarginTop">
