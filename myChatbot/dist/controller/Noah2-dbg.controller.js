@@ -831,6 +831,22 @@ sap.ui.define([
       ].join("");
     },
 
+    _rebindNoah2Dummy4PreviewTable: function() {
+      return;
+    },
+
+    _resetNoah2Dummy4Chart: function() {
+      return;
+    },
+
+    _rebindNoah2Dummy9PreviewTable: function() {
+      return;
+    },
+
+    _resetNoah2Dummy9Chart: function() {
+      return;
+    },
+
     // ─────────────────────────────────────────────────────────────────
     // SEGÉDFÜGGVÉNYEK
     // ─────────────────────────────────────────────────────────────────
