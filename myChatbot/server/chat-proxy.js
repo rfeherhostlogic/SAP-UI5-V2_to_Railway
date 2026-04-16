@@ -418,6 +418,8 @@ const NOAH_CARDS = [
   }
 ];
 
+const NOAH_DISABLED_CARD_IDS = new Set(["dummy-11", "dummy-13"]);
+
 app.use(express.json({ limit: "1mb" }));
 
 function loadAuthUsersFromEnv() {
@@ -3134,6 +3136,17 @@ function getNoahCardById(cardId) {
   }) || null;
 }
 
+function isNoahCardEnabled(cardId) {
+  const id = String(cardId || "").trim();
+  return !!id && !NOAH_DISABLED_CARD_IDS.has(id);
+}
+
+function getEnabledNoahCards() {
+  return NOAH_CARDS.filter(function(card) {
+    return isNoahCardEnabled(card && card.id);
+  });
+}
+
 function toPublicNoahCard(card) {
   if (!card) {
     return null;
@@ -3215,7 +3228,7 @@ function normalizeRouterResponse(raw) {
 }
 
 async function runNoahIntentRouter(userMessage, attachments, history) {
-  const publicCards = NOAH_CARDS.map(toPublicNoahCard);
+  const publicCards = getEnabledNoahCards().map(toPublicNoahCard);
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -3645,7 +3658,7 @@ async function enrichNoahAgentPlan(plan, userMessage, attachments) {
 }
 
 async function buildNoahAgentPlan(userMessage, attachments, history, feedback, currentPlan, excludedCardIds) {
-  const publicCards = NOAH_CARDS.map(toPublicNoahCard);
+  const publicCards = getEnabledNoahCards().map(toPublicNoahCard);
   const excluded = Array.from(new Set((excludedCardIds || []).map(function(item) {
     return String(item || "").trim();
   }).filter(Boolean)));
@@ -6513,7 +6526,7 @@ app.post("/api/noah/router", async function(req, res) {
 
 app.get("/api/noah/cards", function(_req, res) {
   res.json({
-    cards: NOAH_CARDS.map(toPublicNoahCard)
+    cards: getEnabledNoahCards().map(toPublicNoahCard)
   });
 });
 
@@ -6534,7 +6547,7 @@ app.post("/api/noah/prefill-card", async function(req, res) {
     }
 
     const card = getNoahCardById(cardId);
-    if (!card) {
+    if (!card || !isNoahCardEnabled(card.id)) {
       res.status(404).json({ error: "Ismeretlen card_id." });
       return;
     }
@@ -6572,7 +6585,7 @@ app.get("/api/noah/cards/:cardId", async function(req, res) {
   try {
     const cardId = String(req.params && req.params.cardId ? req.params.cardId : "").trim();
     const card = getNoahCardById(cardId);
-    if (!card) {
+    if (!card || !isNoahCardEnabled(card.id)) {
       res.status(404).json({ error: "Ismeretlen card_id." });
       return;
     }
@@ -6603,7 +6616,7 @@ app.post("/api/noah/run-card", async function(req, res) {
     const attachments = normalizeAttachmentList(req.body && req.body.attachments);
 
     const card = getNoahCardById(cardId);
-    if (!card) {
+    if (!card || !isNoahCardEnabled(card.id)) {
       res.status(400).json({ error: "Ervenytelen card_id." });
       return;
     }
