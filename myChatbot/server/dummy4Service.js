@@ -48,6 +48,7 @@ const SQL_PROMPTS = {
     "",
     "Mindig csak a schema hintben szereplő táblákat és oszlopokat használd.",
     "Ne találj ki új oszlopot.",
+    "Ha a felhasznalo explicit azt jelzi, hogy egy szukseges adat vagy dimenzio nincs benne a SQL-ben / semaban, vagy csak CSV-ben, Excelben, illetve kulso fajlban erheto el, ne probald azt meg egy hasonlo schema oszlopra eroszakolni.",
     "Ha több lehetséges oszlop jöhet szóba, válaszd a legvalószínűbbet a séma alapján.",
     "",
     "Kimenet:",
@@ -77,6 +78,7 @@ const SQL_PROMPTS = {
     "- Egyetlen statement",
     "- Nincs ';' es komment",
     "- Csak a schema hintben levo tablak/oszlopok",
+    "- Ha a kerdeshez szukseges mezo nincs a schema hintben, ne talalj ki helyettesito oszlopot",
     "- LIMIT 50 kotelezo",
     "",
     "Kimenet formatuma: csak a SQL szoveg, se markdown, se backtick."

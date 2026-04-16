@@ -221,7 +221,7 @@ const NOAH_CARDS = [
   {
     id: "dummy-4",
     name: "Riportok",
-    description: "Natural nyelv -> SQL SELECT + 1 mondatos osszegzes.",
+    description: "Natural nyelv -> SQL SELECT + 1 mondatos osszegzes. Csak akkor hasznalhato, ha minden szukseges dimenzio, szuro es rendezesi mezo elerheto a megadott SQL semaban; CSV-ben vagy mas kulso fajlban levo mezoket nem tud osszefesulni.",
     prompt_template: [
       "Feladat: natural nyelvu kerdes alapjan SQL riport kerdes ertelmezese.",
       "Kerdes: {{question}}",
@@ -3138,10 +3138,21 @@ function toPublicNoahCard(card) {
   if (!card) {
     return null;
   }
+
+  let limitations = "";
+  if (card.id === "dummy-4") {
+    limitations = "Csak a schema_hint-ben szereplo SQL tablakra es oszlopokra tud tamaszkodni. Ha a feladat olyan mezot igenyel, amelyet a user explicit CSV-ben, Excelben vagy kulso fajlban levo adatkent emlit, ez a kartya onmagaban nem megfelelo.";
+  } else if (card.id === "dummy-5") {
+    limitations = "Noah modban csak dokumentum metadata es kontextus alapjan ad orientacios valaszt, teljes strukturalt adat-egyesitesre nem alkalmas.";
+  } else if (card.id === "dummy-7") {
+    limitations = "RAG alapu penzugyi cegosszehasonlitasra valo, nem altalanos SQL vagy CSV riportkeszitesre.";
+  }
+
   return {
     id: card.id,
     name: card.name,
     description: card.description,
+    limitations: limitations,
     fields: card.fields
   };
 }
@@ -3490,6 +3501,18 @@ function normalizeNoahAgentPlan(raw) {
 function buildNoahAgentFallbackPlan(userMessage, attachments, excludedCardIds) {
   const excluded = new Set((excludedCardIds || []).map(function(item) { return String(item || "").trim(); }));
   const text = String(userMessage || "").toLowerCase();
+  const mentionsCsv = text.indexOf("csv") >= 0 || (attachments || []).some(function(file) {
+    const name = String(file && file.name ? file.name : "").toLowerCase();
+    const type = String(file && file.type ? file.type : "").toLowerCase();
+    return name.endsWith(".csv") || type.indexOf("csv") >= 0;
+  });
+  const mentionsOutsideSql =
+    text.indexOf("nem erhet") >= 0 ||
+    text.indexOf("nem elerheto az sql") >= 0 ||
+    text.indexOf("nincs benne az sql") >= 0 ||
+    text.indexOf("nem az sql-ben") >= 0 ||
+    text.indexOf("sql-ben nincs") >= 0 ||
+    text.indexOf("kulso fajl") >= 0;
   const steps = [];
 
   function addStep(cardId, rationale, inputsToUse) {
@@ -3511,8 +3534,10 @@ function buildNoahAgentFallbackPlan(userMessage, attachments, excludedCardIds) {
     return String(file && file.type ? file.type : "").toLowerCase().indexOf("pdf") >= 0;
   })) {
     addStep("dummy-5", "PDF tartalom alapjan osszegzes vagy kerdes-valasz.", ["attachments", "user_message"]);
-  } else if (text.indexOf("sql") >= 0 || text.indexOf("riport") >= 0 || text.indexOf("kimutatas") >= 0 || text.indexOf("melyik") >= 0) {
+  } else if ((text.indexOf("sql") >= 0 || text.indexOf("riport") >= 0 || text.indexOf("kimutatas") >= 0 || text.indexOf("melyik") >= 0) && !(mentionsCsv && mentionsOutsideSql)) {
     addStep("dummy-4", "Riport kerdesbol SQL es adat preview generalasa.", ["user_message", "schema_hint"]);
+  } else if (mentionsCsv && mentionsOutsideSql) {
+    addStep("summary", "A keres kulso fajlban levo adatot is igenyel, ezert elobb a korlatot es a szukseges kovetkezo lepest kell tisztazni.", ["user_message", "attachments"]);
   } else if (text.indexOf("fordit") >= 0) {
     addStep("sensitive-translation", "Szoveg forditasa a kert nyelvre.", ["user_message"]);
   } else if (text.indexOf("email") >= 0) {
@@ -3678,6 +3703,12 @@ async function buildNoahAgentPlan(userMessage, attachments, history, feedback, c
               "Csak a megadott card_id-k kozul valaszthatsz.",
               "Az excluded_card_ids listaban szereplo kartyakat tilos hasznalni.",
               "Ha a user feedback modositast ker, ahhoz igazitsd a tervet.",
+              "Eloszor mindig az adatforras-korlatozasokat ertelmezd, es csak utana valassz kartyat.",
+              "Ha a user azt irja, hogy egy szukseges mezo vagy dimenzio nem erheto el SQL-ben, nincs benne a semaban, vagy csak CSV/Excel/kulso fajl tartalmazza, ezt kemeny korlatnak tekintsd.",
+              "A dummy-4 Riportok kartya csak akkor valaszthato, ha minden szukseges csoportosito, szuro, rendezesi es join mezo a SQL semaban is elerheto.",
+              "Ha a kert riport SQL adatot es kulso fajlban levo mezot egyszerre igenyel, ne tervezz olyan lepest, amely ezt a hianyzo adat-egyesitest kesz tenykent feltetelezi.",
+              "Ilyen helyzetben inkabb egy biztonsagos, korlatot jelzo lepest tervezz, mint egy lefuttathatatlan SQL riportot.",
+              "A terv csak akkor jo, ha a lepesek tenylegesen vegrehajthatok a megadott inputokkal.",
               "A reasoning legyen rovid, lepesenkenti terv.",
               "A summary 1-2 mondatos legyen."
             ].join("\n")
@@ -8166,4 +8197,3 @@ async function bootstrapServer() {
 }
 
 bootstrapServer();
-
