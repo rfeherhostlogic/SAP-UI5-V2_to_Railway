@@ -343,8 +343,8 @@ const NOAH_CARDS = [
   },
   {
     id: "dummy-8",
-    name: "Dummy 8",
-    description: "Altalanos helyorzo workflow.",
+    name: "Smart Segmentation",
+    description: "SQL + RAG alapu szegmensezes es rekordlista generalas.",
     prompt_template: [
       "Feladat: valaszolj roviden a kovetkezo feladatra:",
       "{{task_text}}"
@@ -357,6 +357,35 @@ const NOAH_CARDS = [
         required: true,
         placeholder: "Ird le mit csinaljon a kartya",
         validation: { minLength: 5 }
+      }
+    ]
+  },
+  {
+    id: "dummy-9",
+    name: "CSV Riport Asszisztens",
+    description: "CSV adatokhoz kapcsolodo kerdesek, preview es rovid riport-szeru valasz.",
+    prompt_template: [
+      "Feladat: valaszolj a csatolt CSV-hez kapcsolodo riportkerdesre.",
+      "Kerdes: {{question}}",
+      "CSV kontextus: {{csv_context}}",
+      "Ha nincs eleg adat, jelezd roviden."
+    ].join("\n"),
+    fields: [
+      {
+        field_id: "question",
+        label: "CSV kerdes",
+        type: "textarea",
+        required: true,
+        placeholder: "Pl. Melyik ertekesitohez tartozik a legnagyobb forgalom?",
+        validation: { minLength: 8 }
+      },
+      {
+        field_id: "csv_context",
+        label: "CSV kontextus",
+        type: "textarea",
+        required: false,
+        placeholder: "Pl. fajlnev, oszlopok, fontos kulcsmezok",
+        validation: { maxLength: 1500 }
       }
     ]
   },
@@ -376,6 +405,64 @@ const NOAH_CARDS = [
         required: false,
         placeholder: "Pl. At Risk ugyfelek valtozasa",
         validation: { maxLength: 120 }
+      }
+    ]
+  },
+  {
+    id: "dummy-12",
+    name: "Konkurencia elemzes",
+    description: "Sajat ceg + versenytars benchmark strukturalt AI kimenettel.",
+    prompt_template: [
+      "Feladat: keszits strukturalt konkurenciaelemzest a megadott vallalatokrol.",
+      "Ceglista vagy input: {{company_input}}",
+      "Kert fokusz: {{analysis_focus}}",
+      "Ha hianyzik kritikus adat, jelezd roviden."
+    ].join("\n"),
+    fields: [
+      {
+        field_id: "company_input",
+        label: "Ceglista vagy input",
+        type: "textarea",
+        required: true,
+        placeholder: "Pl. sajat ceg: Techwave; versenytarsak: Company A, Company B",
+        validation: { minLength: 8 }
+      },
+      {
+        field_id: "analysis_focus",
+        label: "Fokusz",
+        type: "text",
+        required: false,
+        placeholder: "Pl. piaci pozicio, KPI benchmark, strategiai kockazatok",
+        validation: { maxLength: 160 }
+      }
+    ]
+  },
+  {
+    id: "dummy-14",
+    name: "Terv-teny osszehasonlitas v2",
+    description: "Projekt-szintu terv-teny elemzes, okok es eltérések magyarazata.",
+    prompt_template: [
+      "Feladat: strukturalt terv-teny elemzest keszits a megadott problemarol.",
+      "Bemeneti problema: {{analysis_request}}",
+      "Fokusz: {{analysis_focus}}",
+      "Ha a tenyszeru adatok hianyoznak, csak a kovetkezo legjobb lepest javasold."
+    ].join("\n"),
+    fields: [
+      {
+        field_id: "analysis_request",
+        label: "Elemzesi kerdes",
+        type: "textarea",
+        required: true,
+        placeholder: "Pl. Miert maradt el a projekt a tervtol, es mik a fo okok?",
+        validation: { minLength: 8 }
+      },
+      {
+        field_id: "analysis_focus",
+        label: "Fokusz",
+        type: "text",
+        required: false,
+        placeholder: "Pl. variancia, gyokokok, kovetkezo lepesek",
+        validation: { maxLength: 160 }
       }
     ]
   },
@@ -3539,7 +3626,13 @@ function buildNoahAgentFallbackPlan(userMessage, attachments, excludedCardIds) {
     });
   }
 
-  if (text.indexOf("osszehasonlit") >= 0 || text.indexOf("ceg") >= 0) {
+  if (text.indexOf("csv") >= 0) {
+    addStep("dummy-9", "CSV alapu riport vagy kerdes-valasz a feltoltott allomanyokrol.", ["user_message", "attachments"]);
+  } else if (text.indexOf("konkurencia") >= 0 || text.indexOf("benchmark") >= 0 || text.indexOf("versenytars") >= 0) {
+    addStep("dummy-12", "Konkurenciaelemzes vagy benchmark kerdes strukturalt osszegzessel.", ["user_message"]);
+  } else if (text.indexOf("terv-teny") >= 0 || text.indexOf("miert nem sikerult") >= 0 || text.indexOf("variancia") >= 0) {
+    addStep("dummy-14", "Terv-teny vagy okfeltaro elemzes strukturalt kovetkeztetesekkel.", ["user_message"]);
+  } else if (text.indexOf("osszehasonlit") >= 0 || text.indexOf("ceg") >= 0) {
     addStep("dummy-7", "Penzugyi osszehasonlitas ket ceg kozott.", ["user_message", "attachments"]);
   } else if (text.indexOf("szegmen") >= 0 || text.indexOf("kampany") >= 0) {
     addStep("dummy-8", "Marketing szegmens es erintett rekordok kinyerese.", ["user_message"]);

@@ -83,6 +83,9 @@
       }
       var bAll = aActiveTags.indexOf("Összes") >= 0;
       var aFiltered = aTiles.filter(function(oTile) {
+        if (oTile && oTile.id === "dummy-13") {
+          return false;
+        }
         if (bAll) {
           return true;
         }

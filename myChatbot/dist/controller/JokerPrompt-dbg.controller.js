@@ -881,6 +881,10 @@ sap.ui.define([
     _onRouteMatched: function(oEvent) {
       var sJokerId = oEvent.getParameter("arguments").jokerId;
       var oModel = this.getView().getModel("jokers");
+      if (sJokerId === "dummy-13") {
+        this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: "jokers" }, true);
+        return;
+      }
       var aTiles = oModel.getProperty("/tiles") || [];
       var oSelected = aTiles.find(function(oTile) {
         return oTile.id === sJokerId;
@@ -913,6 +917,8 @@ sap.ui.define([
           this._loadDummy12Session();
         } else if (oSelected.id === "dummy-13") {
           this._resetDummy13State();
+        } else if (oSelected.id === "dummy-14") {
+          this._resetDummy14State();
         } else if (oSelected.id === "dummy-5") {
           this._resetDummy5State();
         } else if (oSelected.id === "dummy-7") {
@@ -1520,6 +1526,399 @@ sap.ui.define([
         oWizard.goToStep(oStep, true);
       }
     },
+
+    // ─── DUMMY 14 ──────────────────────────────────────────────────────────────
+
+    onDummy14PlanFileChange: function(oEvent) {
+      var aFiles = this._extractUploaderFiles(oEvent);
+      var oFile = aFiles && aFiles[0] ? aFiles[0] : null;
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy14PlanFile", oFile || null);
+      oModel.setProperty("/dummy14PlanFileName", oFile ? String(oFile.name || "") : String(oEvent && oEvent.getParameter ? oEvent.getParameter("newValue") || "" : ""));
+    },
+
+    onDummy14ActualFileChange: function(oEvent) {
+      var aFiles = this._extractUploaderFiles(oEvent);
+      var oFile = aFiles && aFiles[0] ? aFiles[0] : null;
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy14ActualFile", oFile || null);
+      oModel.setProperty("/dummy14ActualFileName", oFile ? String(oFile.name || "") : String(oEvent && oEvent.getParameter ? oEvent.getParameter("newValue") || "" : ""));
+    },
+
+    onDummy14StartPreview: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var oPlanFile = oModel.getProperty("/dummy14PlanFile");
+      var oActualFile = oModel.getProperty("/dummy14ActualFile");
+      if (!oPlanFile || !oActualFile) {
+        MessageToast.show("Toltsd fel a plan es actual CSV fajlokat.");
+        return;
+      }
+      oModel.setProperty("/dummy14Busy", true);
+      oModel.setProperty("/dummy14Error", "");
+      try {
+        var oResp = await AiService.startDummy14AnalysisRun({ planFile: oPlanFile, actualFile: oActualFile });
+        oModel.setProperty("/dummy14AnalysisRunId", String(oResp && oResp.analysis_run_id ? oResp.analysis_run_id : ""));
+        this._applyDummy14Preview(oResp && oResp.preview ? oResp.preview : {});
+        MessageToast.show("A CSV preview es mapping javaslat elkeszult.");
+        this._goToDummy14Step("dummy14MapStep");
+      } catch (oError) {
+        oModel.setProperty("/dummy14Error", oError && oError.message ? oError.message : "Dummy14 inditasi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "Dummy14 inditasi hiba.");
+      } finally {
+        oModel.setProperty("/dummy14Busy", false);
+      }
+    },
+
+    onDummy14Normalize: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var sRunId = String(oModel.getProperty("/dummy14AnalysisRunId") || "");
+      var oValidation = this._validateDummy14Mapping();
+      if (!oValidation.ok) {
+        oModel.setProperty("/dummy14Error", oValidation.message);
+        MessageToast.show(oValidation.message);
+        return;
+      }
+      oModel.setProperty("/dummy14Busy", true);
+      oModel.setProperty("/dummy14Error", "");
+      try {
+        var oResp = await AiService.normalizeDummy14({
+          analysis_run_id: sRunId,
+          mapping: this._buildDummy14MappingPayload(),
+          compare_keys: oModel.getProperty("/dummy14CompareKeys") || [],
+          mapping_confidence: Number(oModel.getProperty("/dummy14MappingConfidence") || 0)
+        });
+        this._applyDummy14Normalize(oResp || {});
+        this._goToDummy14Step("dummy14NormalizeStep");
+      } catch (oError) {
+        oModel.setProperty("/dummy14Error", oError && oError.message ? oError.message : "Dummy14 normalizalasi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "Dummy14 normalizalasi hiba.");
+      } finally {
+        oModel.setProperty("/dummy14Busy", false);
+      }
+    },
+
+    onDummy14RunAnalysis: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var sRunId = String(oModel.getProperty("/dummy14AnalysisRunId") || "");
+      var oValidation = this._validateDummy14Mapping();
+      if (!oValidation.ok) {
+        oModel.setProperty("/dummy14Error", oValidation.message);
+        MessageToast.show(oValidation.message);
+        return;
+      }
+      oModel.setProperty("/dummy14Busy", true);
+      oModel.setProperty("/dummy14Error", "");
+      oModel.setProperty("/dummy14ProgressPercent", 5);
+      oModel.setProperty("/dummy14ProgressText", "Terv-teny elemzes inditasa...");
+      oModel.setProperty("/dummy14ResultRows", []);
+      oModel.setProperty("/dummy14EvidenceRows", []);
+      oModel.setProperty("/dummy14TopDrivers", []);
+      oModel.setProperty("/dummy14ProjectInsights", []);
+      oModel.setProperty("/dummy14NarrativeBullets", []);
+      oModel.setProperty("/dummy14NarrativeLimitations", []);
+      try {
+        var oStart = await AiService.runDummy14Analysis({
+          analysis_run_id: sRunId,
+          mapping: this._buildDummy14MappingPayload(),
+          compare_keys: oModel.getProperty("/dummy14CompareKeys") || [],
+          mapping_confidence: Number(oModel.getProperty("/dummy14MappingConfidence") || 0),
+          rules: {
+            granularity: String(oModel.getProperty("/dummy14Granularity") || "monthly"),
+            metric: String(oModel.getProperty("/dummy14MetricMode") || "sum_amount"),
+            grouping_keys: oModel.getProperty("/dummy14GroupingKeys") || [],
+            threshold_pct: Number(oModel.getProperty("/dummy14ThresholdPct") || 10),
+            absolute_threshold: Number(oModel.getProperty("/dummy14AbsoluteThreshold") || 100000),
+            zscore_cutoff: Number(oModel.getProperty("/dummy14ZscoreCutoff") || 2.5)
+          }
+        });
+        var sJobId = String(oStart && oStart.job_id ? oStart.job_id : "");
+        if (!sJobId) { throw new Error("A Dummy14 job azonositoja nem erkezett vissza."); }
+        oModel.setProperty("/dummy14JobId", sJobId);
+        this._applyDummy14Status(oStart);
+        this._goToDummy14Step("dummy14RunStep");
+        await this._pollDummy14Job(sJobId);
+        this._goToDummy14Step("dummy14ResultsStep");
+      } catch (oError) {
+        oModel.setProperty("/dummy14Error", oError && oError.message ? oError.message : "Dummy14 elemzesi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "Dummy14 elemzesi hiba.");
+      } finally {
+        oModel.setProperty("/dummy14Busy", false);
+      }
+    },
+
+    onDummy14GoToRules: function() { this._goToDummy14Step("dummy14RulesStep"); },
+
+    onDummy14MappingSelectionChange: function() { this._refreshDummy14CompareKeyOptions(); },
+
+    onDummy14CopyNarrative: function() {
+      var oModel = this.getView().getModel("jokers");
+      var sHeadline = String(oModel.getProperty("/dummy14NarrativeHeadline") || "");
+      var sSummary = String(oModel.getProperty("/dummy14NarrativeSummary") || "");
+      var aBullets = oModel.getProperty("/dummy14NarrativeBullets") || [];
+      var aActions = oModel.getProperty("/dummy14RecommendedActions") || [];
+      var oTotals = oModel.getProperty("/dummy14SummaryTotals") || {};
+      var aLines = [sHeadline, ""];
+      if (sSummary) { aLines.push(sSummary, ""); }
+      if (aBullets.length) {
+        aBullets.forEach(function(s) { aLines.push("• " + s); });
+        aLines.push("");
+      }
+      aLines.push("Összesítés: Terv=" + (oTotals.plan_total || 0) +
+        " | Tény=" + (oTotals.actual_total || 0) +
+        " | Eltérés=" + (oTotals.variance_total || 0));
+      if (aActions.length) {
+        aLines.push(""); aLines.push("Javasolt lépések:");
+        aActions.forEach(function(s) { aLines.push("→ " + s); });
+      }
+      var sText = aLines.join("\n");
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(sText).then(function() {
+          MessageToast.show("Összefoglaló vágólapra másolva.");
+        }).catch(function() {
+          MessageToast.show("Vágólapra másolás nem sikerült.");
+        });
+      } else {
+        MessageToast.show("A böngésző nem támogatja a vágólapra másolást.");
+      }
+    },
+
+    _applyDummy14Preview: function(oPreview) {
+      var oModel = this.getView().getModel("jokers");
+      var oPlan = oPreview && oPreview.plan_preview ? oPreview.plan_preview : {};
+      var oActual = oPreview && oPreview.actual_preview ? oPreview.actual_preview : {};
+      var oSuggested = oPreview && oPreview.suggested_mapping ? oPreview.suggested_mapping : {};
+      var aMappings = this._createDummy14SemanticMappings().map(function(oItem) {
+        return Object.assign({}, oItem, {
+          planColumn: String(oSuggested.plan && oSuggested.plan[oItem.key] ? oSuggested.plan[oItem.key] : ""),
+          actualColumn: String(oSuggested.actual && oSuggested.actual[oItem.key] ? oSuggested.actual[oItem.key] : "")
+        });
+      });
+      oModel.setProperty("/dummy14PlanColumns", Array.isArray(oPlan.columns) ? oPlan.columns : []);
+      oModel.setProperty("/dummy14ActualColumns", Array.isArray(oActual.columns) ? oActual.columns : []);
+      oModel.setProperty("/dummy14PlanPreviewRows", Array.isArray(oPlan.sample_rows) ? oPlan.sample_rows : []);
+      oModel.setProperty("/dummy14ActualPreviewRows", Array.isArray(oActual.sample_rows) ? oActual.sample_rows : []);
+      oModel.setProperty("/dummy14PlanColumnsText", this._formatDummy13ColumnsText(oPlan.columns));
+      oModel.setProperty("/dummy14ActualColumnsText", this._formatDummy13ColumnsText(oActual.columns));
+      oModel.setProperty("/dummy14PlanPreviewText", this._formatDummy13PreviewText(oPlan.sample_rows));
+      oModel.setProperty("/dummy14ActualPreviewText", this._formatDummy13PreviewText(oActual.sample_rows));
+      oModel.setProperty("/dummy14SemanticMappings", aMappings);
+      oModel.setProperty("/dummy14MappingConfidence", Number(oSuggested.mapping_confidence || 0));
+      oModel.setProperty("/dummy14MappingConfidenceText", "AI mapping confidence: " + Math.round(Number(oSuggested.mapping_confidence || 0) * 100) + "%");
+      oModel.setProperty("/dummy14MappingAiSummary", String(oSuggested.rationale_short || "Az AI a mezonevek es a mintaadatok alapjan tett javaslatot a mappingre."));
+      oModel.setProperty("/dummy14CompareKeyHelpText", String(oSuggested.compare_key_reason || "A compare key azoknak a mezoknek a halmaza, amelyek menten a rendszer osszepaarositja a Plan es Actual adatokat."));
+      this._refreshDummy14CompareKeyOptions(Array.isArray(oSuggested.compare_keys) ? oSuggested.compare_keys : []);
+      this._rebindDummy13PreviewTable("dummy14PlanPreviewTable", "/dummy14PlanPreviewRows");
+      this._rebindDummy13PreviewTable("dummy14ActualPreviewTable", "/dummy14ActualPreviewRows");
+    },
+
+    _createDummy14SemanticMappings: function() {
+      return [
+        { key: "date", label: "Datum", required: true, planColumn: "", actualColumn: "" },
+        { key: "amount", label: "Osszeg", required: true, planColumn: "", actualColumn: "" },
+        { key: "metric", label: "Metrika", required: false, planColumn: "", actualColumn: "" },
+        { key: "project", label: "Projekt", required: false, planColumn: "", actualColumn: "" },
+        { key: "cost_center", label: "Koltseghely", required: false, planColumn: "", actualColumn: "" },
+        { key: "account", label: "Fokonyvi szamla", required: false, planColumn: "", actualColumn: "" },
+        { key: "region", label: "Regio", required: false, planColumn: "", actualColumn: "" }
+      ];
+    },
+
+    _refreshDummy14CompareKeyOptions: function(aPreferredKeys) {
+      var oModel = this.getView().getModel("jokers");
+      var aMappings = oModel.getProperty("/dummy14SemanticMappings") || [];
+      var aOptions = aMappings.filter(function(oItem) {
+        return oItem.planColumn && oItem.actualColumn && oItem.key !== "date" && oItem.key !== "amount";
+      }).map(function(oItem) { return { key: oItem.key, text: oItem.label }; });
+      var aAllowedKeys = aOptions.map(function(oItem) { return oItem.key; });
+      var aBaseCompare = Array.isArray(aPreferredKeys) ? aPreferredKeys : (oModel.getProperty("/dummy14CompareKeys") || []);
+      var aBaseGrouping = oModel.getProperty("/dummy14GroupingKeys") || [];
+      var aCompare = aBaseCompare.filter(function(sKey, iIndex, aItems) {
+        return aAllowedKeys.indexOf(sKey) >= 0 && aItems.indexOf(sKey) === iIndex;
+      });
+      var aGrouping = aBaseGrouping.filter(function(sKey, iIndex, aItems) {
+        return aAllowedKeys.indexOf(sKey) >= 0 && aItems.indexOf(sKey) === iIndex;
+      });
+      if (!aCompare.length && aOptions.length > 0) { aCompare = [aOptions[0].key]; }
+      if (!aGrouping.length) { aGrouping = aCompare.slice(); }
+      oModel.setProperty("/dummy14CompareKeyOptions", aOptions);
+      oModel.setProperty("/dummy14CompareKeys", aCompare);
+      oModel.setProperty("/dummy14GroupingKeys", aGrouping);
+    },
+
+    _buildDummy14MappingPayload: function() {
+      var aMappings = this.getView().getModel("jokers").getProperty("/dummy14SemanticMappings") || [];
+      return aMappings.reduce(function(oAcc, oItem) {
+        oAcc.plan[oItem.key] = String(oItem.planColumn || "");
+        oAcc.actual[oItem.key] = String(oItem.actualColumn || "");
+        return oAcc;
+      }, { plan: {}, actual: {} });
+    },
+
+    _validateDummy14Mapping: function() {
+      var oModel = this.getView().getModel("jokers");
+      var aMappings = oModel.getProperty("/dummy14SemanticMappings") || [];
+      var aCompareKeys = oModel.getProperty("/dummy14CompareKeys") || [];
+      var mByKey = {};
+      aMappings.forEach(function(oItem) { mByKey[oItem.key] = oItem; });
+      if (!String(oModel.getProperty("/dummy14AnalysisRunId") || "").trim()) {
+        return { ok: false, message: "Elobb toltsd fel a ket CSV fajlt." };
+      }
+      if (!mByKey.amount || !mByKey.amount.planColumn || !mByKey.amount.actualColumn) {
+        return { ok: false, message: "A Plan es Actual oldalon is kotelezo az Osszeg mezomapping." };
+      }
+      if (!mByKey.date || !mByKey.date.planColumn || !mByKey.date.actualColumn) {
+        return { ok: false, message: "A Datum mezot is map-eld mindket oldalon." };
+      }
+      if (!Array.isArray(aCompareKeys) || aCompareKeys.length === 0) {
+        return { ok: false, message: "Valassz legalabb egy compare key mezot." };
+      }
+      return { ok: true };
+    },
+
+    _applyDummy14Normalize: function(oResp) {
+      var oModel = this.getView().getModel("jokers");
+      var oQuality = oResp && oResp.quality_summary ? oResp.quality_summary : {};
+      var aItems = [];
+      if (oQuality.plan) {
+        aItems.push("Plan sorok: " + Number(oQuality.plan.valid_rows || 0) + " ervenyes / " + Number(oQuality.plan.total_rows || 0));
+        aItems.push("Plan hibas amount sorok: " + Number(oQuality.plan.invalid_amount_rows || 0));
+        aItems.push("Plan hibas datum sorok: " + Number(oQuality.plan.invalid_date_rows || 0));
+      }
+      if (oQuality.actual) {
+        aItems.push("Actual sorok: " + Number(oQuality.actual.valid_rows || 0) + " ervenyes / " + Number(oQuality.actual.total_rows || 0));
+        aItems.push("Actual hibas amount sorok: " + Number(oQuality.actual.invalid_amount_rows || 0));
+        aItems.push("Actual hibas datum sorok: " + Number(oQuality.actual.invalid_date_rows || 0));
+      }
+      aItems.push("Comparison coverage: " + Math.round(Number(oQuality.comparison_coverage || 0) * 100) + "%");
+      aItems.push("Mapping confidence: " + Math.round(Number(oQuality.mapping_confidence || 0) * 100) + "%");
+      oModel.setProperty("/dummy14QualitySummary", oQuality);
+      oModel.setProperty("/dummy14QualityItems", aItems);
+      var aGrouping = oModel.getProperty("/dummy14GroupingKeys") || [];
+      if (!aGrouping.length) {
+        oModel.setProperty("/dummy14GroupingKeys", oModel.getProperty("/dummy14CompareKeys") || []);
+      }
+    },
+
+    _applyDummy14Result: function(oResp) {
+      var oModel = this.getView().getModel("jokers");
+      var oQuality = oResp && oResp.quality_summary ? oResp.quality_summary : {};
+      var oNarrative = oResp && oResp.narrative ? oResp.narrative : {};
+      var oSuggestedThresholds = oResp && oResp.suggested_thresholds ? oResp.suggested_thresholds : null;
+      oModel.setProperty("/dummy14QualitySummary", oQuality);
+      oModel.setProperty("/dummy14SummaryTotals", oResp && oResp.summary_totals ? oResp.summary_totals : {});
+      oModel.setProperty("/dummy14ResultRows", Array.isArray(oResp && oResp.result_rows) ? oResp.result_rows : []);
+      oModel.setProperty("/dummy14EvidenceRows", Array.isArray(oResp && oResp.evidence_rows) ? oResp.evidence_rows : []);
+      oModel.setProperty("/dummy14TopDrivers", Array.isArray(oResp && oResp.top_drivers) ? oResp.top_drivers : []);
+      oModel.setProperty("/dummy14ProjectInsights", Array.isArray(oResp && oResp.project_insights) ? oResp.project_insights : []);
+      oModel.setProperty("/dummy14SuggestedThresholds", oSuggestedThresholds);
+      oModel.setProperty("/dummy14NarrativeHeadline", String(oNarrative.headline || "Terv-teny osszehasonlitas eredmenye"));
+      oModel.setProperty("/dummy14NarrativeSummary", String(oNarrative.summary || ""));
+      oModel.setProperty("/dummy14NarrativeBullets", Array.isArray(oNarrative.bullets) ? oNarrative.bullets : []);
+      oModel.setProperty("/dummy14NarrativeLimitations", Array.isArray(oNarrative.limitations) ? oNarrative.limitations : []);
+      oModel.setProperty("/dummy14RecommendedActions", Array.isArray(oNarrative.recommended_actions) ? oNarrative.recommended_actions : []);
+    },
+
+    _applyDummy14Status: function(oStatus) {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy14ProgressPercent", Number(oStatus && oStatus.progress_percent ? oStatus.progress_percent : 0));
+      oModel.setProperty("/dummy14ProgressText", String(oStatus && oStatus.progress_text ? oStatus.progress_text : ""));
+      oModel.setProperty("/dummy14StepItems", Array.isArray(oStatus && oStatus.steps) ? oStatus.steps : []);
+      if (oStatus && oStatus.status === "done" && oStatus.result) {
+        this._applyDummy14Result(oStatus.result);
+        oModel.setProperty("/dummy14ProgressText", "Terv-teny elemzes v2 elkeszult.");
+      }
+      if (oStatus && oStatus.status === "error") {
+        oModel.setProperty("/dummy14Error", String(oStatus.error || "Dummy14 elemzesi hiba."));
+      }
+    },
+
+    _pollDummy14Job: async function(sJobId) {
+      var iStartedAt = Date.now();
+      while (Date.now() - iStartedAt < 10 * 60 * 1000) {
+        var oStatus = await AiService.getDummy14Status(sJobId);
+        this._applyDummy14Status(oStatus);
+        if (oStatus.status === "done") { return oStatus.result || {}; }
+        if (oStatus.status === "error") { throw new Error(oStatus.error || "Dummy14 elemzesi hiba."); }
+        await new Promise(function(resolve) { window.setTimeout(resolve, 1200); });
+      }
+      throw new Error("A terv-teny elemzes tul sokaig futott. Probald meg ujra.");
+    },
+
+    _goToDummy14Step: function(sStepId) {
+      var oWizard = this.byId("dummy14Wizard");
+      var oStep = this.byId(sStepId);
+      if (!oWizard || !oStep) { return; }
+      var aSteps = oWizard.getSteps ? oWizard.getSteps() : [];
+      var iTargetIndex = aSteps.indexOf(oStep);
+      if (iTargetIndex >= 0 && oWizard.validateStep) {
+        for (var i = 0; i <= iTargetIndex; i++) { oWizard.validateStep(aSteps[i]); }
+      }
+      var oProgressStep = oWizard.getProgressStep ? oWizard.getProgressStep() : null;
+      var iProgressIndex = aSteps.indexOf(oProgressStep);
+      if (iTargetIndex >= 0 && iProgressIndex >= 0 && oWizard.nextStep) {
+        while (iProgressIndex < iTargetIndex) { oWizard.nextStep(); iProgressIndex++; }
+      }
+      if (oWizard.goToStep) { oWizard.goToStep(oStep, true); }
+    },
+
+    _resetDummy14State: function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy14AnalysisRunId", "");
+      oModel.setProperty("/dummy14PlanFile", null);
+      oModel.setProperty("/dummy14ActualFile", null);
+      oModel.setProperty("/dummy14PlanFileName", "");
+      oModel.setProperty("/dummy14ActualFileName", "");
+      oModel.setProperty("/dummy14Busy", false);
+      oModel.setProperty("/dummy14Error", "");
+      oModel.setProperty("/dummy14ProgressText", "");
+      oModel.setProperty("/dummy14ProgressPercent", 0);
+      oModel.setProperty("/dummy14JobId", "");
+      oModel.setProperty("/dummy14StepItems", []);
+      oModel.setProperty("/dummy14PlanColumns", []);
+      oModel.setProperty("/dummy14ActualColumns", []);
+      oModel.setProperty("/dummy14PlanPreviewRows", []);
+      oModel.setProperty("/dummy14ActualPreviewRows", []);
+      oModel.setProperty("/dummy14PlanColumnsText", "");
+      oModel.setProperty("/dummy14ActualColumnsText", "");
+      oModel.setProperty("/dummy14PlanPreviewText", "");
+      oModel.setProperty("/dummy14ActualPreviewText", "");
+      oModel.setProperty("/dummy14SemanticMappings", this._createDummy14SemanticMappings());
+      oModel.setProperty("/dummy14CompareKeyOptions", []);
+      oModel.setProperty("/dummy14CompareKeys", []);
+      oModel.setProperty("/dummy14MappingConfidence", 0);
+      oModel.setProperty("/dummy14MappingConfidenceText", "");
+      oModel.setProperty("/dummy14MappingAiSummary", "");
+      oModel.setProperty("/dummy14CompareKeyHelpText", "");
+      oModel.setProperty("/dummy14QualitySummary", null);
+      oModel.setProperty("/dummy14QualityItems", []);
+      oModel.setProperty("/dummy14Granularity", "monthly");
+      oModel.setProperty("/dummy14MetricMode", "sum_amount");
+      oModel.setProperty("/dummy14GroupingKeys", []);
+      oModel.setProperty("/dummy14ThresholdPct", 10);
+      oModel.setProperty("/dummy14AbsoluteThreshold", 100000);
+      oModel.setProperty("/dummy14ZscoreCutoff", 2.5);
+      oModel.setProperty("/dummy14SummaryTotals", {});
+      oModel.setProperty("/dummy14ResultRows", []);
+      oModel.setProperty("/dummy14EvidenceRows", []);
+      oModel.setProperty("/dummy14TopDrivers", []);
+      oModel.setProperty("/dummy14ProjectInsights", []);
+      oModel.setProperty("/dummy14SuggestedThresholds", null);
+      oModel.setProperty("/dummy14NarrativeHeadline", "");
+      oModel.setProperty("/dummy14NarrativeSummary", "");
+      oModel.setProperty("/dummy14NarrativeBullets", []);
+      oModel.setProperty("/dummy14NarrativeLimitations", []);
+      oModel.setProperty("/dummy14RecommendedActions", []);
+      this._rebindDummy13PreviewTable("dummy14PlanPreviewTable", "/dummy14PlanPreviewRows");
+      this._rebindDummy13PreviewTable("dummy14ActualPreviewTable", "/dummy14ActualPreviewRows");
+      var oWizard = this.byId("dummy14Wizard");
+      if (oWizard && oWizard.discardProgress) { oWizard.discardProgress(oWizard.getSteps()[0]); }
+      var oPlanUploader = this.byId("dummy14PlanUploader");
+      var oActualUploader = this.byId("dummy14ActualUploader");
+      if (oPlanUploader && oPlanUploader.clear) { oPlanUploader.clear(); }
+      if (oActualUploader && oActualUploader.clear) { oActualUploader.clear(); }
+    },
+
+    // ─── DUMMY 14 END ─────────────────────────────────────────────────────────
 
     _extractUploaderFiles: function(oEvent) {
       var aFiles = oEvent && oEvent.getParameter ? oEvent.getParameter("files") : null;

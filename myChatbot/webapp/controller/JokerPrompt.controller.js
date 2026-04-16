@@ -881,6 +881,10 @@ sap.ui.define([
     _onRouteMatched: function(oEvent) {
       var sJokerId = oEvent.getParameter("arguments").jokerId;
       var oModel = this.getView().getModel("jokers");
+      if (sJokerId === "dummy-13") {
+        this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: "jokers" }, true);
+        return;
+      }
       var aTiles = oModel.getProperty("/tiles") || [];
       var oSelected = aTiles.find(function(oTile) {
         return oTile.id === sJokerId;

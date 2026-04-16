@@ -114,6 +114,9 @@
       },
       "noah": {
         "type": "sap.ui.model.json.JSONModel"
+      },
+      "noah2": {
+        "type": "sap.ui.model.json.JSONModel"
       }
     },
     "routing": {

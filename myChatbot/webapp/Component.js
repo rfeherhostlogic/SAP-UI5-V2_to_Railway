@@ -495,7 +495,7 @@ sap.ui.define([
 				draftMessage: "",
 				messages: [{
 					role: "assistant",
-					content: "Szia, en Noah 2 vagyok! Irj szabad szovegesen, es kivalasztom a megfelelo megoldast. Hasznald a Prompt Javito gombot a pontosabb promptokhoz, vagy kapcsold be a Noah Agent modot a tobblepeses tervekhez."
+					content: "Szia, en Noah vagyok! Irj szabad szovegesen, es kivalasztom a megfelelo megoldast. Hasznald a Prompt Javito gombot a pontosabb promptokhoz, vagy kapcsold be a Noah Agent modot a tobblepeses tervekhez."
 				}],
 				attachments: [],
 				routerLog: [],
@@ -506,6 +506,10 @@ sap.ui.define([
 				manualSelectedCardId: "",
 				dummy4PreviewRows: [],
 				dummy4GeneratedSql: "",
+				dummy4Summary: "",
+				dummy4ChartAvailable: false,
+				schemaHintExpanded: false,
+				agentEditingStepIndex: -1,
 				activeCard: null,
 				activeCardRuntimeFields: [],
 				pendingConfirmation: null

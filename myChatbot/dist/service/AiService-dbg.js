@@ -274,6 +274,58 @@
     });
   }
 
+  function startDummy14AnalysisRun(mPayload) {
+    var oFormData = new FormData();
+    if (mPayload.planFile) { oFormData.append("planFile", mPayload.planFile); }
+    if (mPayload.actualFile) { oFormData.append("actualFile", mPayload.actualFile); }
+    return fetch("/api/jokers/dummy14/start", {
+      method: "POST",
+      body: oFormData
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function normalizeDummy14(mPayload) {
+    return fetch("/api/jokers/dummy14/normalize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(mPayload || {})
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function runDummy14Analysis(mPayload) {
+    return fetch("/api/jokers/dummy14/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(mPayload || {})
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function getDummy14Status(sJobId) {
+    return fetch("/api/jokers/dummy14/status/" + encodeURIComponent(String(sJobId || "")), {
+      method: "GET"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
   function getDummy4SchemaHint() {
     return fetch("/api/jokers/dummy4/schema-hint", {
       method: "GET"
@@ -860,6 +912,10 @@
     normalizeDummy13: normalizeDummy13,
     runDummy13Analysis: runDummy13Analysis,
     getDummy13Status: getDummy13Status,
+    startDummy14AnalysisRun: startDummy14AnalysisRun,
+    normalizeDummy14: normalizeDummy14,
+    runDummy14Analysis: runDummy14Analysis,
+    getDummy14Status: getDummy14Status,
     getDummy4SchemaHint: getDummy4SchemaHint,
     uploadDummy5Pdf: uploadDummy5Pdf,
     summarizeDummy5: summarizeDummy5,

@@ -86,7 +86,7 @@ sap.ui.define([
         reports: this.byId("reportsView"),
         jokers: this.byId("jokersView"),
         discovery: this.byId("discoveryView"),
-        noah: this.byId("noahView"),
+        noah: this.byId("noah2View"),
         jokerPrompt: this.byId("jokerPromptView")
       };
       var oPage = oPageMap[sKey] || oPageMap.noah;
