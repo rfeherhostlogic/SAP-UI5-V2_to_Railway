@@ -477,6 +477,40 @@ sap.ui.define([
 				pendingConfirmation: null
 			}), "noah");
 
+			// noah2 model
+			this.setModel(new JSONModel({
+				state: "IDLE",
+				statusText: "",
+				error: "",
+				promptImproverBusy: false,
+				promptImproverImprovedPrompt: "",
+				promptImproverAwaitingRun: false,
+				agentEnabled: false,
+				agentBusy: false,
+				agentPlan: null,
+				agentConstraints: [],
+				agentApprovalPending: false,
+				agentProblemStatement: "",
+				agentStepResults: [],
+				draftMessage: "",
+				messages: [{
+					role: "assistant",
+					content: "Szia, en Noah 2 vagyok! Irj szabad szovegesen, es kivalasztom a megfelelo megoldast. Hasznald a Prompt Javito gombot a pontosabb promptokhoz, vagy kapcsold be a Noah Agent modot a tobblepeses tervekhez."
+				}],
+				attachments: [],
+				routerLog: [],
+				manualCardOptions: [{
+					id: "",
+					name: "Automatikus router"
+				}],
+				manualSelectedCardId: "",
+				dummy4PreviewRows: [],
+				dummy4GeneratedSql: "",
+				activeCard: null,
+				activeCardRuntimeFields: [],
+				pendingConfirmation: null
+			}), "noah2");
+
 			// create the views based on the url/hash
 			this.getRouter().initialize();
 
