@@ -2,28 +2,12 @@ sap.ui.define([
   "sap/ui/core/mvc/Controller",
   "sap/m/MessageToast",
   "sap/suite/ui/commons/demo/tutorial/service/AiService",
-  "sap/ui/model/json/JSONModel",
-  "sap/m/Column",
-  "sap/m/Text",
-  "sap/m/ColumnListItem",
-  "sap/viz/ui5/controls/VizFrame",
-  "sap/viz/ui5/data/FlattenedDataset",
-  "sap/viz/ui5/data/DimensionDefinition",
-  "sap/viz/ui5/data/MeasureDefinition",
-  "sap/viz/ui5/controls/common/feeds/FeedItem"
+  "sap/ui/model/json/JSONModel"
 ], function(
   Controller,
   MessageToast,
   AiService,
-  JSONModel,
-  Column,
-  Text,
-  ColumnListItem,
-  VizFrame,
-  FlattenedDataset,
-  DimensionDefinition,
-  MeasureDefinition,
-  FeedItem
+  JSONModel
 ) {
   "use strict";
 
@@ -732,9 +716,15 @@ sap.ui.define([
           }, this._activeAbortController.signal);
         }
 
-        // dummy-4 eseten chart betoltese, SQL nelkul
+        // dummy-4/dummy-9 eseten rich bubble tartalom
         this._applyCard2SpecificPayload(sCardId, oResp && oResp.payload ? oResp.payload : null);
-        if (sCardId !== "dummy-4" && sCardId !== "dummy-9") {
+        if (sCardId === "dummy-4" || sCardId === "dummy-9") {
+          this._appendNoah2RichResultMessage(
+            sCardId,
+            oResp && oResp.card_name ? oResp.card_name : sCardId,
+            oResp && oResp.payload ? oResp.payload : null
+          );
+        } else {
           this._appendNoah2Message("assistant",
             "[" + (oResp.card_name || sCardId) + "]\n" + (oResp.result || "Nincs valasz."));
         }
@@ -758,40 +748,10 @@ sap.ui.define([
      */
     _applyCard2SpecificPayload: function(sCardId, oPayload) {
       var oModel = this.getView().getModel("noah2");
-      if (sCardId === "dummy-4" && oPayload) {
-        var aRows = Array.isArray(oPayload.rows) ? oPayload.rows : [];
-        oModel.setProperty("/dummy4PreviewRows", aRows);
-        oModel.setProperty("/dummy4Summary", String(oPayload.summary || ""));
-        // Szandekosan NEM allitjuk be a dummy4GeneratedSql-t (3-as kovetelmenyek)
-        this._rebindNoah2Dummy4PreviewTable();
-        this._renderNoah2Dummy4Chart(aRows);
-        return;
-      }
-      if (sCardId === "dummy-9" && oPayload) {
-        var aCsvRows = Array.isArray(oPayload.rows) ? oPayload.rows : [];
-        oModel.setProperty("/dummy9PreviewRows", aCsvRows);
-        oModel.setProperty("/dummy9Summary", String(oPayload.summary || ""));
-        oModel.setProperty("/dummy9SelectedSource", String(oPayload.selectedSource || ""));
-        this._rebindNoah2Dummy9PreviewTable();
-        this._renderNoah2Dummy9Chart(aCsvRows);
-        return;
-      }
-      oModel.setProperty("/dummy4PreviewRows", []);
-      oModel.setProperty("/dummy4GeneratedSql", "");
-      oModel.setProperty("/dummy4Summary", "");
-      oModel.setProperty("/dummy4ChartAvailable", false);
-      oModel.setProperty("/dummy9PreviewRows", []);
-      oModel.setProperty("/dummy9Summary", "");
-      oModel.setProperty("/dummy9ChartAvailable", false);
-      oModel.setProperty("/dummy9SelectedSource", "");
-      this._rebindNoah2Dummy4PreviewTable();
-      this._resetNoah2Dummy4Chart();
-      this._rebindNoah2Dummy9PreviewTable();
-      this._resetNoah2Dummy9Chart();
+      return;
     },
 
-    _renderNoah2Dummy4Chart: function(aRows) {
-      var oHost = this.byId("noah2Dummy4ChartHost");
+    _buildNoah2ChartHtml: function(aRows) {
       var aColumns = this._extractNoah2Columns(aRows);
       var aNumericCols = this._findNoah2NumericColumns(aRows, aColumns);
       var sMeasure = aNumericCols[0] || "";
@@ -799,190 +759,76 @@ sap.ui.define([
         return sCol !== sMeasure;
       }) || aColumns[0] || "";
 
-      this._resetNoah2Dummy4Chart();
-
-      if (!oHost || !sDimension || !sMeasure || aRows.length === 0) {
-        this.getView().getModel("noah2").setProperty("/dummy4ChartAvailable", false);
-        return;
+      if (!sDimension || !sMeasure || !Array.isArray(aRows) || aRows.length === 0) {
+        return "";
       }
 
       var aChartRows = (aRows || []).map(function(oRow) {
-        var oCopy = Object.assign({}, oRow || {});
-        oCopy[sMeasure] = this._toNoah2Number(oCopy[sMeasure]);
-        return oCopy;
+        return {
+          label: String(oRow && oRow[sDimension] != null ? oRow[sDimension] : ""),
+          value: this._toNoah2Number(oRow && oRow[sMeasure])
+        };
       }.bind(this));
-
-      var oChartModel = new JSONModel({ rows: aChartRows });
-
-      var oDataset = new FlattenedDataset({
-        dimensions: [new DimensionDefinition({ name: sDimension, value: "{" + sDimension + "}" })],
-        measures: [new MeasureDefinition({ name: sMeasure, value: "{" + sMeasure + "}" })],
-        data: { path: "/rows" }
-      });
-
-      var oViz = new VizFrame({
-        width: "100%",
-        height: "280px",
-        vizType: "column",
-        dataset: oDataset
-      });
-
-      oViz.setModel(oChartModel);
-      oViz.addFeed(new FeedItem({
-        uid: "categoryAxis",
-        type: "Dimension",
-        values: [sDimension]
-      }));
-      oViz.addFeed(new FeedItem({
-        uid: "valueAxis",
-        type: "Measure",
-        values: [sMeasure]
-      }));
-      oViz.setVizProperties({
-        title: { visible: false },
-        legend: { visible: false },
-        plotArea: { dataLabel: { visible: true } }
-      });
-
-      oHost.addItem(oViz);
-      this.getView().getModel("noah2").setProperty("/dummy4ChartAvailable", true);
-    },
-
-    _resetNoah2Dummy4Chart: function() {
-      var oHost = this.byId("noah2Dummy4ChartHost");
-      if (oHost) {
-        oHost.removeAllItems();
+      var aValidRows = aChartRows.filter(function(item) {
+        return item.label && item.value != null;
+      }).slice(0, 12);
+      if (aValidRows.length === 0) {
+        return "";
       }
-      this.getView().getModel("noah2").setProperty("/dummy4ChartAvailable", false);
-    },
-
-    _renderNoah2Dummy9Chart: function(aRows) {
-      var oHost = this.byId("noah2Dummy9ChartHost");
-      var aColumns = this._extractNoah2Columns(aRows);
-      var aNumericCols = this._findNoah2NumericColumns(aRows, aColumns);
-      var sMeasure = aNumericCols[0] || "";
-      var sDimension = aColumns.find(function(sCol) {
-        return sCol !== sMeasure;
-      }) || aColumns[0] || "";
-
-      this._resetNoah2Dummy9Chart();
-
-      if (!oHost || !sDimension || !sMeasure || aRows.length === 0) {
-        this.getView().getModel("noah2").setProperty("/dummy9ChartAvailable", false);
-        return;
-      }
-
-      var aChartRows = (aRows || []).map(function(oRow) {
-        var oCopy = Object.assign({}, oRow || {});
-        oCopy[sMeasure] = this._toNoah2Number(oCopy[sMeasure]);
-        return oCopy;
+      var nMax = aValidRows.reduce(function(max, item) {
+        return Math.max(max, Number(item.value || 0));
+      }, 0) || 1;
+      var iBarWidth = 28;
+      var iGap = 12;
+      var iChartHeight = 180;
+      var iBaseY = 190;
+      var iWidth = Math.max(320, aValidRows.length * (iBarWidth + iGap) + 40);
+      var aRects = aValidRows.map(function(item, index) {
+        var nHeight = Math.max(4, Math.round((Number(item.value || 0) / nMax) * iChartHeight));
+        var x = 24 + index * (iBarWidth + iGap);
+        var y = iBaseY - nHeight;
+        var sLabel = this._escapeNoah2Html(item.label);
+        var sValue = this._escapeNoah2Html(String(item.value));
+        return [
+          "<rect x='" + x + "' y='" + y + "' width='" + iBarWidth + "' height='" + nHeight + "' rx='4' ry='4' fill='#6aa6ff'></rect>",
+          "<text x='" + (x + (iBarWidth / 2)) + "' y='" + (iBaseY + 14) + "' text-anchor='middle' font-size='10' fill='#4a5568'>" + sLabel.slice(0, 10) + "</text>",
+          "<text x='" + (x + (iBarWidth / 2)) + "' y='" + (y - 6) + "' text-anchor='middle' font-size='10' fill='#2d3748'>" + sValue + "</text>"
+        ].join("");
       }.bind(this));
-
-      var oChartModel = new JSONModel({ rows: aChartRows });
-      var oDataset = new FlattenedDataset({
-        dimensions: [new DimensionDefinition({ name: sDimension, value: "{" + sDimension + "}" })],
-        measures: [new MeasureDefinition({ name: sMeasure, value: "{" + sMeasure + "}" })],
-        data: { path: "/rows" }
-      });
-
-      var oViz = new VizFrame({
-        width: "100%",
-        height: "280px",
-        vizType: "column",
-        dataset: oDataset
-      });
-
-      oViz.setModel(oChartModel);
-      oViz.addFeed(new FeedItem({
-        uid: "categoryAxis",
-        type: "Dimension",
-        values: [sDimension]
-      }));
-      oViz.addFeed(new FeedItem({
-        uid: "valueAxis",
-        type: "Measure",
-        values: [sMeasure]
-      }));
-      oViz.setVizProperties({
-        title: { visible: false },
-        legend: { visible: false },
-        plotArea: { dataLabel: { visible: true } }
-      });
-
-      oHost.addItem(oViz);
-      this.getView().getModel("noah2").setProperty("/dummy9ChartAvailable", true);
+      return [
+        "<div style='overflow-x:auto;margin:8px 0 12px 0'>",
+        "<svg width='" + iWidth + "' height='220' viewBox='0 0 " + iWidth + " 220' xmlns='http://www.w3.org/2000/svg'>",
+        "<line x1='16' y1='" + iBaseY + "' x2='" + (iWidth - 8) + "' y2='" + iBaseY + "' stroke='#cbd5e0' stroke-width='1'></line>",
+        aRects.join(""),
+        "</svg>",
+        "</div>"
+      ].join("");
     },
 
-    _resetNoah2Dummy9Chart: function() {
-      var oHost = this.byId("noah2Dummy9ChartHost");
-      if (oHost) {
-        oHost.removeAllItems();
+    _buildNoah2PreviewHtml: function(aRows) {
+      var aColumns = this._extractNoah2Columns(aRows).slice(0, 8);
+      var aPreviewRows = (Array.isArray(aRows) ? aRows : []).slice(0, 50);
+      if (aColumns.length === 0 || aPreviewRows.length === 0) {
+        return "";
       }
-      this.getView().getModel("noah2").setProperty("/dummy9ChartAvailable", false);
-    },
-
-    _rebindNoah2Dummy4PreviewTable: function() {
-      var oTable = this.byId("noah2Dummy4PreviewTable");
-      var oModel = this.getView().getModel("noah2");
-      var aRows = oModel ? (oModel.getProperty("/dummy4PreviewRows") || []) : [];
-
-      if (!oTable) {
-        return;
-      }
-
-      oTable.unbindItems();
-      oTable.removeAllColumns();
-
-      var aColumns = this._extractNoah2Columns(aRows);
-      if (aColumns.length === 0) {
-        return;
-      }
-
-      aColumns.forEach(function(sName) {
-        oTable.addColumn(new Column({ header: new Text({ text: sName }) }));
-      });
-
-      var aCells = aColumns.map(function(sName) {
-        return new Text({ text: "{noah2>" + sName + "}", wrapping: true });
-      });
-
-      oTable.bindItems({
-        path: "noah2>/dummy4PreviewRows",
-        template: new ColumnListItem({ cells: aCells }),
-        templateShareable: false
-      });
-    },
-
-    _rebindNoah2Dummy9PreviewTable: function() {
-      var oTable = this.byId("noah2Dummy9PreviewTable");
-      var oModel = this.getView().getModel("noah2");
-      var aRows = oModel ? (oModel.getProperty("/dummy9PreviewRows") || []) : [];
-
-      if (!oTable) {
-        return;
-      }
-
-      oTable.unbindItems();
-      oTable.removeAllColumns();
-
-      var aColumns = this._extractNoah2Columns(aRows);
-      if (aColumns.length === 0) {
-        return;
-      }
-
-      aColumns.forEach(function(sName) {
-        oTable.addColumn(new Column({ header: new Text({ text: sName }) }));
-      });
-
-      var aCells = aColumns.map(function(sName) {
-        return new Text({ text: "{noah2>" + sName + "}", wrapping: true });
-      });
-
-      oTable.bindItems({
-        path: "noah2>/dummy9PreviewRows",
-        template: new ColumnListItem({ cells: aCells }),
-        templateShareable: false
-      });
+      var sHead = "<tr>" + aColumns.map(function(sName) {
+        return "<th style='text-align:left;padding:6px 8px;border-bottom:1px solid #e2e8f0;background:#f8fafc'>" + this._escapeNoah2Html(sName) + "</th>";
+      }.bind(this)).join("") + "</tr>";
+      var sBody = aPreviewRows.map(function(oRow) {
+        return "<tr>" + aColumns.map(function(sName) {
+          return "<td style='padding:6px 8px;border-bottom:1px solid #edf2f7;vertical-align:top'>" +
+            this._escapeNoah2Html(oRow && oRow[sName] != null ? String(oRow[sName]) : "") + "</td>";
+        }.bind(this)).join("") + "</tr>";
+      }.bind(this)).join("");
+      return [
+        "<div style='overflow-x:auto;margin-top:8px'>",
+        "<div style='font-size:12px;color:#4a5568;margin-bottom:6px'>Adat preview (max 50 sor)</div>",
+        "<table style='width:100%;border-collapse:collapse;font-size:12px'>",
+        "<thead>", sHead, "</thead>",
+        "<tbody>", sBody, "</tbody>",
+        "</table>",
+        "</div>"
+      ].join("");
     },
 
     // ─────────────────────────────────────────────────────────────────
@@ -1248,6 +1094,37 @@ sap.ui.define([
       aMessages.push({ role: sRole, content: String(sContent || "") });
       oModel.setProperty("/messages", aMessages);
       this._scrollNoah2ChatToBottom();
+    },
+
+    _appendNoah2RichResultMessage: function(sCardId, sTitle, oPayload) {
+      var oModel = this.getView().getModel("noah2");
+      var aRows = Array.isArray(oPayload && oPayload.rows) ? oPayload.rows : [];
+      var sSummary = String(oPayload && oPayload.summary ? oPayload.summary : "");
+      var sSelectedSource = String(oPayload && oPayload.selectedSource ? oPayload.selectedSource : "");
+      var sChartHtml = this._buildNoah2ChartHtml(aRows);
+      var sPreviewHtml = this._buildNoah2PreviewHtml(aRows);
+      var aMessages = oModel.getProperty("/messages") || [];
+      aMessages.push({
+        role: "assistant",
+        messageType: sCardId === "dummy-9" ? "csv-report" : "report",
+        title: String(sTitle || sCardId || "AI"),
+        content: sSummary,
+        selectedSource: sSelectedSource,
+        chartAvailable: !!sChartHtml,
+        chartHtml: sChartHtml,
+        previewHtml: sPreviewHtml
+      });
+      oModel.setProperty("/messages", aMessages);
+      this._scrollNoah2ChatToBottom();
+    },
+
+    _escapeNoah2Html: function(sValue) {
+      return String(sValue == null ? "" : sValue)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
     },
 
     _pushRouter2Log: function(oRoute) {

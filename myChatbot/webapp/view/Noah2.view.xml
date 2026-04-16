@@ -32,7 +32,15 @@
                         press=".onCopyNoah2Message"
                         class="sapUiTinyMarginBegin"/>
                     </HBox>
-                    <Text text="{noah2>content}" wrapping="true" width="100%"/>
+                    <Text text="{noah2>content}" wrapping="true" width="100%" visible="{= !${noah2>messageType} }"/>
+                    <VBox visible="{= !!${noah2>messageType} }" width="100%">
+                      <Text text="{= '[' + (${noah2>title} || 'AI') + ']' }" class="chatBubbleMeta"/>
+                      <Text text="{= ${noah2>content} ? 'Osszegzes:\n' + ${noah2>content} : 'Osszegzes nem elerheto.' }" wrapping="true" class="sapUiTinyMarginTop sapUiTinyMarginBottom"/>
+                      <Text text="{= ${noah2>selectedSource} ? 'Forras: ' + ${noah2>selectedSource} : '' }" visible="{= !!${noah2>selectedSource} }" wrapping="true" class="sapUiTinyMarginBottom"/>
+                      <Text text="Chart nem elerheto." visible="{= !${noah2>chartAvailable} }" wrapping="true" class="sapUiTinyMarginBottom"/>
+                      <core:HTML content="{noah2>chartHtml}" visible="{= !!${noah2>chartHtml} }"/>
+                      <core:HTML content="{noah2>previewHtml}" visible="{= !!${noah2>previewHtml} }"/>
+                    </VBox>
                   </VBox>
                 </HBox>
                 <HBox width="100%" justifyContent="End" visible="{= ${noah2>role} === 'user' }">
@@ -45,69 +53,6 @@
             </CustomListItem>
           </List>
         </VBox>
-
-        <HBox
-          width="100%"
-          justifyContent="Start"
-          visible="{= !!${noah2>/dummy4Summary} || ${noah2>/dummy4PreviewRows}.length > 0 }"
-          class="sapUiTinyMarginTop">
-          <Avatar initials="AI" displaySize="XS" class="chatAvatar noahAvatar"/>
-          <VBox class="chatBubble chatBubbleAi noahBubbleAi" width="100%">
-            <HBox justifyContent="SpaceBetween" alignItems="Center">
-              <Text text="AI" class="chatBubbleMeta"/>
-              <Text text="[Riportok]" class="chatBubbleMeta"/>
-            </HBox>
-            <Text
-              text="{= ${noah2>/dummy4Summary} ? 'Osszegzes:\n' + ${noah2>/dummy4Summary} : 'Osszegzes nem elerheto.' }"
-              wrapping="true"
-              class="sapUiSmallMarginBottom"/>
-            <Text
-              text="{= ${noah2>/dummy4ChartAvailable} ? '' : 'Chart nem elerheto.' }"
-              visible="{= !${noah2>/dummy4ChartAvailable} }"
-              wrapping="true"
-              class="sapUiTinyMarginBottom"/>
-            <Panel
-              headerText="Adat preview (max 50 sor)"
-              visible="{= ${noah2>/dummy4PreviewRows}.length > 0 }">
-              <VBox id="noah2Dummy4ChartHost" class="sapUiSmallMarginBottom"/>
-              <Table id="noah2Dummy4PreviewTable" growing="true" growingThreshold="50" inset="false"/>
-            </Panel>
-          </VBox>
-        </HBox>
-
-        <HBox
-          width="100%"
-          justifyContent="Start"
-          visible="{= !!${noah2>/dummy9Summary} || ${noah2>/dummy9PreviewRows}.length > 0 }"
-          class="sapUiTinyMarginTop">
-          <Avatar initials="AI" displaySize="XS" class="chatAvatar noahAvatar"/>
-          <VBox class="chatBubble chatBubbleAi noahBubbleAi" width="100%">
-            <HBox justifyContent="SpaceBetween" alignItems="Center">
-              <Text text="AI" class="chatBubbleMeta"/>
-              <Text text="[CSV Riport Asszisztens]" class="chatBubbleMeta"/>
-            </HBox>
-            <Text
-              text="{= ${noah2>/dummy9Summary} ? 'Osszegzes:\n' + ${noah2>/dummy9Summary} : 'Osszegzes nem elerheto.' }"
-              wrapping="true"
-              class="sapUiSmallMarginBottom"/>
-            <Text
-              text="{= ${noah2>/dummy9SelectedSource} ? 'Forras: ' + ${noah2>/dummy9SelectedSource} : '' }"
-              visible="{= !!${noah2>/dummy9SelectedSource} }"
-              wrapping="true"
-              class="sapUiTinyMarginBottom"/>
-            <Text
-              text="{= ${noah2>/dummy9ChartAvailable} ? '' : 'Chart nem elerheto.' }"
-              visible="{= !${noah2>/dummy9ChartAvailable} }"
-              wrapping="true"
-              class="sapUiTinyMarginBottom"/>
-            <Panel
-              headerText="Adat preview (max 50 sor)"
-              visible="{= ${noah2>/dummy9PreviewRows}.length > 0 }">
-              <VBox id="noah2Dummy9ChartHost" class="sapUiSmallMarginBottom"/>
-              <Table id="noah2Dummy9PreviewTable" growing="true" growingThreshold="50" inset="false"/>
-            </Panel>
-          </VBox>
-        </HBox>
 
         <!-- Uzenetiro komponens -->
         <VBox class="noahComposer sapUiSmallMarginTop">
