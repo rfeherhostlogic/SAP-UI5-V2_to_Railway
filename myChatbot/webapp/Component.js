@@ -188,6 +188,36 @@ sap.ui.define([
 						footer: "AI Joker 14",
 						description: "Javított terv-tény elemzés: szisztematikus vs. egyszeri eltérés azonosítása, projekt-szintű 'Miért vizsgáld?' magyarázatok, küszöbérték-javaslatok és részletes ok-szövegek.",
 						systemPrompt: "Segits terv-teny adatokat strukturaltan osszehasonlitani es az okokat azonositani."
+					},
+					{
+						id: "dummy-15",
+						title: "Gyartastervezes",
+						subtitle: "Kapacitas, prioritas, utemezes",
+						primaryTag: "\u00c1ltal\u00e1nos",
+						tags: ["\u00c1ltal\u00e1nos"],
+						footer: "AI Joker 15",
+						description: "Gyartasi igenyek, kapacitasok, hataridok es korlatok alapjan strukturalt termelesi tervet es prioritasokat javasol.",
+						systemPrompt: "Segits gyartastervet kesziteni a megadott igenyek, hataridok, kapacitasok es korlatok alapjan. Adj egyertelmu prioritasokat, javasolt utemezest, fobb kockazatokat es gyakorlati kovetkezo lepeseket roviden, uzletileg erthetoen."
+					},
+					{
+						id: "dummy-16",
+						title: "Keszletgazdalkodas",
+						subtitle: "Ujrarendeles es keszletkockazat",
+						primaryTag: "\u00c1ltal\u00e1nos",
+						tags: ["\u00c1ltal\u00e1nos"],
+						footer: "AI Joker 16",
+						description: "Keszletszintek, fogyas, beszerzesi idok es ellatasi kockazatok alapjan ujrarendelesi es optimalizalasi javaslatokat ad.",
+						systemPrompt: "Elemezd a megadott keszletgazdalkodasi helyzetet. Azonositsd a hiany- es tulkeszlet-kockazatokat, majd adj rovid, priorizalt ujrarendelesi, atcsoportositasi es optimalizalasi javaslatokat uzletileg erthetoen."
+					},
+					{
+						id: "dummy-17",
+						title: "Tanacsado",
+						subtitle: "Uzleti helyzetek gyors attekintese",
+						primaryTag: "\u00c1ltal\u00e1nos",
+						tags: ["\u00c1ltal\u00e1nos"],
+						footer: "AI Joker 17",
+						description: "Altalanos uzleti, mukodesi vagy dontesi helyzetekre ad strukturalt tanacsot, opciokat es kovetkezo lepeseket.",
+						systemPrompt: "Viselkedj tapasztalt uzleti tanacsadokent. Ertsd meg a helyzetet, foglald ossze roviden a problemat, adj 2-4 realis opciot az elonyokkel es kockazatokkal, majd javasolj vilagos kovetkezo lepeseket."
 					}
 				],
 				filteredTiles: [],
