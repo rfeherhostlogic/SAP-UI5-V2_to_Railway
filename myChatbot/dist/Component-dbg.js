@@ -441,40 +441,86 @@ sap.ui.define([
 				smartSegSelectedRecordIds: []
 			}), "jokers");
 
-			// discovery model
+			// discovery model – ML Wizard
 			this.setModel(new JSONModel({
-				currentPage: "selector",
-				busy: false,
-				error: "",
-				promptPreview: "",
-				schemaTables: [],
-				suggestions: [],
-				activeUseCase: null,
-				specSessionId: "",
-				specChatMessages: [],
-				specAnswerDraft: "",
-				specStep: 0,
-				specMaxSteps: 0,
-				specDone: false,
-				specBusy: false,
-				trainingSpecYaml: "",
-				trainingStatus: "IDLE",
-				trainingProgress: 0,
-				trainingMessage: "",
-				trainingJobId: "",
-				resultPreviewRows: [],
-				resultColumns: [],
-				metricsItems: [],
-				businessSummary: "",
-				csvDownloadUrl: "",
-				businessBusy: false,
-				businessError: "",
-				businessSchemaTables: [],
-				businessChatMessages: [],
-				businessDraft: "",
-				businessCsvFiles: [],
-				businessSuggestedUseCase: null,
-				businessAutoStartPending: false
+				wizardInitDone: false,
+				wizardError: "",
+				sessionId: "",
+				// Step 1
+				step1Goal: "prediction",
+				step1GoalHint: "Folyamatos értéket (pl. bevétel, mennyiség) jósolj meg.",
+				step1SourceType: "csv",
+				step1SelectedTable: "",
+				step1AvailableTables: [],
+				step1CsvFileName: "",
+				step1ColumnPreview: [],
+				step1RowCountEstimate: 0,
+				step1AiGoalSuggestions: [],
+				step1EarlyFeatureHints: [],
+				step1AiBusy: false,
+				step1Busy: false,
+				// Step 2
+				step2Profile: null,
+				step2QualityIssues: [],
+				step2QualitySummary: "",
+				step2AiFeatureSuggestions: [],
+				step2AvailableColumnItems: [],
+				step2InputColumns: [],
+				step2TargetColumn: "",
+				step2SelectedFeatures: [],
+				step2ReadinessSummary: "",
+				step2Busy: false,
+				// Step 3
+				step3ModelTier: "balanced",
+				step3AiTierExplanation: "",
+				step3TrainingJobId: "",
+				step3TrainingProgress: 0,
+				step3TrainingMessage: "",
+				step3TrainingStatus: "IDLE",
+				step3TierOptions: [
+					{
+						key: "fast",
+						title: "Gyors",
+						description: "Azonnali eredmény, egyszerűbb modell. Kisebb adathalmazhoz vagy gyors teszteléshez.",
+						icon: "sap-icon://accelerated",
+						color: "#e78c07",
+						selected: false
+					},
+					{
+						key: "balanced",
+						title: "Kiegyensúlyozott",
+						description: "Jó arány a pontosság és a futási idő között. Legtöbb esetben ez az ajánlott.",
+						icon: "sap-icon://compare",
+						color: "#0854a0",
+						selected: true
+					},
+					{
+						key: "accurate",
+						title: "Pontos",
+						description: "Maximális pontosság, hosszabb futási idő. Nagy adathalmazhoz és kritikus döntésekhez.",
+						icon: "sap-icon://quality-issue",
+						color: "#107e3e",
+						selected: false
+					}
+				],
+				// Step 4
+				step4PreviewRows: [],
+				step4Metrics: null,
+				step4MetricsItems: [],
+				step4FeatureImportance: [],
+				step4AiInsight: {
+					executive_summary: "",
+					insights: [],
+					recommendations: [],
+					risks: []
+				},
+				step4CsvDownloadUrl: "",
+				step4Busy: false,
+				// Step 5
+				step5SimulationChanges: [],
+				step5SimulationResult: null,
+				step5AiSimulationContext: "",
+				step5SimBusy: false
 			}), "discovery");
 
 			// noah model

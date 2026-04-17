@@ -68,3 +68,108 @@
     width: 100%;
   }
 }
+
+/* ─── ML WIZARD STYLES ────────────────────────────────────────────────────── */
+
+.mlWizardPage {
+  background:
+    radial-gradient(circle at 8% 10%, rgba(8, 84, 160, 0.07), transparent 32%),
+    radial-gradient(circle at 90% 12%, rgba(16, 126, 62, 0.07), transparent 34%),
+    linear-gradient(180deg, #f8fbff 0%, #eff5fb 100%);
+}
+
+.mlWizardShell {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.mlWizardSubtitle {
+  color: #5a7184;
+  font-size: 0.875rem;
+}
+
+.mlWizardControl {
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.07);
+  border-radius: 0.8rem;
+  overflow: hidden;
+}
+
+.mlWizardStepContent {
+  padding: 1rem;
+  max-width: 900px;
+}
+
+.mlWizardSection {
+  margin-bottom: 1.25rem;
+}
+
+.mlWizardSectionLabel {
+  font-weight: 600;
+  color: #1e3148;
+}
+
+.mlWizardHintText {
+  color: #5a7184;
+  font-size: 0.85rem;
+}
+
+.mlWizardWarningText {
+  color: #bb0000;
+  font-size: 0.82rem;
+}
+
+.mlWizardBold {
+  font-weight: 600;
+}
+
+/* Feature item readiness border */
+.mlWizardFeatureInfo {
+  flex: 1;
+}
+
+/* Tier selection */
+.mlWizardTierTitle {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+/* Insight card */
+.mlWizardInsightCard {
+  background: linear-gradient(135deg, #ffffff 0%, #f4f8fd 100%);
+  border: 1px solid #dce5ef;
+  border-radius: 0.8rem;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
+}
+
+.mlWizardInsightSummary {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #1e3148;
+}
+
+/* Metrics & Feature Importance side by side */
+.mlWizardHalfPanel {
+  flex: 1 1 280px;
+  margin-right: 1rem;
+  margin-bottom: 1rem;
+  min-width: 200px;
+}
+
+.mlWizardMetricValue {
+  font-weight: 600;
+  color: #0854a0;
+}
+
+/* Centered loading box */
+.mlWizardCenteredBox {
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+}
+
+@media (max-width: 700px) {
+  .mlWizardHalfPanel {
+    flex: 1 1 100%;
+    margin-right: 0;
+  }
+}

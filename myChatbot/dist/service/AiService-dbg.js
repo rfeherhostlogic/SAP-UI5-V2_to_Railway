@@ -876,6 +876,158 @@
     });
   }
 
+  // ─── ML WIZARD API ──────────────────────────────────────────────────────────
+
+  function mlWizardInit(mPayload) {
+    var oFormData = new FormData();
+    oFormData.append("goal", mPayload.goal || "prediction");
+    oFormData.append("source_type", mPayload.source_type || "csv");
+    oFormData.append("table_name", mPayload.table_name || "");
+    if (mPayload.csv_file) {
+      oFormData.append("csv_file", mPayload.csv_file);
+    }
+    return fetch("/api/ml-wizard/init", {
+      method: "POST",
+      body: oFormData
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function mlWizardGetDbTables() {
+    return fetch("/api/ml-wizard/db-tables", { method: "GET" }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function mlWizardStep1AiSuggestions(mPayload) {
+    return fetch("/api/ml-wizard/step1/ai-suggestions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: mPayload.session_id || "" })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function mlWizardStep2Profile(mPayload) {
+    return fetch("/api/ml-wizard/step2/profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: mPayload.session_id || "" })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function mlWizardGetJobStatus(mPayload) {
+    return fetch("/api/ml-wizard/status/" + encodeURIComponent(String(mPayload.job_id || "")), {
+      method: "GET"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function mlWizardStep2ProfileResult(mPayload) {
+    return fetch("/api/ml-wizard/step2/profile-result/" + encodeURIComponent(String(mPayload.session_id || "")), {
+      method: "GET"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function mlWizardStep2ConfirmFeatures(mPayload) {
+    return fetch("/api/ml-wizard/step2/confirm-features", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: mPayload.session_id || "",
+        input_columns: mPayload.input_columns || [],
+        target_column: mPayload.target_column || "",
+        selected_features: mPayload.selected_features || []
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function mlWizardStep3StartTraining(mPayload) {
+    return fetch("/api/ml-wizard/step3/start-training", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: mPayload.session_id || "",
+        model_tier: mPayload.model_tier || "balanced"
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function mlWizardStep4Result(mPayload) {
+    return fetch("/api/ml-wizard/step4/result/" + encodeURIComponent(String(mPayload.session_id || "")), {
+      method: "GET"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function mlWizardStep5Simulate(mPayload) {
+    return fetch("/api/ml-wizard/step5/simulate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: mPayload.session_id || "",
+        simulation_changes: mPayload.simulation_changes || {}
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function mlWizardStep5SimulationResult(mPayload) {
+    return fetch("/api/ml-wizard/step5/simulation-result/" + encodeURIComponent(String(mPayload.session_id || "")), {
+      method: "GET"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  // ─── ML WIZARD API END ───────────────────────────────────────────────────────
+
   function noahChat(mPayload, oSignal) {
     return fetch("/api/noah/chat", {
       method: "POST",
@@ -947,7 +1099,18 @@
     noahGetCardConfig: noahGetCardConfig,
     noahRunCard: noahRunCard,
     noahAgentPlan: noahAgentPlan,
-    noahChat: noahChat
+    noahChat: noahChat,
+    mlWizardInit: mlWizardInit,
+    mlWizardGetDbTables: mlWizardGetDbTables,
+    mlWizardStep1AiSuggestions: mlWizardStep1AiSuggestions,
+    mlWizardStep2Profile: mlWizardStep2Profile,
+    mlWizardGetJobStatus: mlWizardGetJobStatus,
+    mlWizardStep2ProfileResult: mlWizardStep2ProfileResult,
+    mlWizardStep2ConfirmFeatures: mlWizardStep2ConfirmFeatures,
+    mlWizardStep3StartTraining: mlWizardStep3StartTraining,
+    mlWizardStep4Result: mlWizardStep4Result,
+    mlWizardStep5Simulate: mlWizardStep5Simulate,
+    mlWizardStep5SimulationResult: mlWizardStep5SimulationResult
   };
 });
 
