@@ -158,7 +158,7 @@
 
               <!-- Loading state -->
               <VBox visible="{= ${discovery>/step2Busy} }" class="mlWizardCenteredBox">
-                <BusyIndicator size="Medium" class="sapUiMediumMargin"/>
+                <BusyIndicator size="3rem" class="sapUiMediumMargin"/>
                 <Text text="Adatok elemzése folyamatban..." class="sapUiSmallMarginTop"/>
               </VBox>
 
@@ -323,7 +323,7 @@
 
               <!-- Loading -->
               <VBox visible="{= ${discovery>/step4Busy} }" class="mlWizardCenteredBox">
-                <BusyIndicator size="Medium" class="sapUiMediumMargin"/>
+                <BusyIndicator size="3rem" class="sapUiMediumMargin"/>
                 <Text text="Eredmények és AI összefoglaló betöltése..." class="sapUiSmallMarginTop"/>
               </VBox>
 
