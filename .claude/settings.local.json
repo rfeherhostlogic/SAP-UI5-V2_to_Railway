@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(node --check \"c:/Users/rfeher/Documents/GitHub/SAP-UI5-V2_to_Railway/myChatbot/server/chat-proxy.js\")"
+    ]
+  }
+}

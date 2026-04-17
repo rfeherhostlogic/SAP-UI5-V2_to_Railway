@@ -36,7 +36,7 @@
       <NavContainer id="mainNav">
         <mvc:XMLView id="reportsView" viewName="sap.suite.ui.commons.demo.tutorial.view.Reports"/>
         <mvc:XMLView id="jokersView" viewName="sap.suite.ui.commons.demo.tutorial.view.Jokers"/>
-        <mvc:XMLView id="discoveryView" viewName="sap.suite.ui.commons.demo.tutorial.view.Discovery"/>
+        <mvc:XMLView id="discoveryView" viewName="sap.suite.ui.commons.demo.tutorial.view.MLWizard"/>
         <mvc:XMLView id="noah2View" viewName="sap.suite.ui.commons.demo.tutorial.view.Noah2"/>
         <mvc:XMLView id="jokerPromptView" viewName="sap.suite.ui.commons.demo.tutorial.view.JokerPrompt"/>
       </NavContainer>
