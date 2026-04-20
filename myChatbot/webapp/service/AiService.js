@@ -882,10 +882,16 @@
     var oFormData = new FormData();
     oFormData.append("goal", mPayload.goal || "prediction");
     oFormData.append("source_type", mPayload.source_type || "csv");
-    oFormData.append("table_name", mPayload.table_name || "");
-    if (mPayload.csv_file) {
-      oFormData.append("csv_file", mPayload.csv_file);
-    }
+    // Több tábla: JSON tömb stringként
+    oFormData.append("table_names", JSON.stringify(mPayload.table_names || []));
+    // Visszafelé-kompatibilitás (single table_name)
+    if (mPayload.table_name) { oFormData.append("table_name", mPayload.table_name); }
+    // Több CSV fájl
+    (mPayload.csv_files || []).forEach(function(oFile) {
+      oFormData.append("csv_files", oFile);
+    });
+    // Egyes fájl fallback
+    if (mPayload.csv_file) { oFormData.append("csv_files", mPayload.csv_file); }
     return fetch("/api/ml-wizard/init", {
       method: "POST",
       body: oFormData
@@ -911,6 +917,87 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_id: mPayload.session_id || "" })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  // Új: AI javaslatok oszlopnév-lista alapján (session nélkül)
+  function mlWizardStep1AiSuggestionsFromColumns(mPayload) {
+    return fetch("/api/ml-wizard/step1/ai-suggestions-from-columns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        goal: mPayload.goal || "prediction",
+        source_type: mPayload.source_type || "csv",
+        column_names: mPayload.column_names || []
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  // Új: Szabadszavas cél AI finomítása
+  function mlWizardStep1RefineGoal(mPayload) {
+    return fetch("/api/ml-wizard/step1/refine-goal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        goal_text: mPayload.goal_text || "",
+        column_names: mPayload.column_names || [],
+        source_type: mPayload.source_type || "csv"
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  // Új: Adatkapcsolás AI javaslat
+  function mlWizardStep1bAiJoin(mPayload) {
+    return fetch("/api/ml-wizard/step1b/ai-join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: mPayload.session_id || "" })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  // Új: Aggregálás AI javaslat
+  function mlWizardStep1cAiAggregation(mPayload) {
+    return fetch("/api/ml-wizard/step1c/ai-aggregation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: mPayload.session_id || "",
+        goal_text: mPayload.goal_text || ""
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
+  // Új: Vezető összefoglaló (cél-alapú) külön lekérdezés
+  function mlWizardStep4ExecutiveSummary(mPayload) {
+    return fetch("/api/ml-wizard/step4/executive-summary/" + encodeURIComponent(String(mPayload.session_id || "")), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal_text: mPayload.goal_text || "" })
     }).then(function(oResponse) {
       if (!oResponse.ok) {
         return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
@@ -1103,6 +1190,11 @@
     mlWizardInit: mlWizardInit,
     mlWizardGetDbTables: mlWizardGetDbTables,
     mlWizardStep1AiSuggestions: mlWizardStep1AiSuggestions,
+    mlWizardStep1AiSuggestionsFromColumns: mlWizardStep1AiSuggestionsFromColumns,
+    mlWizardStep1RefineGoal: mlWizardStep1RefineGoal,
+    mlWizardStep1bAiJoin: mlWizardStep1bAiJoin,
+    mlWizardStep1cAiAggregation: mlWizardStep1cAiAggregation,
+    mlWizardStep4ExecutiveSummary: mlWizardStep4ExecutiveSummary,
     mlWizardStep2Profile: mlWizardStep2Profile,
     mlWizardGetJobStatus: mlWizardGetJobStatus,
     mlWizardStep2ProfileResult: mlWizardStep2ProfileResult,

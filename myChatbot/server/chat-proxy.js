@@ -124,8 +124,8 @@ const oDummy14Upload = multer({
 const oMLWizardUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024,
-    files: 1
+    fileSize: 50 * 1024 * 1024,
+    files: 5
   }
 });
 
@@ -8383,7 +8383,7 @@ async function mlWizardAiStep1(session) {
         source_type: session.source_type,
         row_count_estimate: session.row_count_estimate || 0,
         column_names: columns,
-        instruction: "Javasolj 2-3 üzleti ML célkitűzést és 2-3 korai jellemzőötletet. Válasz JSON: { goal_suggestions: [string], early_feature_hints: [{name, rationale}] }"
+        instruction: "Javasolj 3-5 üzleti ML célkitűzést és 2-3 korai jellemzőötletet. Döntsd el, szükséges-e aggregálás az adatokon a célkitűzés eléréséhez. Válasz JSON: { goal_suggestions: [{text: string, rationale: string}], early_feature_hints: [{name, rationale}], aggregation_recommendation: 'Ajánlott'|'Nem szükséges'|'Bizonytalan', aggregation_reason: string }"
       })
     }
   ];
@@ -8391,10 +8391,12 @@ async function mlWizardAiStep1(session) {
     const result = await callOpenAiJsonObject(messages, 0.3);
     return {
       goal_suggestions: Array.isArray(result.goal_suggestions) ? result.goal_suggestions : [],
-      early_feature_hints: Array.isArray(result.early_feature_hints) ? result.early_feature_hints : []
+      early_feature_hints: Array.isArray(result.early_feature_hints) ? result.early_feature_hints : [],
+      aggregation_recommendation: String(result.aggregation_recommendation || "Bizonytalan"),
+      aggregation_reason: String(result.aggregation_reason || "")
     };
   } catch (_err) {
-    return { goal_suggestions: [], early_feature_hints: [] };
+    return { goal_suggestions: [], early_feature_hints: [], aggregation_recommendation: "Bizonytalan", aggregation_reason: "" };
   }
 }
 
@@ -8474,21 +8476,21 @@ async function mlWizardAiStep4(session, metrics) {
         accuracy: metrics.accuracy,
         top_features: fi,
         label_distribution: dist,
-        instruction: "Generálj üzleti összefoglalót. Válasz JSON: { executive_summary: string, insights: [string], recommendations: [string], risks: [string], confidence_level: 'low'|'medium'|'high' }"
+        instruction: "Generálj modellértékelő összefoglalót technikai szempontból. A 'model_evaluation' mező legyen tömör modell-értékelés (pontosság, fontosabb jellemzők). Válasz JSON: { model_evaluation: string, insights: [string], recommendations: [string], risks: [string], confidence_level: 'low'|'medium'|'high' }"
       })
     }
   ];
   try {
     const result = await callOpenAiJsonObject(messages, 0.3);
     return {
-      executive_summary: String(result.executive_summary || ""),
+      model_evaluation: String(result.model_evaluation || result.executive_summary || ""),
       insights: Array.isArray(result.insights) ? result.insights : [],
       recommendations: Array.isArray(result.recommendations) ? result.recommendations : [],
       risks: Array.isArray(result.risks) ? result.risks : [],
       confidence_level: String(result.confidence_level || "medium")
     };
   } catch (_err) {
-    return { executive_summary: "", insights: [], recommendations: [], risks: [], confidence_level: "medium" };
+    return { model_evaluation: "", insights: [], recommendations: [], risks: [], confidence_level: "medium" };
   }
 }
 
@@ -8561,47 +8563,72 @@ function getTableColumns(tableName) {
 }
 
 // ─── ROUTE: POST /api/ml-wizard/init ─────────────────────────────────────────
-app.post("/api/ml-wizard/init", oMLWizardUpload.single("csv_file"), async function(req, res) {
+// Támogat több CSV fájlt (csv_files[]) és több DB táblát (table_names JSON array)
+app.post("/api/ml-wizard/init", oMLWizardUpload.array("csv_files", 5), async function(req, res) {
   try {
     const goal = String(req.body && req.body.goal ? req.body.goal : "prediction").trim();
     const source_type = String(req.body && req.body.source_type ? req.body.source_type : "csv").trim();
-    const table_name = String(req.body && req.body.table_name ? req.body.table_name : "").trim();
+
+    // Több tábla
+    let tableNames = [];
+    try {
+      tableNames = JSON.parse(req.body && req.body.table_names ? req.body.table_names : "[]");
+    } catch (_e) { tableNames = []; }
+    // Visszafelé kompatibilis single table_name
+    const singleTableName = String(req.body && req.body.table_name ? req.body.table_name : "").trim();
+    if (singleTableName && tableNames.indexOf(singleTableName) < 0) {
+      tableNames.push(singleTableName);
+    }
 
     const sessionId = mlWizardSessionId();
     const jobDir = path.join(DISCOVERY_JOBS_DIR, sessionId);
     ensureDirectory(jobDir);
 
-    let columns = [];
+    let columns = [];       // {source, name, dtype_hint}
     let row_count_estimate = 0;
-    let csv_tmp_path = "";
+    let csv_tmp_paths = []; // [{name, path}]
 
-    if (source_type === "csv" && req.file) {
-      const csvContent = req.file.buffer.toString("utf-8");
-      csv_tmp_path = path.join(jobDir, "input.csv");
-      fs.writeFileSync(csv_tmp_path, csvContent, "utf8");
+    if (source_type === "csv" && req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const csvContent = file.buffer.toString("utf-8");
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const tmpPath = path.join(jobDir, safeName);
+        fs.writeFileSync(tmpPath, csvContent, "utf8");
+        csv_tmp_paths.push({ name: file.originalname, path: tmpPath });
 
-      // Quick column scan
-      const lines = csvContent.split(/\r?\n/).filter(function(l) { return l.trim(); });
-      row_count_estimate = Math.max(0, lines.length - 1);
-      if (lines.length > 0) {
-        const headers = lines[0].split(",").map(function(h) { return h.replace(/^"|"$/g, "").trim(); });
-        columns = headers.map(function(h) { return { name: h, dtype_hint: "unknown" }; });
+        const lines = csvContent.split(/\r?\n/).filter(function(l) { return l.trim(); });
+        row_count_estimate += Math.max(0, lines.length - 1);
+        if (lines.length > 0) {
+          const headers = lines[0].split(",").map(function(h) { return h.replace(/^"|"$/g, "").trim(); });
+          headers.forEach(function(h) {
+            columns.push({ source: file.originalname, name: h, dtype_hint: "unknown" });
+          });
+        }
       }
-    } else if (source_type === "db_table" && table_name) {
-      try {
-        columns = await getTableColumns(table_name);
-        row_count_estimate = 500;
-      } catch (_e) {
-        columns = [];
+    } else if (source_type === "db_table" && tableNames.length > 0) {
+      for (const tName of tableNames) {
+        try {
+          const tCols = await getTableColumns(tName);
+          tCols.forEach(function(c) {
+            columns.push({ source: tName, name: c.name, dtype_hint: c.dtype_hint || "unknown" });
+          });
+          row_count_estimate += 500;
+        } catch (_e) { /* ignore */ }
       }
     }
+
+    // Elsődleges CSV path (első fájl) – visszafelé-kompatibilitás a Python runner számára
+    const csv_tmp_path = csv_tmp_paths.length > 0 ? csv_tmp_paths[0].path : "";
+    const table_name = tableNames.length > 0 ? tableNames[0] : "";
 
     const session = {
       id: sessionId,
       goal: goal,
       source_type: source_type,
       csv_tmp_path: csv_tmp_path,
+      csv_tmp_paths: csv_tmp_paths,
       table_name: table_name,
+      table_names: tableNames,
       columns: columns,
       row_count_estimate: row_count_estimate,
       profile_job_id: "",
@@ -8621,6 +8648,7 @@ app.post("/api/ml-wizard/init", oMLWizardUpload.single("csv_file"), async functi
         step2: null,
         step3: null,
         step4: null,
+        step4_exec: null,
         step5: null
       },
       createdAt: Date.now()
@@ -8660,6 +8688,207 @@ app.post("/api/ml-wizard/step1/ai-suggestions", express.json(), async function(r
     res.json(session.ai_cache.step1);
   } catch (err) {
     res.status(500).json({ error: "AI javaslat hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+// ─── ROUTE: POST /api/ml-wizard/step1/ai-suggestions-from-columns ────────────
+app.post("/api/ml-wizard/step1/ai-suggestions-from-columns", express.json(), async function(req, res) {
+  try {
+    const body = req.body || {};
+    const goal = String(body.goal || "");
+    const source_type = String(body.source_type || "csv");
+    const column_names = Array.isArray(body.column_names) ? body.column_names : [];
+    const colStr = column_names.join(", ");
+
+    const messages = [
+      {
+        role: "system",
+        content: "Te egy üzleti-szemléletű ML tanácsadó vagy. Rövid, üzleti nyelvű JSON-t adsz vissza. Ne használj ML-zsargont."
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          goal: goal || "(nincs megadva)",
+          source_type: source_type,
+          column_names: colStr,
+          instruction: "Az oszlopnevek alapján javasolj 3-5 üzleti ML célkitűzést. Döntsd el, szükséges-e aggregálás. Válasz JSON: { goal_suggestions: [{text: string, rationale: string}], suggested_goal: string, aggregation_recommendation: 'Ajánlott'|'Nem szükséges'|'Bizonytalan', aggregation_reason: string }"
+        })
+      }
+    ];
+
+    const result = await callOpenAiJsonObject(messages, 0.4);
+    res.json({
+      goal_suggestions: Array.isArray(result.goal_suggestions) ? result.goal_suggestions : [],
+      suggested_goal: String(result.suggested_goal || ""),
+      aggregation_recommendation: String(result.aggregation_recommendation || "Bizonytalan"),
+      aggregation_reason: String(result.aggregation_reason || "")
+    });
+  } catch (err) {
+    res.status(500).json({ error: "AI javaslat hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+// ─── ROUTE: POST /api/ml-wizard/step1/refine-goal ────────────────────────────
+app.post("/api/ml-wizard/step1/refine-goal", express.json(), async function(req, res) {
+  try {
+    const body = req.body || {};
+    const goal_text = String(body.goal_text || "");
+    const source_type = String(body.source_type || "csv");
+    const column_names = Array.isArray(body.column_names) ? body.column_names : [];
+    const colStr = column_names.join(", ");
+
+    if (!goal_text) { return res.status(400).json({ error: "goal_text kötelező." }); }
+
+    const messages = [
+      {
+        role: "system",
+        content: "ML tanácsadó vagy. A felhasználó szabad szöveges célkitűzését pontosítod, üzleti ML szempontból. Válasz JSON."
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          goal_text: goal_text,
+          source_type: source_type,
+          column_names: colStr,
+          instruction: "Javítsd, pontosítsd és bővítsd a megadott ML célkitűzést az oszlopok alapján. Adj 3-5 alternatív célkitűzést is. Döntsd el, szükséges-e aggregálás. Válasz JSON: { refined_goal: string, goal_suggestions: [{text: string, rationale: string}], aggregation_recommendation: 'Ajánlott'|'Nem szükséges'|'Bizonytalan', aggregation_reason: string }"
+        })
+      }
+    ];
+
+    const result = await callOpenAiJsonObject(messages, 0.4);
+    res.json({
+      refined_goal: String(result.refined_goal || ""),
+      goal_suggestions: Array.isArray(result.goal_suggestions) ? result.goal_suggestions : [],
+      aggregation_recommendation: String(result.aggregation_recommendation || "Bizonytalan"),
+      aggregation_reason: String(result.aggregation_reason || "")
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Célkitűzés finomítási hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+// ─── ROUTE: POST /api/ml-wizard/step1b/ai-join ───────────────────────────────
+app.post("/api/ml-wizard/step1b/ai-join", express.json(), async function(req, res) {
+  try {
+    const body = req.body || {};
+    const sessionId = String(body.session_id || "");
+    const session = oMLWizardSessions.get(sessionId);
+    if (!session) { return res.status(404).json({ error: "Munkamenet nem található." }); }
+
+    const sources = (session.csv_tmp_paths || []).map(function(p) { return path.basename(p); });
+    const tables = (session.table_names || []);
+    const allSources = sources.concat(tables);
+    const columns = (session.columns || []).map(function(c) { return (c.source || "") + "." + c.name; }).join(", ");
+
+    const messages = [
+      {
+        role: "system",
+        content: "Adatintegrációs szakértő vagy. Segítesz azonosítani, hogyan kapcsolhatók össze az adatforrások. Válasz JSON."
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          goal: session.goal,
+          sources: allSources,
+          columns: columns,
+          instruction: "Javasolj egy adatkapcsolási tervet: melyik legyen a fő forrás, milyen kulcs alapján kapcsolhatók össze a többi forrással, milyen join típust javasolsz. Válasz JSON: { main_source: string, join_mappings: [{left_key: string, right_source: string, right_key: string, join_type: 'inner'|'left'|'right'|'full'}], explanation: string }"
+        })
+      }
+    ];
+
+    const result = await callOpenAiJsonObject(messages, 0.3);
+    res.json({
+      main_source: String(result.main_source || (allSources[0] || "")),
+      join_mappings: Array.isArray(result.join_mappings) ? result.join_mappings : [],
+      explanation: String(result.explanation || "")
+    });
+  } catch (err) {
+    res.status(500).json({ error: "AI join javaslat hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+// ─── ROUTE: POST /api/ml-wizard/step1c/ai-aggregation ────────────────────────
+app.post("/api/ml-wizard/step1c/ai-aggregation", express.json(), async function(req, res) {
+  try {
+    const body = req.body || {};
+    const sessionId = String(body.session_id || "");
+    const goal_text = String(body.goal_text || "");
+    const session = oMLWizardSessions.get(sessionId);
+    if (!session) { return res.status(404).json({ error: "Munkamenet nem található." }); }
+
+    const colNames = (session.columns || []).map(function(c) { return c.name; });
+    const dateColCandidates = colNames.filter(function(n) {
+      return /date|datum|time|ido|created|modified|year|ev|month|honap/i.test(n);
+    });
+
+    const messages = [
+      {
+        role: "system",
+        content: "Adatelemzési szakértő vagy. Aggregálási javaslatot adsz üzleti célokhoz. Válasz JSON, nem technikai."
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          goal: goal_text || session.goal,
+          column_names: colNames,
+          date_column_candidates: dateColCandidates,
+          instruction: "Javasolj aggregálási beállításokat a célkitűzéshez. Válasz JSON: { analysis_unit: string, group_by_keys: [string], date_column: string, time_level: 'daily'|'weekly'|'monthly'|'quarterly'|'yearly', time_period: 'last_30d'|'last_90d'|'last_year'|'last_3y'|'all', explanation: string }"
+        })
+      }
+    ];
+
+    const result = await callOpenAiJsonObject(messages, 0.3);
+    res.json({
+      analysis_unit: String(result.analysis_unit || ""),
+      group_by_keys: Array.isArray(result.group_by_keys) ? result.group_by_keys : [],
+      date_column: String(result.date_column || (dateColCandidates[0] || "")),
+      time_level: String(result.time_level || "monthly"),
+      time_period: String(result.time_period || "all"),
+      explanation: String(result.explanation || "")
+    });
+  } catch (err) {
+    res.status(500).json({ error: "AI aggregálás javaslat hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+// ─── ROUTE: POST /api/ml-wizard/step4/executive-summary/:sessionId ────────────
+app.post("/api/ml-wizard/step4/executive-summary/:sessionId", express.json(), async function(req, res) {
+  try {
+    const sessionId = String(req.params && req.params.sessionId ? req.params.sessionId : "").trim();
+    const session = oMLWizardSessions.get(sessionId);
+    if (!session) { return res.status(404).json({ error: "Munkamenet nem található." }); }
+
+    const goal_text = String(req.body && req.body.goal_text ? req.body.goal_text : session.goal || "");
+
+    const jobDir = path.join(DISCOVERY_JOBS_DIR, sessionId);
+    const metricsPath = path.join(jobDir, "metrics.json");
+    let metrics = {};
+    if (fs.existsSync(metricsPath)) {
+      try { metrics = JSON.parse(fs.readFileSync(metricsPath, "utf8")); } catch (_e) { metrics = {}; }
+    }
+
+    const messages = [
+      {
+        role: "system",
+        content: "Vezető tanácsadó vagy. Üzleti döntéshozóknak készítesz tömör, akcióképes összefoglalót az ML elemzés eredményéről. Kerüld a technikai részleteket. Válasz JSON."
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          goal: goal_text,
+          accuracy: metrics.accuracy,
+          row_count: metrics.row_count,
+          target_column: metrics.target_column,
+          label_distribution: metrics.label_distribution,
+          instruction: "Írj 2-4 mondatos vezető összefoglalót üzleti döntéshozóknak. Fókuszálj arra, mit jelent ez az üzlet számára. Válasz JSON: { executive_summary: string }"
+        })
+      }
+    ];
+
+    const result = await callOpenAiJsonObject(messages, 0.4);
+    res.json({ executive_summary: String(result.executive_summary || "") });
+  } catch (err) {
+    res.status(500).json({ error: "Vezető összefoglaló hiba", details: err && err.message ? err.message : String(err) });
   }
 });
 
@@ -8790,11 +9019,18 @@ app.get("/api/ml-wizard/step4/result/:sessionId", async function(req, res) {
       session.ai_cache.step4 = await mlWizardAiStep4(session, metrics);
     }
 
+    const ai4 = session.ai_cache.step4;
     res.json({
-      preview_rows: Array.isArray(previewRows) ? previewRows.slice(0, 50) : [],
+      preview_rows: Array.isArray(previewRows) ? previewRows.slice(0, 20) : [],
       metrics: metrics,
       feature_importance: metrics.feature_importance || [],
-      ai_insight: session.ai_cache.step4,
+      ai_insight: {
+        model_evaluation: ai4.model_evaluation || "",
+        insights: ai4.insights || [],
+        recommendations: ai4.recommendations || [],
+        risks: ai4.risks || [],
+        confidence_level: ai4.confidence_level || "medium"
+      },
       csv_download_url: "/api/ml-wizard/result/" + encodeURIComponent(sessionId) + "/download.csv"
     });
   } catch (err) {

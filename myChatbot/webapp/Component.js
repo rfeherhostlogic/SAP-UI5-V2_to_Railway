@@ -447,18 +447,46 @@ sap.ui.define([
 				wizardError: "",
 				sessionId: "",
 				// Step 1
+				step1GoalMode: "ai_suggested",
 				step1Goal: "prediction",
 				step1GoalHint: "Folyamatos értéket (pl. bevétel, mennyiség) jósolj meg.",
+				step1FreeTextGoal: "",
+				step1FreeTextRefined: "",
+				step1FreeTextBusy: false,
 				step1SourceType: "csv",
-				step1SelectedTable: "",
+				step1SelectedTables: [],
 				step1AvailableTables: [],
-				step1CsvFileName: "",
+				step1CsvFiles: [],
 				step1ColumnPreview: [],
-				step1RowCountEstimate: 0,
 				step1AiGoalSuggestions: [],
 				step1EarlyFeatureHints: [],
+				step1SelectedGoalText: "",
+				step1AggregationRecommendation: "",
 				step1AiBusy: false,
 				step1Busy: false,
+				showStepJoin: false,
+				showStepAggr: false,
+				// Step Join (1b)
+				stepJoinSourceOptions: [],
+				stepJoinMainSource: "",
+				stepJoinMappings: [],
+				stepJoinPreviewCount: 0,
+				stepJoinPreviewError: "",
+				stepJoinBusy: false,
+				// Step Aggr (1c)
+				stepAggrUnit: "",
+				stepAggrGroupKeys: [],
+				stepAggrDateColumn: "",
+				stepAggrTimeLevel: "monthly",
+				stepAggrTimePeriod: "all",
+				stepAggrTimePeriodFrom: "",
+				stepAggrTimePeriodTo: "",
+				stepAggrAvailableColumns: [],
+				stepAggrAvailableDateColumns: [],
+				stepAggrPreviewBefore: null,
+				stepAggrPreviewAfter: null,
+				stepAggrPreviewError: "",
+				stepAggrBusy: false,
 				// Step 2
 				step2Profile: null,
 				step2QualityIssues: [],
@@ -478,49 +506,33 @@ sap.ui.define([
 				step3TrainingMessage: "",
 				step3TrainingStatus: "IDLE",
 				step3TierOptions: [
-					{
-						key: "fast",
-						title: "Gyors",
-						description: "Azonnali eredmény, egyszerűbb modell. Kisebb adathalmazhoz vagy gyors teszteléshez.",
-						icon: "sap-icon://accelerated",
-						color: "#e78c07",
-						selected: false
-					},
-					{
-						key: "balanced",
-						title: "Kiegyensúlyozott",
-						description: "Jó arány a pontosság és a futási idő között. Legtöbb esetben ez az ajánlott.",
-						icon: "sap-icon://compare",
-						color: "#0854a0",
-						selected: true
-					},
-					{
-						key: "accurate",
-						title: "Pontos",
-						description: "Maximális pontosság, hosszabb futási idő. Nagy adathalmazhoz és kritikus döntésekhez.",
-						icon: "sap-icon://quality-issue",
-						color: "#107e3e",
-						selected: false
-					}
+					{ key: "fast",     title: "Gyors",           description: "Azonnali eredmény, egyszerűbb modell. Kisebb adathalmazhoz vagy gyors teszteléshez.", icon: "sap-icon://accelerated",  color: "#e78c07", selected: false },
+					{ key: "balanced", title: "Kiegyensúlyozott", description: "Jó arány a pontosság és a futási idő között. Legtöbb esetben ez az ajánlott.",      icon: "sap-icon://compare",      color: "#0854a0", selected: true },
+					{ key: "accurate", title: "Pontos",           description: "Maximális pontosság, hosszabb futási idő. Nagy adathalmazhoz és kritikus döntésekhez.", icon: "sap-icon://quality-issue", color: "#107e3e", selected: false }
 				],
 				// Step 4
 				step4PreviewRows: [],
 				step4Metrics: null,
 				step4MetricsItems: [],
 				step4FeatureImportance: [],
-				step4AiInsight: {
-					executive_summary: "",
-					insights: [],
-					recommendations: [],
-					risks: []
-				},
+				step4AiInsight: { model_evaluation: "", insights: [], recommendations: [], risks: [] },
+				step4ExecutiveSummary: "",
+				step4ExecutiveSummaryBusy: false,
+				step4PredictionDistribution: [],
 				step4CsvDownloadUrl: "",
 				step4Busy: false,
 				// Step 5
 				step5SimulationChanges: [],
 				step5SimulationResult: null,
 				step5AiSimulationContext: "",
-				step5SimBusy: false
+				step5SimBusy: false,
+				step5ScheduleEnabled: false,
+				step5ScheduleId: 0,
+				step5ScheduleFrequency: "immediate",
+				step5ScheduleWeeklyDay: 1,
+				step5ScheduleTime: "09:00",
+				step5ScheduleStatusText: "",
+				step5ScheduleError: false
 			}), "discovery");
 
 			// noah model

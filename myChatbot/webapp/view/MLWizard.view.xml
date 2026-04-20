@@ -39,7 +39,42 @@
           <WizardStep id="wizStep1" title="Cél és adatforrás" icon="sap-icon://target-group" validated="false">
             <VBox class="mlWizardStepContent">
 
-              <!-- ML Goal -->
+              <!-- Beviteli mód választó -->
+              <VBox class="mlWizardSection">
+                <Label text="Hogyan adod meg a célodat?" class="sapUiSmallMarginBottom mlWizardSectionLabel"/>
+                <SegmentedButton id="goalModeBtn" selectedKey="{discovery>/step1GoalMode}" selectionChange=".onStep1GoalModeChange">
+                  <items>
+                    <SegmentedButtonItem key="ai_suggested" text="AI javasolt"/>
+                    <SegmentedButtonItem key="free_text" text="Szabadszavas"/>
+                  </items>
+                </SegmentedButton>
+              </VBox>
+
+              <!-- Szabadszavas mód -->
+              <VBox visible="{= ${discovery>/step1GoalMode} === 'free_text' }" class="mlWizardSection">
+                <Label text="Írd le szavakkal, milyen üzleti problémát szeretnél megoldani:" class="sapUiSmallMarginBottom"/>
+                <TextArea id="freeTextGoalInput"
+                  value="{discovery>/step1FreeTextGoal}"
+                  rows="3"
+                  growing="true"
+                  maxLength="800"
+                  placeholder="Pl.: Szeretném előre jelezni, melyik ügyfelek fognak lemorzsolódni a következő 30 napban..."
+                  width="100%"/>
+                <HBox alignItems="Center" class="sapUiSmallMarginTop">
+                  <Button text="AI javított" icon="sap-icon://ai" type="Ghost"
+                    press=".onStep1RefineGoal"
+                    busy="{discovery>/step1FreeTextBusy}"
+                    enabled="{= !!${discovery>/step1FreeTextGoal} }"/>
+                </HBox>
+                <MessageStrip id="refinedGoalStrip"
+                  text="{discovery>/step1FreeTextRefined}"
+                  type="Success"
+                  showCloseButton="false"
+                  visible="{= !!${discovery>/step1FreeTextRefined} }"
+                  class="sapUiSmallMarginTop"/>
+              </VBox>
+
+              <!-- ML cél típusa -->
               <VBox class="mlWizardSection">
                 <Label text="Milyen üzleti problémát szeretnél megoldani?" class="sapUiSmallMarginBottom mlWizardSectionLabel"/>
                 <SegmentedButton id="goalSegBtn" selectedKey="{discovery>/step1Goal}" selectionChange=".onStep1GoalChange">
@@ -52,76 +87,58 @@
                 <Text id="goalHintText" text="{discovery>/step1GoalHint}" class="sapUiTinyMarginTop mlWizardHintText" visible="{= !!${discovery>/step1GoalHint} }"/>
               </VBox>
 
-              <!-- Data Source -->
+              <!-- AI Javaslatok panel -->
               <VBox class="mlWizardSection">
-                <Label text="Honnan érkeznek az adatok?" class="sapUiSmallMarginBottom mlWizardSectionLabel"/>
-                <IconTabBar id="sourceTabBar" select=".onStep1SourceTypeChange" selectedKey="{discovery>/step1SourceType}">
-                  <items>
-                    <!-- CSV Tab -->
-                    <IconTabFilter key="csv" icon="sap-icon://upload-to-cloud" text="CSV feltöltés">
-                      <VBox class="sapUiSmallMargin">
-                        <unified:FileUploader
-                          id="mlCsvUploader"
-                          fileType="csv"
-                          uploadOnChange="false"
-                          change=".onStep1CsvSelected"
-                          placeholder="Húzd ide a CSV fájlt, vagy kattints a feltöltéshez"
-                          width="100%"
-                          style="Emphasized"/>
-                        <Text text="{discovery>/step1CsvFileName}" class="sapUiTinyMarginTop" visible="{= !!${discovery>/step1CsvFileName} }"/>
-                      </VBox>
-                    </IconTabFilter>
-
-                    <!-- DB Tab -->
-                    <IconTabFilter key="db_table" icon="sap-icon://database" text="Adatbázis tábla">
-                      <VBox class="sapUiSmallMargin">
-                        <Label text="Válassz táblát:" class="sapUiTinyMarginBottom"/>
-                        <Select id="dbTableSelect"
-                          items="{discovery>/step1AvailableTables}"
-                          selectedKey="{discovery>/step1SelectedTable}"
-                          change=".onStep1TableSelected"
-                          width="100%">
-                          <core:Item xmlns:core="sap.ui.core" key="{discovery>}" text="{discovery>}"/>
-                        </Select>
-                      </VBox>
-                    </IconTabFilter>
-                  </items>
-                </IconTabBar>
-              </VBox>
-
-              <!-- Column Preview -->
-              <Panel id="columnPreviewPanel" headerText="Oszlopok előnézete" expandable="true" expanded="false"
-                visible="{= ${discovery>/step1ColumnPreview}.length > 0 }" class="mlWizardSection">
-                <Table id="columnPreviewTable" items="{discovery>/step1ColumnPreview}" fixedLayout="false">
-                  <columns>
-                    <Column><Text text="Oszlop neve"/></Column>
-                    <Column><Text text="Típus"/></Column>
-                  </columns>
-                  <items>
-                    <ColumnListItem>
-                      <cells>
-                        <Text text="{discovery>name}"/>
-                        <ObjectStatus text="{discovery>dtype_hint}" state="Information"/>
-                      </cells>
-                    </ColumnListItem>
-                  </items>
-                </Table>
-                <Text text="{= ${discovery>/step1RowCountEstimate} + ' sor'}" class="sapUiTinyMarginTop sapUiTinyMarginBegin"/>
-              </Panel>
-
-              <!-- AI Suggestions -->
-              <VBox class="mlWizardSection">
-                <HBox alignItems="Center">
-                  <Button text="AI javaslatok betöltése" icon="sap-icon://ai" type="Ghost"
-                    press=".onStep1LoadAiSuggestions" busy="{discovery>/step1AiBusy}"
-                    enabled="{= !!${discovery>/sessionId} }"/>
+                <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                  <Button id="loadAiSuggestionsBtn"
+                    text="AI javaslatok betöltése"
+                    icon="sap-icon://ai"
+                    type="Ghost"
+                    press=".onStep1LoadAiSuggestions"
+                    busy="{discovery>/step1AiBusy}"
+                    visible="{= ${discovery>/step1GoalMode} === 'ai_suggested' }"
+                    enabled="{= ${discovery>/step1SourceType} === 'csv' ? ${discovery>/step1CsvFiles}.length > 0 : ${discovery>/step1SelectedTables}.length > 0 }"/>
                 </HBox>
-                <VBox visible="{= ${discovery>/step1AiGoalSuggestions}.length > 0 }" class="sapUiTinyMarginTop">
-                  <Label text="Javasolt ML célkitűzések:" class="sapUiTinyMarginBottom"/>
-                  <List items="{discovery>/step1AiGoalSuggestions}" noDataText="Nincs javaslat">
-                    <StandardListItem title="{discovery>}" icon="sap-icon://hint"/>
+
+                <!-- Aggregálás ajánlás badge -->
+                <MessageStrip id="aggrRecommendationStrip"
+                  text="{= ${discovery>/step1AggregationRecommendation} === 'recommended' ? 'Az AI aggregálást javasol – az Aggregálás lépés kötelező lesz.' : ${discovery>/step1AggregationRecommendation} === 'uncertain' ? 'Az AI bizonytalan az aggregálás szükségességéről – az Aggregálás lépés kötelező lesz.' : 'Az AI szerint nem szükséges aggregálás ehhez a célhoz.' }"
+                  type="{= ${discovery>/step1AggregationRecommendation} === 'recommended' || ${discovery>/step1AggregationRecommendation} === 'uncertain' ? 'Warning' : 'Success' }"
+                  showCloseButton="false"
+                  visible="{= !!${discovery>/step1AggregationRecommendation} }"
+                  class="sapUiSmallMarginBottom"/>
+
+                <!-- Javasolt ML célkitűzések (kiválasztható lista) -->
+                <VBox visible="{= ${discovery>/step1AiGoalSuggestions}.length > 0 }">
+                  <Label text="Javasolt ML célkitűzések (kattints a kiválasztáshoz):" class="sapUiSmallMarginBottom mlWizardSectionLabel"/>
+                  <List id="goalSuggestionsList"
+                    items="{discovery>/step1AiGoalSuggestions}"
+                    mode="SingleSelectMaster"
+                    selectionChange=".onStep1GoalSuggestionSelect"
+                    noDataText="Nincs javaslat">
+                    <CustomListItem selected="{discovery>selected}">
+                      <HBox class="sapUiSmallMarginBegin sapUiSmallMarginTopBottom" alignItems="Center" wrap="Wrap">
+                        <core:Icon
+                          src="{= ${discovery>selected} ? 'sap-icon://accept' : 'sap-icon://hint' }"
+                          color="{= ${discovery>selected} ? '#107e3e' : '#5a7184' }"
+                          size="1.2rem"
+                          class="sapUiSmallMarginEnd"/>
+                        <VBox class="mlWizardFeatureInfo">
+                          <Text text="{discovery>text}" wrapping="true" class="{= ${discovery>selected} ? 'mlWizardBold' : '' }"/>
+                          <Text text="{discovery>rationale}" wrapping="true" class="mlWizardHintText sapUiTinyMarginTop" visible="{= !!${discovery>rationale} }"/>
+                        </VBox>
+                      </HBox>
+                    </CustomListItem>
                   </List>
+                  <MessageStrip id="selectedGoalStrip"
+                    text="{= 'Kiválasztott cél: ' + ${discovery>/step1SelectedGoalText} }"
+                    type="Success"
+                    showCloseButton="false"
+                    visible="{= !!${discovery>/step1SelectedGoalText} }"
+                    class="sapUiSmallMarginTop"/>
                 </VBox>
+
+                <!-- Korai jellemző ötletek -->
                 <VBox visible="{= ${discovery>/step1EarlyFeatureHints}.length > 0 }" class="sapUiTinyMarginTop">
                   <Label text="Korai jellemző ötletek:" class="sapUiTinyMarginBottom"/>
                   <List items="{discovery>/step1EarlyFeatureHints}" noDataText="Nincs adat">
@@ -138,14 +155,269 @@
                 </VBox>
               </VBox>
 
+              <!-- Adatforrás kiválasztás -->
+              <VBox class="mlWizardSection">
+                <Label text="Honnan érkeznek az adatok?" class="sapUiSmallMarginBottom mlWizardSectionLabel"/>
+                <IconTabBar id="sourceTabBar" select=".onStep1SourceTypeChange" selectedKey="{discovery>/step1SourceType}">
+                  <items>
+                    <!-- CSV Tab -->
+                    <IconTabFilter key="csv" icon="sap-icon://upload-to-cloud" text="CSV feltöltés">
+                      <VBox class="sapUiSmallMargin">
+                        <unified:FileUploader
+                          id="mlCsvUploader"
+                          fileType="csv"
+                          uploadOnChange="false"
+                          multiple="true"
+                          change=".onStep1CsvSelected"
+                          placeholder="Válassz egy vagy több CSV fájlt"
+                          width="100%"
+                          style="Emphasized"/>
+                        <!-- Selected files list -->
+                        <List id="selectedFilesList"
+                          items="{discovery>/step1CsvFiles}"
+                          noDataText=""
+                          visible="{= ${discovery>/step1CsvFiles}.length > 0 }"
+                          class="sapUiTinyMarginTop">
+                          <CustomListItem>
+                            <HBox class="sapUiSmallMarginBegin sapUiTinyMarginTopBottom" alignItems="Center">
+                              <core:Icon src="sap-icon://document" class="sapUiTinyMarginEnd" color="#0854a0"/>
+                              <Text text="{discovery>name}" class="mlWizardBold sapUiSmallMarginEnd"/>
+                              <Text text="{= ${discovery>rowCount} + ' sor'}" class="mlWizardHintText"/>
+                            </HBox>
+                          </CustomListItem>
+                        </List>
+                      </VBox>
+                    </IconTabFilter>
+
+                    <!-- DB Tab -->
+                    <IconTabFilter key="db_table" icon="sap-icon://database" text="Adatbázis táblák">
+                      <VBox class="sapUiSmallMargin">
+                        <Label text="Válassz táblát vagy táblákat:" class="sapUiTinyMarginBottom"/>
+                        <MultiComboBox id="dbTablesMulti"
+                          items="{discovery>/step1AvailableTables}"
+                          selectionChange=".onStep1TablesSelected"
+                          placeholder="Válassz egy vagy több táblát"
+                          width="100%">
+                          <core:Item key="{discovery>}" text="{discovery>}"/>
+                        </MultiComboBox>
+                      </VBox>
+                    </IconTabFilter>
+                  </items>
+                </IconTabBar>
+              </VBox>
+
+              <!-- Oszlop előnézet -->
+              <Panel id="columnPreviewPanel" headerText="Oszlopok előnézete" expandable="true" expanded="false"
+                visible="{= ${discovery>/step1ColumnPreview}.length > 0 }" class="mlWizardSection">
+                <Table id="columnPreviewTable" items="{discovery>/step1ColumnPreview}" fixedLayout="false">
+                  <columns>
+                    <Column><Text text="Forrás"/></Column>
+                    <Column><Text text="Oszlop neve"/></Column>
+                    <Column><Text text="Típus"/></Column>
+                  </columns>
+                  <items>
+                    <ColumnListItem>
+                      <cells>
+                        <Text text="{discovery>source}"/>
+                        <Text text="{discovery>name}"/>
+                        <ObjectStatus text="{discovery>dtype_hint}" state="Information"/>
+                      </cells>
+                    </ColumnListItem>
+                  </items>
+                </Table>
+              </Panel>
+
               <!-- Step 1 Next Button -->
               <HBox justifyContent="End" class="sapUiSmallMarginTop">
-                <Button id="step1NextBtn" text="Tovább: Adatellenőrzés"
+                <Button id="step1NextBtn" text="Tovább"
                   type="Emphasized" icon="sap-icon://arrow-right"
                   iconFirst="false"
                   press=".onStep1Next"
                   busy="{discovery>/step1Busy}"
-                  enabled="{= !!${discovery>/step1Goal} }"/>
+                  enabled="{= !!${discovery>/step1Goal} &amp;&amp; (${discovery>/step1SourceType} === 'csv' ? ${discovery>/step1CsvFiles}.length > 0 : ${discovery>/step1SelectedTables}.length > 0) }"/>
+              </HBox>
+            </VBox>
+          </WizardStep>
+
+          <!-- ───────────────────────────────────────────────────────────
+               STEP 1b – ADATKAPCSOLÁS (feltételes, többforrás esetén)
+          ─────────────────────────────────────────────────────────────── -->
+          <WizardStep id="wizStepJoin" title="Adatkapcsolás" icon="sap-icon://connected" validated="false">
+            <VBox class="mlWizardStepContent">
+
+              <MessageStrip text="Több adatforrást választottál. Határozd meg, hogyan kapcsolódjanak össze az adatok." type="Information" showCloseButton="false" class="mlWizardSection"/>
+
+              <!-- Fő adatforrás -->
+              <Panel headerText="Fő adatforrás" class="mlWizardSection" expandable="true" expanded="true">
+                <VBox class="sapUiSmallMargin">
+                  <Label text="Melyik a fő adatforrás?" class="sapUiSmallMarginBottom"/>
+                  <Select id="joinMainSourceSelect"
+                    items="{discovery>/stepJoinSourceOptions}"
+                    selectedKey="{discovery>/stepJoinMainSource}"
+                    width="100%">
+                    <core:Item key="{discovery>}" text="{discovery>}"/>
+                  </Select>
+                </VBox>
+              </Panel>
+
+              <!-- Join leképezések -->
+              <Panel headerText="Join kulcsok párosítása" class="mlWizardSection" expandable="true" expanded="true">
+                <VBox class="sapUiSmallMargin">
+                  <Text text="Határozd meg, mely oszlopok kötik össze az adatforrásokat (pl. sales.CustomerId = customers.CustomerId)." wrapping="true" class="mlWizardHintText sapUiSmallMarginBottom"/>
+                  <Table id="joinMappingsTable" items="{discovery>/stepJoinMappings}" fixedLayout="false" noDataText="Nincs join leképezés.">
+                    <columns>
+                      <Column><Text text="Bal forrás → Oszlop"/></Column>
+                      <Column><Text text="Join típus"/></Column>
+                      <Column><Text text="Jobb forrás → Oszlop"/></Column>
+                      <Column width="3rem"><Text text=""/></Column>
+                    </columns>
+                    <items>
+                      <ColumnListItem>
+                        <cells>
+                          <Input value="{discovery>left_col}" placeholder="forrás.oszlop"/>
+                          <Select selectedKey="{discovery>join_type}" width="9rem">
+                            <items>
+                              <core:Item key="left" text="LEFT JOIN"/>
+                              <core:Item key="inner" text="INNER JOIN"/>
+                              <core:Item key="right" text="RIGHT JOIN"/>
+                            </items>
+                          </Select>
+                          <Input value="{discovery>right_col}" placeholder="forrás.oszlop"/>
+                          <Button icon="sap-icon://delete" type="Transparent" press=".onRemoveJoinRow"/>
+                        </cells>
+                      </ColumnListItem>
+                    </items>
+                  </Table>
+                  <HBox class="sapUiSmallMarginTop" wrap="Wrap">
+                    <Button text="Sor hozzáadása" icon="sap-icon://add" type="Ghost" press=".onAddJoinRow" class="sapUiSmallMarginEnd"/>
+                    <Button text="AI javaslat" icon="sap-icon://ai" type="Ghost" press=".onLoadJoinAiSuggestion" busy="{discovery>/stepJoinBusy}"/>
+                  </HBox>
+                </VBox>
+              </Panel>
+
+              <!-- Join validáció -->
+              <MessageStrip id="joinErrorStrip" text="{discovery>/stepJoinPreviewError}" type="Error"
+                visible="{= !!${discovery>/stepJoinPreviewError} }" showCloseButton="false" class="mlWizardSection"/>
+
+              <!-- Navigation -->
+              <HBox justifyContent="SpaceBetween" class="sapUiSmallMarginTop">
+                <Button text="Vissza" icon="sap-icon://nav-back" press=".onWizardBack"/>
+                <Button text="Tovább" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false"
+                  press=".onStepJoinNext"/>
+              </HBox>
+            </VBox>
+          </WizardStep>
+
+          <!-- ───────────────────────────────────────────────────────────
+               STEP 1c – AGGREGÁLÁS (feltételes, AI ajánlja)
+          ─────────────────────────────────────────────────────────────── -->
+          <WizardStep id="wizStepAggr" title="Aggregálás" icon="sap-icon://group-2" validated="false">
+            <VBox class="mlWizardStepContent">
+
+              <!-- Magyarázat -->
+              <Panel headerText="Mi ez és miért szükséges?" class="mlWizardSection" expandable="true" expanded="true">
+                <VBox class="sapUiSmallMargin">
+                  <Text text="Az aggregálás összevon több sort egy közös egységbe (pl. összes rendelés ügyfelenként), hogy a gépi tanulási modell értelmesebb összefüggéseket ismerjen fel." wrapping="true" class="sapUiSmallMarginBottom"/>
+                  <Text text="Például ügyfél-lemorzsolódásnál az adatokat ügyfelenként kell összefoglalni: hány rendelés volt, mikor volt az utolsó, mennyi az átlagos kosárérték." wrapping="true" class="mlWizardHintText"/>
+                </VBox>
+              </Panel>
+
+              <!-- AI előtöltés -->
+              <HBox class="mlWizardSection">
+                <Button text="AI javaslat betöltése" icon="sap-icon://ai" type="Ghost"
+                  press=".onLoadAggrAiSuggestion"
+                  busy="{discovery>/stepAggrBusy}"/>
+              </HBox>
+
+              <!-- 1. Elemzési egység -->
+              <Panel headerText="1. Elemzési egység" class="mlWizardSection" expandable="true" expanded="true">
+                <VBox class="sapUiSmallMargin">
+                  <Text text="Mi legyen az elemzés alapegysége? (pl. ügyfél, termék, rendelés, projekt)" wrapping="true" class="mlWizardHintText sapUiSmallMarginBottom"/>
+                  <Input id="aggrUnitInput" value="{discovery>/stepAggrUnit}" placeholder="pl. ügyfél, termék, projekt..." width="100%"/>
+                </VBox>
+              </Panel>
+
+              <!-- 2. Group by kulcsok -->
+              <Panel headerText="2. Csoportosítási kulcsok (Group by)" class="mlWizardSection" expandable="true" expanded="true">
+                <VBox class="sapUiSmallMargin">
+                  <Text text="Melyik oszlopok azonosítják az elemzési egységet? (pl. CustomerId, ProductId)" wrapping="true" class="mlWizardHintText sapUiSmallMarginBottom"/>
+                  <MultiComboBox id="aggrGroupKeysMulti"
+                    items="{discovery>/stepAggrAvailableColumns}"
+                    selectionChange=".onAggrGroupKeysChange"
+                    placeholder="Válassz csoportosítási oszlopot(okat)"
+                    width="100%">
+                    <core:Item key="{discovery>key}" text="{discovery>text}"/>
+                  </MultiComboBox>
+                </VBox>
+              </Panel>
+
+              <!-- 3. Időkezelés -->
+              <Panel headerText="3. Időkezelés" class="mlWizardSection" expandable="true" expanded="true">
+                <VBox class="sapUiSmallMargin">
+                  <Label text="Melyik dátummezőt használjuk?" class="sapUiSmallMarginBottom"/>
+                  <Select id="aggrDateColSelect"
+                    items="{discovery>/stepAggrAvailableDateColumns}"
+                    selectedKey="{discovery>/stepAggrDateColumn}"
+                    width="100%">
+                    <core:Item key="{discovery>}" text="{discovery>}"/>
+                  </Select>
+
+                  <Label text="Milyen időszintre aggregáljunk?" class="sapUiSmallMarginTop sapUiSmallMarginBottom"/>
+                  <Select id="aggrTimeLevelSelect" selectedKey="{discovery>/stepAggrTimeLevel}" width="100%">
+                    <items>
+                      <core:Item key="daily"     text="Napi"/>
+                      <core:Item key="weekly"    text="Heti"/>
+                      <core:Item key="monthly"   text="Havi"/>
+                      <core:Item key="quarterly" text="Negyedéves"/>
+                      <core:Item key="yearly"    text="Éves"/>
+                    </items>
+                  </Select>
+
+                  <Label text="Milyen időszakból számoljunk?" class="sapUiSmallMarginTop sapUiSmallMarginBottom"/>
+                  <Select id="aggrTimePeriodSelect" selectedKey="{discovery>/stepAggrTimePeriod}" width="100%">
+                    <items>
+                      <core:Item key="all"     text="Teljes history"/>
+                      <core:Item key="last30"  text="Utolsó 30 nap"/>
+                      <core:Item key="last90"  text="Utolsó 90 nap"/>
+                      <core:Item key="last365" text="Utolsó 365 nap"/>
+                      <core:Item key="custom"  text="Egyedi időszak"/>
+                    </items>
+                  </Select>
+
+                  <HBox visible="{= ${discovery>/stepAggrTimePeriod} === 'custom' }" class="sapUiSmallMarginTop" alignItems="Center" wrap="Wrap">
+                    <Label text="Tól:" class="sapUiSmallMarginEnd"/>
+                    <DatePicker value="{discovery>/stepAggrTimePeriodFrom}" valueFormat="yyyy-MM-dd" displayFormat="yyyy. MM. dd." width="12rem" class="sapUiSmallMarginEnd"/>
+                    <Label text="Ig:" class="sapUiSmallMarginEnd"/>
+                    <DatePicker value="{discovery>/stepAggrTimePeriodTo}" valueFormat="yyyy-MM-dd" displayFormat="yyyy. MM. dd." width="12rem"/>
+                  </HBox>
+                </VBox>
+              </Panel>
+
+              <!-- 4. Előnézet -->
+              <Panel id="aggrPreviewPanel" headerText="4. Aggregálás előnézete" class="mlWizardSection"
+                visible="{= !!${discovery>/stepAggrPreviewBefore} }"
+                expandable="true" expanded="true">
+                <VBox class="sapUiSmallMargin">
+                  <HBox wrap="Wrap" alignItems="Center">
+                    <VBox class="sapUiSmallMarginEnd">
+                      <Label text="Előtte:" class="mlWizardSectionLabel"/>
+                      <Text text="{= ${discovery>/stepAggrPreviewBefore/rows} + ' sor, ' + ${discovery>/stepAggrPreviewBefore/cols} + ' oszlop'}" class="mlWizardHintText"/>
+                    </VBox>
+                    <core:Icon src="sap-icon://arrow-right" size="1.5rem" color="#5a7184" class="sapUiSmallMarginEnd sapUiSmallMarginTop"/>
+                    <VBox>
+                      <Label text="Utána (becslés):" class="mlWizardSectionLabel"/>
+                      <Text text="{= ${discovery>/stepAggrPreviewAfter/rows} + ' sor, ' + ${discovery>/stepAggrPreviewAfter/cols} + ' oszlop'}" class="mlWizardHintText"/>
+                    </VBox>
+                  </HBox>
+                </VBox>
+              </Panel>
+
+              <!-- Navigation -->
+              <HBox justifyContent="SpaceBetween" class="sapUiSmallMarginTop">
+                <Button text="Vissza" icon="sap-icon://nav-back" press=".onWizardBack"/>
+                <Button text="Tovább: Adatellenőrzés" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false"
+                  press=".onStepAggrNext"
+                  enabled="{= !!${discovery>/stepAggrUnit} &amp;&amp; ${discovery>/stepAggrGroupKeys}.length > 0 }"/>
               </HBox>
             </VBox>
           </WizardStep>
@@ -199,7 +471,7 @@
                       items="{discovery>/step2AvailableColumnItems}"
                       selectionChange=".onStep2InputColumnsChange"
                       placeholder="Válassz egy vagy több oszlopot">
-                      <core:Item xmlns:core="sap.ui.core" key="{discovery>key}" text="{discovery>text}"/>
+                      <core:Item key="{discovery>key}" text="{discovery>text}"/>
                     </MultiComboBox>
 
                     <Label text="Célváltozó (amit előre jelezni szeretnél):" class="sapUiSmallMarginBottom sapUiSmallMarginTop"/>
@@ -208,7 +480,7 @@
                       selectedKey="{discovery>/step2TargetColumn}"
                       change=".onStep2TargetColumnChange"
                       width="100%">
-                      <core:Item xmlns:core="sap.ui.core" key="{discovery>key}" text="{discovery>text}"/>
+                      <core:Item key="{discovery>key}" text="{discovery>text}"/>
                     </Select>
                   </VBox>
                 </Panel>
@@ -330,11 +602,24 @@
               <!-- Content -->
               <VBox visible="{= !${discovery>/step4Busy} }">
 
-                <!-- AI Insight Card -->
-                <Panel id="aiInsightPanel" headerText="Vezető összefoglaló (AI)" class="mlWizardSection mlWizardInsightCard"
+                <!-- Vezető összefoglaló (cél alapú) -->
+                <Panel id="executiveSummaryPanel" headerText="Vezető összefoglaló" class="mlWizardSection mlWizardInsightCard"
+                  expandable="true" expanded="true"
+                  visible="{= !!${discovery>/step4ExecutiveSummary} || ${discovery>/step4ExecutiveSummaryBusy} }">
+                  <VBox class="sapUiSmallMargin">
+                    <VBox visible="{discovery>/step4ExecutiveSummaryBusy}" class="mlWizardCenteredBox">
+                      <BusyIndicator size="3rem"/>
+                    </VBox>
+                    <Text text="{discovery>/step4ExecutiveSummary}" wrapping="true" class="mlWizardInsightSummary"
+                      visible="{= !!${discovery>/step4ExecutiveSummary} }"/>
+                  </VBox>
+                </Panel>
+
+                <!-- Modell értékelése (AI) – korábban "Vezető összefoglaló (AI)" -->
+                <Panel id="aiInsightPanel" headerText="Modell értékelése (AI)" class="mlWizardSection mlWizardInsightCard"
                   expandable="true" expanded="true">
                   <VBox class="sapUiSmallMargin">
-                    <Text text="{discovery>/step4AiInsight/executive_summary}" wrapping="true" class="mlWizardInsightSummary"/>
+                    <Text text="{discovery>/step4AiInsight/model_evaluation}" wrapping="true" class="mlWizardInsightSummary"/>
 
                     <Label text="Felismerések:" class="sapUiSmallMarginTop sapUiSmallMarginBottom" visible="{= ${discovery>/step4AiInsight/insights}.length > 0 }"/>
                     <List items="{discovery>/step4AiInsight/insights}" noDataText=""
@@ -373,7 +658,6 @@
 
                 <!-- Metrics + Feature Importance -->
                 <HBox wrap="Wrap" class="mlWizardSection">
-                  <!-- Metrics -->
                   <Panel headerText="Modell metrikák" class="mlWizardHalfPanel">
                     <List id="metricsList" items="{discovery>/step4MetricsItems}" noDataText="Nincs metrikai adat">
                       <CustomListItem>
@@ -385,7 +669,6 @@
                     </List>
                   </Panel>
 
-                  <!-- Feature Importance -->
                   <Panel headerText="Jellemző fontosság" class="mlWizardHalfPanel">
                     <List id="featureImportanceList" items="{discovery>/step4FeatureImportance}" noDataText="Nincs adat">
                       <CustomListItem>
@@ -402,12 +685,31 @@
                   </Panel>
                 </HBox>
 
-                <!-- Data Preview Table -->
-                <Panel id="previewTablePanel" headerText="Előrejelzési előnézet (első 50 sor)" expandable="true" expanded="false" class="mlWizardSection">
-                  <Table id="mlPreviewTable" fixedLayout="false" growing="true" growingThreshold="20">
-                    <columns/>
-                    <items/>
-                  </Table>
+                <!-- Data Preview Table (20 sor) + Eloszlás chart -->
+                <Panel id="previewTablePanel" headerText="Előrejelzési előnézet (első 20 sor)" expandable="true" expanded="false" class="mlWizardSection">
+                  <VBox>
+                    <Table id="mlPreviewTable" fixedLayout="false" growing="true" growingThreshold="20">
+                      <columns/>
+                      <items/>
+                    </Table>
+
+                    <!-- Előrejelzés eloszlása chart -->
+                    <Panel headerText="Előrejelzések eloszlása" class="sapUiSmallMarginTop"
+                      visible="{= ${discovery>/step4PredictionDistribution}.length > 0 }"
+                      backgroundDesign="Transparent">
+                      <List items="{discovery>/step4PredictionDistribution}" noDataText="">
+                        <CustomListItem>
+                          <VBox class="sapUiSmallMarginBegin sapUiSmallMarginTopBottom sapUiSmallMarginEnd">
+                            <HBox justifyContent="SpaceBetween">
+                              <Text text="{discovery>label}" class="mlWizardBold"/>
+                              <Text text="{= ${discovery>count} + ' db (' + ${discovery>pct} + '%)' }" class="mlWizardHintText"/>
+                            </HBox>
+                            <ProgressIndicator percentValue="{discovery>pct}" state="Information" height="1rem" class="sapUiTinyMarginTop"/>
+                          </VBox>
+                        </CustomListItem>
+                      </List>
+                    </Panel>
+                  </VBox>
                 </Panel>
 
                 <!-- Download -->
@@ -420,19 +722,19 @@
               <!-- Navigation -->
               <HBox justifyContent="SpaceBetween" class="sapUiSmallMarginTop">
                 <Button text="Vissza" icon="sap-icon://nav-back" press=".onWizardBack"/>
-                <Button text="Szimuláció és export" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false" press=".onStep4Next"/>
+                <Button text="Szimuláció, Export és Időzítés" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false" press=".onStep4Next"/>
               </HBox>
             </VBox>
           </WizardStep>
 
           <!-- ───────────────────────────────────────────────────────────
-               STEP 5 – SZIMULÁCIÓ + EXPORT
+               STEP 5 – SZIMULÁCIÓ, EXPORT ÉS IDŐZÍTÉS
           ─────────────────────────────────────────────────────────────── -->
-          <WizardStep id="wizStep5" title="Szimuláció és export" icon="sap-icon://simulate" validated="true">
+          <WizardStep id="wizStep5" title="Szimuláció, Export és Időzítés" icon="sap-icon://simulate" validated="true">
             <VBox class="mlWizardStepContent">
 
-              <!-- Simulation Editor -->
-              <Panel headerText="What-if szimuláció" class="mlWizardSection" expandable="true" expanded="true">
+              <!-- What-if szimuláció (összezárva alapértelmezetten) -->
+              <Panel headerText="What-if szimuláció" class="mlWizardSection" expandable="true" expanded="false">
                 <VBox class="sapUiSmallMargin">
                   <Text text="Módosíts jellemzőértékeket és nézd meg, hogyan változnak az előrejelzések." class="mlWizardHintText sapUiSmallMarginBottom"/>
                   <Table id="simEditorTable" items="{discovery>/step5SimulationChanges}" fixedLayout="false" noDataText="Kattints az 'Sor hozzáadása' gombra.">
@@ -454,22 +756,22 @@
                   <HBox class="sapUiSmallMarginTop">
                     <Button text="Sor hozzáadása" icon="sap-icon://add" type="Ghost" press=".onAddSimRow"/>
                   </HBox>
+
+                  <!-- AI Simulation Context -->
+                  <MessageStrip id="simContextStrip" text="{discovery>/step5AiSimulationContext}"
+                    type="Information" showCloseButton="false"
+                    visible="{= !!${discovery>/step5AiSimulationContext} }"
+                    class="sapUiSmallMarginTop"/>
+
+                  <!-- Run Simulation Button -->
+                  <HBox class="sapUiSmallMarginTop">
+                    <Button text="Szimuláció futtatása" icon="sap-icon://play" type="Emphasized"
+                      press=".onStep5RunSimulation"
+                      busy="{= ${discovery>/step5SimBusy} }"
+                      enabled="{= ${discovery>/step5SimulationChanges}.length > 0 }"/>
+                  </HBox>
                 </VBox>
               </Panel>
-
-              <!-- AI Simulation Context -->
-              <MessageStrip id="simContextStrip" text="{discovery>/step5AiSimulationContext}"
-                type="Information" showCloseButton="false"
-                visible="{= !!${discovery>/step5AiSimulationContext} }"
-                class="mlWizardSection"/>
-
-              <!-- Run Simulation Button -->
-              <HBox class="mlWizardSection">
-                <Button text="Szimuláció futtatása" icon="sap-icon://play" type="Emphasized"
-                  press=".onStep5RunSimulation"
-                  busy="{= ${discovery>/step5SimBusy} }"
-                  enabled="{= ${discovery>/step5SimulationChanges}.length > 0 }"/>
-              </HBox>
 
               <!-- Simulation Results -->
               <Panel id="simResultPanel" headerText="Szimuláció eredménye"
@@ -512,6 +814,57 @@
                   <Button text="Újraindítás" icon="sap-icon://refresh" type="Ghost"
                     press=".onResetWizard" class="sapUiSmallMarginEnd"/>
                 </HBox>
+              </Panel>
+
+              <!-- Időzítés panel -->
+              <Panel headerText="Időzítés – ML tréning automatikus újrafuttatása" class="mlWizardSection" expandable="true" expanded="false">
+                <VBox class="sapUiSmallMargin">
+                  <Text text="Beállíthatod, hogy az ML modell rendszeresen újrafusson ugyanazzal a konfigurációval és adatforrással. A futás eredményéről értesítést küld a rendszer." wrapping="true" class="mlWizardHintText sapUiSmallMarginBottom"/>
+
+                  <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                    <Switch id="step5ScheduleSwitch" state="{discovery>/step5ScheduleEnabled}" change=".onStep5ScheduleToggle"/>
+                    <Text text="{= ${discovery>/step5ScheduleEnabled} ? 'Időzítés bekapcsolva' : 'Időzítés kikapcsolva' }" class="sapUiSmallMarginBegin mlWizardHintText"/>
+                  </HBox>
+
+                  <VBox visible="{discovery>/step5ScheduleEnabled}">
+                    <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginBottom">
+                      <Label text="Gyakoriság:" class="sapUiSmallMarginEnd"/>
+                      <Select id="step5ScheduleFreqSelect" width="12rem" selectedKey="{discovery>/step5ScheduleFrequency}">
+                        <items>
+                          <core:Item key="immediate" text="Azonnali (egyszeri)"/>
+                          <core:Item key="daily"     text="Napi"/>
+                          <core:Item key="weekly"    text="Heti"/>
+                        </items>
+                      </Select>
+                    </HBox>
+
+                    <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginBottom"
+                      visible="{= ${discovery>/step5ScheduleFrequency} === 'weekly' }">
+                      <Label text="Hét napja (0=Vas, 1=Hét...):" class="sapUiSmallMarginEnd"/>
+                      <Input width="8rem" value="{discovery>/step5ScheduleWeeklyDay}"/>
+                    </HBox>
+
+                    <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginBottom"
+                      visible="{= ${discovery>/step5ScheduleFrequency} !== 'immediate' }">
+                      <Label text="Időpont (ÓÓ:PP):" class="sapUiSmallMarginEnd"/>
+                      <Input width="8rem" value="{discovery>/step5ScheduleTime}" placeholder="09:00"/>
+                    </HBox>
+
+                    <HBox class="sapUiSmallMarginTop" wrap="Wrap">
+                      <Button text="Időzítés mentése" icon="sap-icon://save" type="Ghost"
+                        press=".onSaveMlWizardSchedule"
+                        class="sapUiSmallMarginEnd"/>
+                    </HBox>
+
+                    <MessageStrip id="scheduleStatusStrip"
+                      text="{discovery>/step5ScheduleStatusText}"
+                      type="{= ${discovery>/step5ScheduleError} ? 'Error' : 'Success' }"
+                      showCloseButton="true"
+                      visible="{= !!${discovery>/step5ScheduleStatusText} }"
+                      close=".onClearScheduleStatus"
+                      class="sapUiSmallMarginTop"/>
+                  </VBox>
+                </VBox>
               </Panel>
 
               <!-- Navigation -->
