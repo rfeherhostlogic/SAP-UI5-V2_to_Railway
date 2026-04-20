@@ -526,8 +526,4 @@
     </content>
   </Page>
 
-  <!-- Column Selection Dialog for Simulation -->
-  <core:FragmentDefinition xmlns:core="sap.ui.core">
-  </core:FragmentDefinition>
-
 </mvc:View>
