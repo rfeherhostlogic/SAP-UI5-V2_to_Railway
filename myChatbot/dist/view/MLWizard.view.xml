@@ -234,7 +234,7 @@
           <!-- ───────────────────────────────────────────────────────────
                STEP 1b – ADATKAPCSOLÁS (feltételes, többforrás esetén)
           ─────────────────────────────────────────────────────────────── -->
-          <WizardStep id="wizStepJoin" title="Adatkapcsolás" icon="sap-icon://connected" validated="false">
+          <WizardStep id="wizStepJoin" title="Adatkapcsolás" icon="sap-icon://connected" validated="false" visible="{discovery>/showStepJoin}">
             <VBox class="mlWizardStepContent">
 
               <MessageStrip text="Több adatforrást választottál. Határozd meg, hogyan kapcsolódjanak össze az adatok." type="Information" showCloseButton="false" class="mlWizardSection"/>
@@ -303,7 +303,7 @@
           <!-- ───────────────────────────────────────────────────────────
                STEP 1c – AGGREGÁLÁS (feltételes, AI ajánlja)
           ─────────────────────────────────────────────────────────────── -->
-          <WizardStep id="wizStepAggr" title="Aggregálás" icon="sap-icon://group-2" validated="false">
+          <WizardStep id="wizStepAggr" title="Aggregálás" icon="sap-icon://group-2" validated="false" visible="{discovery>/showStepAggr}">
             <VBox class="mlWizardStepContent">
 
               <MessageStrip

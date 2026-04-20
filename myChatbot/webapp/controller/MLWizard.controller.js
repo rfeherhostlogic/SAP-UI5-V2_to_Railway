@@ -432,19 +432,18 @@ sap.ui.define([
         if (!bMultiSource) { that._validateStep("wizStepJoin"); }
         if (!bNeedAggr) { that._validateStep("wizStepAggr"); }
 
-        // Navigáció az első releváns lépésre
+        // Navigáció a következő látható wizard lépésre
         that._stepHistory = ["wizStep1"];
         if (bMultiSource) {
-          // Töltse be a join-forrás opciókat
           that._buildJoinSourceOptions();
-          that._navigateTo("wizStepJoin");
+          that._stepHistory.push("wizStepJoin");
         } else if (bNeedAggr) {
           that._buildAggrColumns();
-          that._navigateTo("wizStepAggr");
+          that._stepHistory.push("wizStepAggr");
         } else {
-          // Egyből az adatellenőrzésre
-          that._navigateTo("wizStep2");
+          that._stepHistory.push("wizStep2");
         }
+        that._getWizard().nextStep();
       }).catch(function(err) {
         that._set("/wizardError", "Inicializálási hiba: " + (err && err.message ? err.message : String(err)));
         that._set("/step1Busy", false);
@@ -577,11 +576,12 @@ sap.ui.define([
       var bNeedAggr = this._get("/showStepAggr");
       if (!bNeedAggr) {
         this._validateStep("wizStepAggr");
-        this._navigateTo("wizStep2");
+        this._stepHistory.push("wizStep2");
       } else {
         this._buildAggrColumns();
-        this._navigateTo("wizStepAggr");
+        this._stepHistory.push("wizStepAggr");
       }
+      this._getWizard().nextStep();
     },
 
     // ─── STEP AGGR (1c) HANDLERS ─────────────────────────────────────────────
@@ -645,7 +645,8 @@ sap.ui.define([
         return;
       }
       this._validateStep("wizStepAggr");
-      this._navigateTo("wizStep2");
+      this._stepHistory.push("wizStep2");
+      this._getWizard().nextStep();
     },
 
     // ─── STEP 2 HANDLERS ─────────────────────────────────────────────────────
