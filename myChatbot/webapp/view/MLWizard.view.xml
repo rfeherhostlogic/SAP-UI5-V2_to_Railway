@@ -100,14 +100,6 @@
                     enabled="{= ${discovery>/step1SourceType} === 'csv' ? ${discovery>/step1CsvFiles}.length > 0 : ${discovery>/step1SelectedTables}.length > 0 }"/>
                 </HBox>
 
-                <!-- Aggregálás ajánlás badge -->
-                <MessageStrip id="aggrRecommendationStrip"
-                  text="{= ${discovery>/step1AggregationRecommendation} === 'recommended' ? 'Az AI aggregálást javasol – az Aggregálás lépés kötelező lesz.' : ${discovery>/step1AggregationRecommendation} === 'uncertain' ? 'Az AI bizonytalan az aggregálás szükségességéről – az Aggregálás lépés kötelező lesz.' : 'Az AI szerint nem szükséges aggregálás ehhez a célhoz.' }"
-                  type="{= ${discovery>/step1AggregationRecommendation} === 'recommended' || ${discovery>/step1AggregationRecommendation} === 'uncertain' ? 'Warning' : 'Success' }"
-                  showCloseButton="false"
-                  visible="{= !!${discovery>/step1AggregationRecommendation} }"
-                  class="sapUiSmallMarginBottom"/>
-
                 <!-- Javasolt ML célkitűzések (kiválasztható lista) -->
                 <VBox visible="{= ${discovery>/step1AiGoalSuggestions}.length > 0 }">
                   <Label text="Javasolt ML célkitűzések (kattints a kiválasztáshoz):" class="sapUiSmallMarginBottom mlWizardSectionLabel"/>
@@ -313,6 +305,14 @@
           ─────────────────────────────────────────────────────────────── -->
           <WizardStep id="wizStepAggr" title="Aggregálás" icon="sap-icon://group-2" validated="false">
             <VBox class="mlWizardStepContent">
+
+              <MessageStrip
+                id="aggrRecommendationStrip"
+                text="{= ${discovery>/step1AggregationRecommendation} === 'recommended' ? 'Az AI aggregálást javasol ehhez a célhoz.' : ${discovery>/step1AggregationRecommendation} === 'uncertain' ? 'Az AI bizonytalan az aggregálás szükségességében, ezért érdemes itt pontosítani a beállításokat.' : 'Az AI szerint ehhez a célhoz nem szükséges aggregálás, ezért ez a lépés általában kihagyható.' }"
+                type="{= ${discovery>/step1AggregationRecommendation} === 'recommended' || ${discovery>/step1AggregationRecommendation} === 'uncertain' ? 'Warning' : 'Information' }"
+                showCloseButton="false"
+                visible="{= !!${discovery>/step1AggregationRecommendation} }"
+                class="mlWizardSection"/>
 
               <!-- Magyarázat -->
               <Panel headerText="Mi ez és miért szükséges?" class="mlWizardSection" expandable="true" expanded="true">

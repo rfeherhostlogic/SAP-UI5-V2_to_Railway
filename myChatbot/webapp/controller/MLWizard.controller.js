@@ -140,15 +140,21 @@ sap.ui.define([
       }));
     },
 
-    // DB táblák betöltése – dummy4 schema-hint végponton keresztül (user request)
+    // DB táblák betöltése – elsődlegesen a dedikált ML Wizard végpontról.
+    // Ha ez nem elérhető, fallbackként használjuk a Riportok schema hintet.
     _loadDbTables: function() {
       var that = this;
-      AiService.getDummy4SchemaHint().then(function(oData) {
-        var sHint = String(oData && oData.schemaHint ? oData.schemaHint : "");
-        var aTables = sHint.split("\n")
-          .map(function(l) { return l.split(":")[0].trim(); })
-          .filter(Boolean);
+      AiService.mlWizardGetDbTables().then(function(oData) {
+        var aTables = Array.isArray(oData && oData.tables) ? oData.tables.filter(Boolean) : [];
         that._set("/step1AvailableTables", aTables);
+      }).catch(function() {
+        return AiService.getDummy4SchemaHint().then(function(oData) {
+          var sHint = String(oData && oData.schemaHint ? oData.schemaHint : "");
+          var aTables = sHint.split("\n")
+            .map(function(l) { return l.split(":")[0].trim(); })
+            .filter(Boolean);
+          that._set("/step1AvailableTables", aTables);
+        });
       }).catch(function() {
         // silently ignore – DB tables may not be available
       });
