@@ -4609,6 +4609,13 @@ async function ensureShieldTables() {
       "  CreatedAt TEXT NOT NULL",
       ")"
     ].join("\n"));
+    const webhookColumns = await sqliteAll(db, "PRAGMA table_info('ShieldWebhook')");
+    const webhookColumnNames = webhookColumns.map(function(item) {
+      return String(item && item.name ? item.name : "").trim().toLowerCase();
+    });
+    if (webhookColumnNames.indexOf("username") < 0) {
+      await sqliteRun(db, "ALTER TABLE ShieldWebhook ADD COLUMN Username TEXT");
+    }
     await sqliteRun(db, [
       "CREATE TABLE IF NOT EXISTS ShieldSchedule (",
       "  ScheduleId INTEGER PRIMARY KEY AUTOINCREMENT,",
@@ -6347,10 +6354,17 @@ app.get("/api/reports/db-preview", async function(req, res) {
 
 app.get("/api/reports/webhooks", async function(_req, res) {
   try {
+    const authUser = _req && _req.authUser ? _req.authUser : null;
+    const username = String(authUser && authUser.username ? authUser.username : "").trim();
     const db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
     let rows = [];
     try {
-      rows = await sqliteAll(db, "SELECT WebhookId, Channel, Url, CreatedAt FROM ShieldWebhook ORDER BY WebhookId ASC");
+      rows = await sqliteAllParams(db, [
+        "SELECT WebhookId, Channel, Url, CreatedAt",
+        "FROM ShieldWebhook",
+        "WHERE Username = ? OR Username IS NULL OR TRIM(COALESCE(Username, '')) = ''",
+        "ORDER BY WebhookId ASC"
+      ].join("\n"), [username]);
     } finally {
       await closeSqlite(db);
     }
@@ -6362,21 +6376,28 @@ app.get("/api/reports/webhooks", async function(_req, res) {
 
 app.post("/api/reports/webhooks", async function(req, res) {
   try {
+    const authUser = req && req.authUser ? req.authUser : null;
+    const username = String(authUser && authUser.username ? authUser.username : "").trim();
     const channel = String(req.body && req.body.channel ? req.body.channel : "").trim();
     const url = String(req.body && req.body.url ? req.body.url : "").trim();
-    if (!channel || !url) {
+    if (!username || !channel || !url) {
       res.status(400).json({ error: "channel es url kotelezo." });
       return;
     }
     const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
     let row = null;
     try {
-      const ins = await sqliteRun(db, "INSERT INTO ShieldWebhook (Channel, Url, CreatedAt) VALUES (?, ?, ?)", [
+      const ins = await sqliteRun(db, "INSERT INTO ShieldWebhook (Channel, Url, CreatedAt, Username) VALUES (?, ?, ?, ?)", [
         channel,
         url,
-        nowIso()
+        nowIso(),
+        username
       ]);
-      row = await sqliteGet(db, "SELECT WebhookId, Channel, Url, CreatedAt FROM ShieldWebhook WHERE WebhookId = ?", [ins.lastID]);
+      row = await sqliteGet(db, [
+        "SELECT WebhookId, Channel, Url, CreatedAt",
+        "FROM ShieldWebhook",
+        "WHERE WebhookId = ? AND Username = ?"
+      ].join("\n"), [ins.lastID, username]);
     } finally {
       await closeSqlite(db);
     }
@@ -6388,18 +6409,30 @@ app.post("/api/reports/webhooks", async function(req, res) {
 
 app.put("/api/reports/webhooks/:id", async function(req, res) {
   try {
+    const authUser = req && req.authUser ? req.authUser : null;
+    const username = String(authUser && authUser.username ? authUser.username : "").trim();
     const webhookId = Number(req.params.id || 0);
     const channel = String(req.body && req.body.channel ? req.body.channel : "").trim();
     const url = String(req.body && req.body.url ? req.body.url : "").trim();
-    if (!webhookId || !channel || !url) {
+    if (!username || !webhookId || !channel || !url) {
       res.status(400).json({ error: "ervenytelen webhook adat." });
       return;
     }
     const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
     let row = null;
     try {
-      await sqliteRun(db, "UPDATE ShieldWebhook SET Channel = ?, Url = ? WHERE WebhookId = ?", [channel, url, webhookId]);
-      row = await sqliteGet(db, "SELECT WebhookId, Channel, Url, CreatedAt FROM ShieldWebhook WHERE WebhookId = ?", [webhookId]);
+      const result = await sqliteRun(db, [
+        "UPDATE ShieldWebhook",
+        "SET Channel = ?, Url = ?, Username = ?",
+        "WHERE WebhookId = ? AND (Username = ? OR Username IS NULL OR TRIM(COALESCE(Username, '')) = '')"
+      ].join("\n"), [channel, url, username, webhookId, username]);
+      if (Number(result && result.changes ? result.changes : 0) > 0) {
+        row = await sqliteGet(db, [
+          "SELECT WebhookId, Channel, Url, CreatedAt",
+          "FROM ShieldWebhook",
+          "WHERE WebhookId = ? AND Username = ?"
+        ].join("\n"), [webhookId, username]);
+      }
     } finally {
       await closeSqlite(db);
     }
@@ -6415,14 +6448,19 @@ app.put("/api/reports/webhooks/:id", async function(req, res) {
 
 app.delete("/api/reports/webhooks/:id", async function(req, res) {
   try {
+    const authUser = req && req.authUser ? req.authUser : null;
+    const username = String(authUser && authUser.username ? authUser.username : "").trim();
     const webhookId = Number(req.params.id || 0);
-    if (!webhookId) {
+    if (!username || !webhookId) {
       res.status(400).json({ error: "ervenytelen webhook id." });
       return;
     }
     const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
     try {
-      await sqliteRun(db, "DELETE FROM ShieldWebhook WHERE WebhookId = ?", [webhookId]);
+      await sqliteRun(db, [
+        "DELETE FROM ShieldWebhook",
+        "WHERE WebhookId = ? AND (Username = ? OR Username IS NULL OR TRIM(COALESCE(Username, '')) = '')"
+      ].join("\n"), [webhookId, username]);
     } finally {
       await closeSqlite(db);
     }
@@ -6454,7 +6492,7 @@ app.get("/api/reports/feed", async function(req, res) {
     const db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
     let rows = [];
     try {
-      rows = await sqliteAll(db, [
+      rows = await sqliteAllParams(db, [
         "SELECT",
         "  r.RunId,",
         "  r.ScheduleId,",

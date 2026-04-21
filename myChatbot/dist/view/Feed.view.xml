@@ -32,13 +32,6 @@
           </CustomListItem>
         </List>
       </VBox>
-
-      <MessageStrip
-        visible="{= !!${feed>/error} }"
-        text="{feed>/error}"
-        type="Error"
-        showIcon="true"
-        class="sapUiSmallMarginTop"/>
     </VBox>
   </Page>
 </mvc:View>
