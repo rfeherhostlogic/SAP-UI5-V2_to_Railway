@@ -1,13 +1,14 @@
 sap.ui.define([
   "sap/ui/core/mvc/Controller",
   "sap/m/MessageToast",
+  "sap/ui/core/BusyIndicator",
   "sap/m/ColumnListItem",
   "sap/m/Column",
   "sap/m/Text",
   "sap/m/Token",
   "sap/ui/core/Item",
   "sap/suite/ui/commons/demo/tutorial/service/AiService"
-], function(Controller, MessageToast, ColumnListItem, Column, Text, Token, CoreItem, AiService) {
+], function(Controller, MessageToast, BusyIndicator, ColumnListItem, Column, Text, Token, CoreItem, AiService) {
   "use strict";
 
   var POLL_INTERVAL_MS = 1500;
@@ -250,6 +251,7 @@ sap.ui.define([
         step1AggregationRecommendation: "",
         step1AiBusy: false,
         step1Busy: false,
+        step1StatusText: "",
         showStepJoin: false,
         showStepAggr: false,
         // Step Join (1b)
@@ -607,12 +609,18 @@ sap.ui.define([
       }
 
       this._set("/step1Busy", true);
+      this._set("/step1StatusText", "Adatforras ellenorzese es kovetkezo lepes elokeszitese...");
       this._set("/wizardError", "");
+      BusyIndicator.show(0);
       var that = this;
 
       this._initSessionAndProfile().then(function() {
         that._validateStep("wizStep1");
+        that._set("/step1StatusText", "");
         that._set("/step1Busy", false);
+        BusyIndicator.hide();
+        that._set("/step1StatusText", "A profilozas elindult. Betoltjuk a kovetkezo lepest...");
+        BusyIndicator.hide();
 
         var bMultiSource = that._get("/step1CsvFiles").length > 1 ||
           that._get("/step1SelectedTables").length > 1 ||
@@ -634,7 +642,7 @@ sap.ui.define([
         }
 
         that._stepHistory = ["wizStep1"];
-        that._goToStep("wizStepJoin");
+        that._goToStep(bMultiSource ? "wizStepJoin" : (bNeedAggr ? "wizStepAggr" : "wizStep2"));
         return;
       }).catch(function(err) {
         that._set("/wizardError", "Inicializálási hiba: " + (err && err.message ? err.message : String(err)));
@@ -677,11 +685,13 @@ sap.ui.define([
           if (oData.status === "done") {
             clearInterval(that._profileTimer);
             that._profileTimer = null;
+            that._set("/step1StatusText", "Az adatok elemzese befejezodott.");
             that._loadProfileResult();
           } else if (oData.status === "error") {
             clearInterval(that._profileTimer);
             that._profileTimer = null;
             that._set("/step2Busy", false);
+            that._set("/step1StatusText", "");
             that._set("/wizardError", "Adatelemzési hiba: " + (oData.message || "Ismeretlen hiba"));
           }
         }).catch(function() {});
@@ -715,14 +725,17 @@ sap.ui.define([
         that._set("/step2AiFeatureSuggestions", aSuggestions);
         that._set("/step2SelectedFeatures", aSuggestions);
         that._prefillStep2Selections(oProfile, aSuggestions);
+        that._set("/step1StatusText", "");
         that._set("/step2Busy", false);
       }).catch(function(err) {
         if (err && err.status === 404 && iRetryCount < 6) {
+          that._set("/step1StatusText", "Az adatok elemzese folyamatban van, varunk az eredmenyre...");
           setTimeout(function() {
             that._loadProfileResult(iRetryCount + 1);
           }, 1000);
           return;
         }
+        that._set("/step1StatusText", "");
         that._set("/step2Busy", false);
         that._set("/wizardError", "Profil betöltési hiba: " + (err && err.message ? err.message : String(err)));
       });

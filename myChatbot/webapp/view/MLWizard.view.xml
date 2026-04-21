@@ -220,6 +220,13 @@
               </Panel>
 
               <!-- Step 1 Next Button -->
+              <MessageStrip
+                id="step1StatusStrip"
+                text="{discovery>/step1StatusText}"
+                type="Information"
+                showCloseButton="false"
+                visible="{= !!${discovery>/step1StatusText} }"
+                class="sapUiSmallMarginTop"/>
               <HBox justifyContent="End" class="sapUiSmallMarginTop">
                 <Button id="step1NextBtn" text="Elfogadás és folytatás"
                   type="Emphasized" icon="sap-icon://arrow-right"
