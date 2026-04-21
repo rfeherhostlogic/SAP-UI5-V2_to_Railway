@@ -214,13 +214,38 @@ sap.ui.define([
     _goToStep: function(sStepId) {
       var oWizard = this._getWizard();
       var oStep = this._getStep(sStepId);
+      var aSteps;
+      var iTargetIndex;
+      var iStepIndex;
+      var oProgressStep;
+      var iProgressIndex;
       if (!oWizard || !oStep) {
         return;
       }
       if (this._stepHistory[this._stepHistory.length - 1] !== sStepId) {
         this._stepHistory.push(sStepId);
       }
-      oWizard.goToStep(oStep, false);
+
+      aSteps = oWizard.getSteps ? oWizard.getSteps() : [];
+      iTargetIndex = aSteps.indexOf(oStep);
+
+      if (iTargetIndex >= 0 && oWizard.validateStep) {
+        for (iStepIndex = 0; iStepIndex <= iTargetIndex; iStepIndex += 1) {
+          oWizard.validateStep(aSteps[iStepIndex]);
+        }
+      }
+
+      oProgressStep = oWizard.getProgressStep ? oWizard.getProgressStep() : null;
+      iProgressIndex = aSteps.indexOf(oProgressStep);
+
+      if (iTargetIndex >= 0 && iProgressIndex >= 0 && oWizard.nextStep) {
+        while (iProgressIndex < iTargetIndex) {
+          oWizard.nextStep();
+          iProgressIndex += 1;
+        }
+      }
+
+      oWizard.goToStep(oStep, true);
     },
 
     _clearAllTimers: function() {
@@ -642,7 +667,7 @@ sap.ui.define([
         }
 
         that._stepHistory = ["wizStep1"];
-        that._goToStep(bMultiSource ? "wizStepJoin" : (bNeedAggr ? "wizStepAggr" : "wizStep2"));
+        that._goToStep("wizStepJoin");
         return;
       }).catch(function(err) {
         that._set("/wizardError", "Inicializálási hiba: " + (err && err.message ? err.message : String(err)));
