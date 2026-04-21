@@ -1,7 +1,22 @@
-﻿sap.ui.define([
+sap.ui.define([
   "sap/ui/core/mvc/Controller"
 ], function(Controller) {
   "use strict";
+
+  function normalizeTagKey(sTag) {
+    var sValue = String(sTag || "").trim().toLowerCase();
+    var mMap = {
+      "osszes": "Osszes",
+      "összes": "Osszes",
+      "altalanos": "Altalanos",
+      "általános": "Altalanos",
+      "marketing": "Marketing",
+      "idozitheto": "Idozitheto",
+      "időzíthető": "Idozitheto",
+      "gdc": "GDC"
+    };
+    return mMap[sValue] || String(sTag || "").trim();
+  }
 
   return Controller.extend("sap.suite.ui.commons.demo.tutorial.controller.Jokers", {
     onInit: function() {
@@ -13,24 +28,43 @@
     },
 
     onTagFilterChange: function(oEvent) {
-      var oSource = oEvent.getSource();
-      var aSelectedKeys = typeof oSource.getSelectedKeys === "function" ? oSource.getSelectedKeys() : [];
-      var aNormalized = aSelectedKeys.map(function(sKey) {
-        return String(sKey || "").trim();
-      }).filter(Boolean);
-      if (aNormalized.length === 0 || aNormalized.indexOf("Összes") >= 0) {
-        aNormalized = ["Összes"];
-      } else {
-        aNormalized = aNormalized.filter(function(sKey, idx, arr) {
-          return sKey !== "Összes" && arr.indexOf(sKey) === idx;
-        });
-      }
       var oModel = this.getView().getModel("jokers") || this.getOwnerComponent().getModel("jokers");
       if (!oModel) {
         return;
       }
+
+      var oSource = oEvent.getSource();
+      var aSelectedKeys = typeof oSource.getSelectedKeys === "function" ? oSource.getSelectedKeys() : [];
+      var sEventId = oEvent && typeof oEvent.getId === "function" ? oEvent.getId() : "";
+      var oChangedItem = oEvent && typeof oEvent.getParameter === "function" ? oEvent.getParameter("changedItem") : null;
+      var bSelected = oEvent && typeof oEvent.getParameter === "function" ? !!oEvent.getParameter("selected") : false;
+
+      if (sEventId === "selectionChange" && oChangedItem && typeof oChangedItem.getKey === "function") {
+        var sChangedKey = normalizeTagKey(oChangedItem.getKey());
+        var aCurrentKeys = (oModel.getProperty("/activeTags") || []).map(normalizeTagKey);
+        if (bSelected) {
+          if (aCurrentKeys.indexOf(sChangedKey) < 0) {
+            aCurrentKeys.push(sChangedKey);
+          }
+        } else {
+          aCurrentKeys = aCurrentKeys.filter(function(sKey) {
+            return sKey !== sChangedKey;
+          });
+        }
+        aSelectedKeys = aCurrentKeys;
+      }
+
+      var aNormalized = aSelectedKeys.map(normalizeTagKey).filter(Boolean);
+      if (aNormalized.length === 0 || aNormalized.indexOf("Osszes") >= 0) {
+        aNormalized = ["Osszes"];
+      } else {
+        aNormalized = aNormalized.filter(function(sKey, idx, arr) {
+          return sKey !== "Osszes" && arr.indexOf(sKey) === idx;
+        });
+      }
+
       oModel.setProperty("/activeTags", aNormalized);
-      oModel.setProperty("/activeTag", aNormalized[0] || "Összes");
+      oModel.setProperty("/activeTag", aNormalized[0] || "Osszes");
       this._applyTagFilter();
     },
 
@@ -77,11 +111,12 @@
       var aTiles = oModel.getProperty("/tiles") || [];
       var aActiveTags = oModel.getProperty("/activeTags");
       if (!Array.isArray(aActiveTags) || aActiveTags.length === 0) {
-        var sFallbackTag = String(oModel.getProperty("/activeTag") || "Összes");
-        aActiveTags = [sFallbackTag];
+        aActiveTags = [normalizeTagKey(oModel.getProperty("/activeTag") || "Osszes")];
         oModel.setProperty("/activeTags", aActiveTags);
       }
-      var bAll = aActiveTags.indexOf("Összes") >= 0;
+
+      aActiveTags = aActiveTags.map(normalizeTagKey);
+      var bAll = aActiveTags.indexOf("Osszes") >= 0;
       var aFiltered = aTiles.filter(function(oTile) {
         if (oTile && oTile.id === "dummy-13") {
           return false;
@@ -89,7 +124,7 @@
         if (bAll) {
           return true;
         }
-        var aTags = Array.isArray(oTile && oTile.tags) ? oTile.tags : [];
+        var aTags = Array.isArray(oTile && oTile.tags) ? oTile.tags.map(normalizeTagKey) : [];
         return aActiveTags.some(function(sTag) {
           return aTags.indexOf(sTag) >= 0;
         });
@@ -98,4 +133,3 @@
     }
   });
 });
-
