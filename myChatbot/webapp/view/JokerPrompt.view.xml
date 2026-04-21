@@ -1503,7 +1503,7 @@
 
                   <!-- Project insights: "Miért vizsgáld?" -->
                   <Panel headerText="Miért vizsgáld? – Projekt-szintű elemzések" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy14ProjectInsights}.length > 0 }">
-                    <List items="{jokers>/dummy14ProjectInsights}" separators="Inner">
+                    <List items="{jokers>/dummy14ProjectInsights}" showSeparators="Inner">
                       <CustomListItem>
                         <VBox class="sapUiSmallMargin">
                           <HBox justifyContent="SpaceBetween" alignItems="Start">
@@ -1635,4 +1635,3 @@
     </VBox>
   </Page>
 </mvc:View>
-
