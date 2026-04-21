@@ -490,6 +490,65 @@ def phase_train(spec, job_dir):
             writer.writeheader()
             writer.writerows(results)
 
+    # ── Forecast generation (jövőbeli előrejelzés idősor esetén) ──────────────
+    date_col = spec.get("date_column", "")
+    group_by_keys = spec.get("group_by_keys", [])
+    forecast_horizon = int(spec.get("forecast_horizon", 3))
+    time_level = spec.get("time_level", "monthly")
+
+    if goal == "prediction" and date_col and date_col in available_columns and group_by_keys:
+        import re
+        from collections import defaultdict
+
+        # Átlag per csoport
+        group_vals = defaultdict(list)
+        for row in rows:
+            key = tuple(str(row.get(k, "")) for k in group_by_keys)
+            try:
+                val = float(str(row.get(target_column, 0) or 0).replace(",", "."))
+                group_vals[key].append(val)
+            except (ValueError, TypeError):
+                pass
+
+        # Max dátum keresése (YYYY-MM vagy YYYY-MM-DD formátum)
+        dates = []
+        for row in rows:
+            d_str = str(row.get(date_col, "") or "")
+            m = re.match(r"(\d{4})-(\d{1,2})", d_str)
+            if m:
+                dates.append((int(m.group(1)), int(m.group(2))))
+
+        forecast_rows_out = []
+        if dates and group_vals:
+            max_year, max_month = max(dates)
+
+            for i in range(1, forecast_horizon + 1):
+                fm = max_month + i
+                fy = max_year
+                while fm > 12:
+                    fm -= 12
+                    fy += 1
+                period_str = f"{fy}-{fm:02d}-01"
+
+                for key, vals in sorted(group_vals.items()):
+                    if not vals:
+                        continue
+                    avg = sum(vals) / len(vals)
+                    # Determinisztikus kis variáció per időszak+csoport
+                    variation = (hash_score(str(key) + period_str, seed=17) - 0.5) * 0.12
+                    pred_val = max(0, round(avg * (1 + variation)))
+
+                    f_row = {}
+                    for j, gk in enumerate(group_by_keys):
+                        f_row[gk] = key[j]
+                    f_row[date_col] = period_str
+                    f_row["elojelzett_" + target_column] = pred_val
+                    forecast_rows_out.append(f_row)
+
+        if forecast_rows_out:
+            with open(os.path.join(job_dir, "forecast_preview.json"), "w", encoding="utf-8") as f:
+                json.dump(forecast_rows_out, f, ensure_ascii=False, indent=2)
+
     progress(100, "Tréning kész")
 
 

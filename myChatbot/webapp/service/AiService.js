@@ -1021,6 +1021,23 @@
     });
   }
 
+  function mlWizardStep5SuggestedInputs(mPayload) {
+    return fetch("/api/ml-wizard/step5/suggested-inputs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: mPayload.session_id || "",
+        goal_text: mPayload.goal_text || "",
+        column_names: mPayload.column_names || []
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
   function mlWizardStep2Profile(mPayload) {
     return fetch("/api/ml-wizard/step2/profile", {
       method: "POST",
@@ -1217,6 +1234,7 @@
     mlWizardStep2ConfirmFeatures: mlWizardStep2ConfirmFeatures,
     mlWizardStep3StartTraining: mlWizardStep3StartTraining,
     mlWizardStep4Result: mlWizardStep4Result,
+    mlWizardStep5SuggestedInputs: mlWizardStep5SuggestedInputs,
     mlWizardStep5Simulate: mlWizardStep5Simulate,
     mlWizardStep5SimulationResult: mlWizardStep5SimulationResult
   };

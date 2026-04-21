@@ -221,7 +221,7 @@
 
               <!-- Step 1 Next Button -->
               <HBox justifyContent="End" class="sapUiSmallMarginTop">
-                <Button id="step1NextBtn" text="Tovább"
+                <Button id="step1NextBtn" text="Elfogadás és folytatás"
                   type="Emphasized" icon="sap-icon://arrow-right"
                   iconFirst="false"
                   press=".onStep1Next"
@@ -234,10 +234,13 @@
           <!-- ───────────────────────────────────────────────────────────
                STEP 1b – ADATKAPCSOLÁS (feltételes, többforrás esetén)
           ─────────────────────────────────────────────────────────────── -->
-          <WizardStep id="wizStepJoin" title="Adatkapcsolás" icon="sap-icon://connected" validated="false" visible="{discovery>/showStepJoin}">
+          <WizardStep id="wizStepJoin" title="Adatkapcsolás" icon="sap-icon://connected" validated="false">
             <VBox class="mlWizardStepContent">
 
-              <MessageStrip text="Több adatforrást választottál. Határozd meg, hogyan kapcsolódjanak össze az adatok." type="Information" showCloseButton="false" class="mlWizardSection"/>
+              <MessageStrip text="Egyforrású adatnál ez a lépés általában kihagyható – kattints az 'Elfogadás és folytatás' gombra." type="Information" showCloseButton="false"
+                visible="{= !${discovery>/showStepJoin} }" class="mlWizardSection"/>
+              <MessageStrip text="Több adatforrást választottál. Határozd meg, hogyan kapcsolódjanak össze az adatok." type="Warning" showCloseButton="false"
+                visible="{= !!${discovery>/showStepJoin} }" class="mlWizardSection"/>
 
               <!-- Fő adatforrás -->
               <Panel headerText="Fő adatforrás" class="mlWizardSection" expandable="true" expanded="true">
@@ -294,7 +297,7 @@
               <!-- Navigation -->
               <HBox justifyContent="SpaceBetween" class="sapUiSmallMarginTop">
                 <Button text="Vissza" icon="sap-icon://nav-back" press=".onWizardBack"/>
-                <Button text="Tovább" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false"
+                <Button text="Elfogadás és folytatás" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false"
                   press=".onStepJoinNext"/>
               </HBox>
             </VBox>
@@ -303,7 +306,7 @@
           <!-- ───────────────────────────────────────────────────────────
                STEP 1c – AGGREGÁLÁS (feltételes, AI ajánlja)
           ─────────────────────────────────────────────────────────────── -->
-          <WizardStep id="wizStepAggr" title="Aggregálás" icon="sap-icon://group-2" validated="false" visible="{discovery>/showStepAggr}">
+          <WizardStep id="wizStepAggr" title="Aggregálás" icon="sap-icon://group-2" validated="false">
             <VBox class="mlWizardStepContent">
 
               <MessageStrip
@@ -415,9 +418,8 @@
               <!-- Navigation -->
               <HBox justifyContent="SpaceBetween" class="sapUiSmallMarginTop">
                 <Button text="Vissza" icon="sap-icon://nav-back" press=".onWizardBack"/>
-                <Button text="Tovább: Adatellenőrzés" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false"
-                  press=".onStepAggrNext"
-                  enabled="{= !!${discovery>/stepAggrUnit} &amp;&amp; ${discovery>/stepAggrGroupKeys}.length > 0 }"/>
+                <Button text="Elfogadás és folytatás" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false"
+                  press=".onStepAggrNext"/>
               </HBox>
             </VBox>
           </WizardStep>
@@ -527,7 +529,7 @@
               <!-- Navigation -->
               <HBox justifyContent="SpaceBetween" class="sapUiSmallMarginTop">
                 <Button text="Vissza" icon="sap-icon://nav-back" press=".onWizardBack"/>
-                <Button text="Tovább: Modell beállítás" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false"
+                <Button text="Elfogadás és folytatás" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false"
                   press=".onStep2Next"
                   enabled="{= !!${discovery>/step2TargetColumn} &amp;&amp; ${discovery>/step2InputColumns}.length > 0 }"/>
               </HBox>
@@ -579,10 +581,16 @@
               <!-- Navigation -->
               <HBox justifyContent="SpaceBetween" class="sapUiSmallMarginTop">
                 <Button text="Vissza" icon="sap-icon://nav-back" press=".onWizardBack"/>
-                <Button id="startTrainingBtn" text="Tréning indítása" type="Emphasized" icon="sap-icon://play"
-                  press=".onStep3StartTraining"
-                  busy="{= ${discovery>/step3TrainingStatus} === 'RUNNING' }"
-                  enabled="{= ${discovery>/step3TrainingStatus} === 'IDLE' || ${discovery>/step3TrainingStatus} === 'ERROR' }"/>
+                <HBox>
+                  <Button id="startTrainingBtn" text="Tréning indítása" type="Ghost" icon="sap-icon://play"
+                    press=".onStep3StartTraining"
+                    busy="{= ${discovery>/step3TrainingStatus} === 'RUNNING' }"
+                    enabled="{= ${discovery>/step3TrainingStatus} === 'IDLE' || ${discovery>/step3TrainingStatus} === 'ERROR' }"
+                    class="sapUiSmallMarginEnd"/>
+                  <Button text="Elfogadás és folytatás" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false"
+                    press=".onStep3Next"
+                    visible="{= ${discovery>/step3TrainingStatus} === 'DONE' }"/>
+                </HBox>
               </HBox>
             </VBox>
           </WizardStep>
@@ -686,7 +694,7 @@
                 </HBox>
 
                 <!-- Data Preview Table (20 sor) + Eloszlás chart -->
-                <Panel id="previewTablePanel" headerText="Előrejelzési előnézet (első 20 sor)" expandable="true" expanded="false" class="mlWizardSection">
+                <Panel id="previewTablePanel" headerText="Előrejelzési eredmény" expandable="true" expanded="true" class="mlWizardSection">
                   <VBox>
                     <Table id="mlPreviewTable" fixedLayout="false" growing="true" growingThreshold="20">
                       <columns/>
@@ -722,87 +730,48 @@
               <!-- Navigation -->
               <HBox justifyContent="SpaceBetween" class="sapUiSmallMarginTop">
                 <Button text="Vissza" icon="sap-icon://nav-back" press=".onWizardBack"/>
-                <Button text="Szimuláció, Export és Időzítés" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false" press=".onStep4Next"/>
+                <Button text="Elfogadás és folytatás" type="Emphasized" icon="sap-icon://arrow-right" iconFirst="false" press=".onStep4Next"/>
               </HBox>
             </VBox>
           </WizardStep>
 
           <!-- ───────────────────────────────────────────────────────────
-               STEP 5 – SZIMULÁCIÓ, EXPORT ÉS IDŐZÍTÉS
+               STEP 5 – JAVASLATOK, EXPORT ÉS IDŐZÍTÉS
           ─────────────────────────────────────────────────────────────── -->
-          <WizardStep id="wizStep5" title="Szimuláció, Export és Időzítés" icon="sap-icon://simulate" validated="true">
+          <WizardStep id="wizStep5" title="Javaslatok, Export és Időzítés" icon="sap-icon://discussion" validated="true">
             <VBox class="mlWizardStepContent">
 
-              <!-- What-if szimuláció (összezárva alapértelmezetten) -->
-              <Panel headerText="What-if szimuláció" class="mlWizardSection" expandable="true" expanded="false">
+              <!-- Javasolt kiegészítő adatok -->
+              <Panel headerText="Javasolt kiegészítő adatok" class="mlWizardSection" expandable="true" expanded="true">
                 <VBox class="sapUiSmallMargin">
-                  <Text text="Módosíts jellemzőértékeket és nézd meg, hogyan változnak az előrejelzések." class="mlWizardHintText sapUiSmallMarginBottom"/>
-                  <Table id="simEditorTable" items="{discovery>/step5SimulationChanges}" fixedLayout="false" noDataText="Kattints az 'Sor hozzáadása' gombra.">
-                    <columns>
-                      <Column><Text text="Jellemző"/></Column>
-                      <Column><Text text="Új érték (szimuláció)"/></Column>
-                      <Column><Text text=""/></Column>
-                    </columns>
-                    <items>
-                      <ColumnListItem>
-                        <cells>
-                          <Text text="{discovery>column}"/>
-                          <Input value="{discovery>new_value}" placeholder="Adj meg új értéket"/>
-                          <Button icon="sap-icon://delete" type="Transparent" press=".onRemoveSimRow"/>
-                        </cells>
-                      </ColumnListItem>
-                    </items>
-                  </Table>
-                  <HBox class="sapUiSmallMarginTop">
-                    <Button text="Sor hozzáadása" icon="sap-icon://add" type="Ghost" press=".onAddSimRow"/>
-                  </HBox>
+                  <Text text="Az AI azonosított olyan jellemzőket, amelyek jelentősen javíthatják az előrejelzés pontosságát, de jelenleg hiányoznak az adataidból. Ezeket érdemes összegyűjteni és a modellt újratanítani." wrapping="true" class="mlWizardHintText sapUiSmallMarginBottom"/>
 
-                  <!-- AI Simulation Context -->
-                  <MessageStrip id="simContextStrip" text="{discovery>/step5AiSimulationContext}"
-                    type="Information" showCloseButton="false"
-                    visible="{= !!${discovery>/step5AiSimulationContext} }"
-                    class="sapUiSmallMarginTop"/>
+                  <VBox visible="{discovery>/step5SuggestedInputsBusy}" class="mlWizardCenteredBox sapUiSmallMarginTopBottom">
+                    <BusyIndicator size="3rem"/>
+                    <Text text="AI javaslatok generálása..." class="sapUiTinyMarginTop"/>
+                  </VBox>
 
-                  <!-- Run Simulation Button -->
-                  <HBox class="sapUiSmallMarginTop">
-                    <Button text="Szimuláció futtatása" icon="sap-icon://play" type="Emphasized"
-                      press=".onStep5RunSimulation"
-                      busy="{= ${discovery>/step5SimBusy} }"
-                      enabled="{= ${discovery>/step5SimulationChanges}.length > 0 }"/>
-                  </HBox>
-                </VBox>
-              </Panel>
-
-              <!-- Simulation Results -->
-              <Panel id="simResultPanel" headerText="Szimuláció eredménye"
-                visible="{= !!${discovery>/step5SimulationResult} }"
-                class="mlWizardSection">
-                <VBox class="sapUiSmallMargin">
-                  <HBox wrap="Wrap" class="sapUiSmallMarginBottom">
-                    <ObjectStatus title="Megváltozott sorok" text="{discovery>/step5SimulationResult/changed_count}"
-                      state="Warning" class="sapUiSmallMarginEnd"/>
-                    <ObjectStatus title="Összes sor" text="{discovery>/step5SimulationResult/total_count}"
-                      state="None" class="sapUiSmallMarginEnd"/>
-                    <ObjectStatus title="Változási arány" text="{= ${discovery>/step5SimulationResult/change_rate_pct} + '%' }"
-                      state="{= ${discovery>/step5SimulationResult/change_rate_pct} > 10 ? 'Warning' : 'Success' }"/>
-                  </HBox>
-                  <Table id="simDeltaTable" items="{discovery>/step5SimulationResult/delta_rows}"
-                    noDataText="Nem változott egyetlen sor előrejelzése sem." growing="true" growingThreshold="10">
-                    <columns>
-                      <Column><Text text="Sor #"/></Column>
-                      <Column><Text text="Eredeti előrejelzés"/></Column>
-                      <Column><Text text="Új előrejelzés"/></Column>
-                    </columns>
-                    <items>
-                      <ColumnListItem>
-                        <cells>
-                          <Text text="{discovery>row_id}"/>
-                          <ObjectStatus text="{discovery>original_prediction}" state="None"/>
-                          <ObjectStatus text="{discovery>new_prediction}" state="Warning"/>
-                        </cells>
-                      </ColumnListItem>
-                    </items>
-                  </Table>
+                  <List id="suggestedInputsList"
+                    items="{discovery>/step5SuggestedInputs}"
+                    noDataText="Nincs javaslat."
+                    visible="{= !${discovery>/step5SuggestedInputsBusy} }">
+                    <CustomListItem>
+                      <VBox class="sapUiSmallMarginBegin sapUiMediumMarginTopBottom sapUiSmallMarginEnd">
+                        <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                          <core:Icon src="sap-icon://lightbulb" color="#e78c07" size="1.2rem" class="sapUiSmallMarginEnd"/>
+                          <Text text="{discovery>title}" wrapping="true" class="mlWizardBold"/>
+                        </HBox>
+                        <Text text="{discovery>why}" wrapping="true" class="mlWizardHintText"/>
+                        <Text text="{= '→ ' + ${discovery>impact} }" wrapping="true" class="sapUiTinyMarginTop"
+                          visible="{= !!${discovery>impact} }"/>
+                        <Panel headerText="Példa adatok" expandable="true" expanded="false"
+                          backgroundDesign="Transparent" class="sapUiSmallMarginTop"
+                          visible="{= !!${discovery>example} }">
+                          <Text text="{discovery>example}" wrapping="true" class="sapUiSmallMargin mlWizardHintText"/>
+                        </Panel>
+                      </VBox>
+                    </CustomListItem>
+                  </List>
                 </VBox>
               </Panel>
 

@@ -9091,6 +9091,11 @@ app.post("/api/ml-wizard/step3/start-training", express.json(), async function(r
     if (!session) { return res.status(404).json({ error: "Munkamenet nem található." }); }
 
     session.wizard_spec.model_tier = model_tier;
+    // Aggregálás beállítások mentése a spec-be (forecast generáláshoz)
+    if (req.body.date_column) { session.wizard_spec.date_column = String(req.body.date_column); }
+    if (req.body.time_level) { session.wizard_spec.time_level = String(req.body.time_level); }
+    if (Array.isArray(req.body.group_by_keys)) { session.wizard_spec.group_by_keys = req.body.group_by_keys; }
+    if (req.body.forecast_horizon) { session.wizard_spec.forecast_horizon = Number(req.body.forecast_horizon) || 3; }
 
     const tierExplanation = await mlWizardAiStep3(session);
     session.ai_cache.step3 = tierExplanation;
@@ -9123,6 +9128,8 @@ app.get("/api/ml-wizard/step4/result/:sessionId", async function(req, res) {
 
     const metrics = JSON.parse(fs.readFileSync(metricsPath, "utf8"));
     const previewRows = fs.existsSync(previewPath) ? JSON.parse(fs.readFileSync(previewPath, "utf8")) : [];
+    const forecastPath = path.join(jobDir, "forecast_preview.json");
+    const forecastRows = fs.existsSync(forecastPath) ? JSON.parse(fs.readFileSync(forecastPath, "utf8")) : [];
 
     if (!session.ai_cache.step4) {
       session.ai_cache.step4 = await mlWizardAiStep4(session, metrics);
@@ -9131,6 +9138,7 @@ app.get("/api/ml-wizard/step4/result/:sessionId", async function(req, res) {
     const ai4 = session.ai_cache.step4;
     res.json({
       preview_rows: Array.isArray(previewRows) ? previewRows.slice(0, 20) : [],
+      forecast_rows: Array.isArray(forecastRows) ? forecastRows : [],
       metrics: metrics,
       feature_importance: metrics.feature_importance || [],
       ai_insight: {
@@ -9144,6 +9152,39 @@ app.get("/api/ml-wizard/step4/result/:sessionId", async function(req, res) {
     });
   } catch (err) {
     res.status(500).json({ error: "Eredmény lekérési hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+// ─── ROUTE: POST /api/ml-wizard/step5/suggested-inputs ───────────────────────
+app.post("/api/ml-wizard/step5/suggested-inputs", express.json(), async function(req, res) {
+  try {
+    const body = req.body || {};
+    const sessionId = String(body.session_id || "");
+    const goal_text = String(body.goal_text || "");
+    const column_names = Array.isArray(body.column_names) ? body.column_names : [];
+    const session = oMLWizardSessions.get(sessionId);
+    if (!session) { return res.status(404).json({ error: "Munkamenet nem található." }); }
+
+    const colStr = column_names.join(", ");
+    const messages = [
+      {
+        role: "system",
+        content: "Üzleti-szemléletű ML adattanácsadó vagy. Azonosítod, milyen extra adatot érdemes gyűjteni a jobb előrejelzéshez. Válasz JSON, magyar nyelven, nem technikai."
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          goal: goal_text || session.goal,
+          existing_columns: colStr,
+          instruction: "Javasolj 3-5 olyan kiegészítő adatjellemzőt, amelyek jelenleg hiányoznak, de jelentősen javítanák az előrejelzés minőségét. Minden javaslathoz adj: sorszámozott cím (pl. '1. Ár / átlagos eladási ár'), miért fontos, milyen hatást vár, egy konkrét adatsor példát. Válasz JSON: { suggested_inputs: [{title: string, column_name: string, why: string, impact: string, example: string}] }"
+        })
+      }
+    ];
+
+    const result = await callOpenAiJsonObject(messages, 0.5);
+    res.json({ suggested_inputs: Array.isArray(result.suggested_inputs) ? result.suggested_inputs : [] });
+  } catch (err) {
+    res.status(500).json({ error: "Kiegészítő adat javaslat hiba", details: err && err.message ? err.message : String(err) });
   }
 });
 

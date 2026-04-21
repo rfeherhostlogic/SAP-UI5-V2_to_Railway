@@ -126,6 +126,8 @@ sap.ui.define([
         step4CsvDownloadUrl: "",
         step4Busy: false,
         // Step 5
+        step5SuggestedInputs: [],
+        step5SuggestedInputsBusy: false,
         step5SimulationChanges: [],
         step5SimulationResult: null,
         step5AiSimulationContext: "",
@@ -205,6 +207,14 @@ sap.ui.define([
         optimization:   "Optimális döntést vagy elosztást javasolj (pl. készlet, erőforrás, ütemezés)."
       };
       this._set("/step1GoalHint", hints[sKey] || "");
+      // Szinkronizáld az AI javaslatokat az új céltípushoz
+      var bHasSource = this._get("/step1SourceType") === "csv"
+        ? this._get("/step1CsvFiles").length > 0
+        : this._get("/step1SelectedTables").length > 0;
+      if (bHasSource) {
+        this._set("/step1AiGoalSuggestions", []);
+        this.onStep1LoadAiSuggestions();
+      }
     },
 
     onStep1SourceTypeChange: function(oEvent) {
@@ -423,27 +433,18 @@ sap.ui.define([
           that._get("/step1SelectedTables").length > 1 ||
           (that._get("/step1CsvFiles").length >= 1 && that._get("/step1SelectedTables").length >= 1);
         var sAggrRec = that._get("/step1AggregationRecommendation");
-        var bNeedAggr = sAggrRec === "recommended" || sAggrRec === "uncertain";
+        // Hungarian values: "Ajánlott" | "Nem szükséges" | "Bizonytalan"
+        var bNeedAggr = sAggrRec === "Ajánlott" || sAggrRec === "Bizonytalan";
 
         that._set("/showStepJoin", bMultiSource);
         that._set("/showStepAggr", bNeedAggr);
 
-        // Optional step-ek auto-validálása ha kihagyjuk
-        if (!bMultiSource) { that._validateStep("wizStepJoin"); }
-        if (!bNeedAggr) { that._validateStep("wizStepAggr"); }
+        // Mindig előkészítjük mindkét lépést (felhasználó mindig látja)
+        that._buildJoinSourceOptions();
+        that._buildAggrColumns();
 
-        // Navigáció a következő látható wizard lépésre
-        that._stepHistory = ["wizStep1"];
-        if (bMultiSource) {
-          that._buildJoinSourceOptions();
-          that._stepHistory.push("wizStepJoin");
-        } else if (bNeedAggr) {
-          that._buildAggrColumns();
-          that._stepHistory.push("wizStepAggr");
-        } else {
-          that._stepHistory.push("wizStep2");
-        }
-        that._getWizard().nextStep();
+        that._stepHistory = ["wizStep1", "wizStepJoin"];
+        that._getWizard().nextStep(); // mindig wizStepJoin következik
       }).catch(function(err) {
         that._set("/wizardError", "Inicializálási hiba: " + (err && err.message ? err.message : String(err)));
         that._set("/step1Busy", false);
@@ -573,15 +574,8 @@ sap.ui.define([
 
     onStepJoinNext: function() {
       this._validateStep("wizStepJoin");
-      var bNeedAggr = this._get("/showStepAggr");
-      if (!bNeedAggr) {
-        this._validateStep("wizStepAggr");
-        this._stepHistory.push("wizStep2");
-      } else {
-        this._buildAggrColumns();
-        this._stepHistory.push("wizStepAggr");
-      }
-      this._getWizard().nextStep();
+      this._stepHistory.push("wizStepAggr");
+      this._getWizard().nextStep(); // mindig wizStepAggr következik
     },
 
     // ─── STEP AGGR (1c) HANDLERS ─────────────────────────────────────────────
@@ -636,14 +630,6 @@ sap.ui.define([
     },
 
     onStepAggrNext: function() {
-      if (!this._get("/stepAggrUnit")) {
-        MessageToast.show("Add meg az elemzési egységet.");
-        return;
-      }
-      if ((this._get("/stepAggrGroupKeys") || []).length === 0) {
-        MessageToast.show("Válassz legalább egy csoportosítási kulcsot.");
-        return;
-      }
       this._validateStep("wizStepAggr");
       this._stepHistory.push("wizStep2");
       this._getWizard().nextStep();
@@ -717,7 +703,11 @@ sap.ui.define([
 
       AiService.mlWizardStep3StartTraining({
         session_id: sSessionId,
-        model_tier: sTier
+        model_tier: sTier,
+        date_column: that._get("/stepAggrDateColumn") || "",
+        time_level: that._get("/stepAggrTimeLevel") || "monthly",
+        group_by_keys: that._get("/stepAggrGroupKeys") || [],
+        forecast_horizon: 3
       }).then(function(oData) {
         that._set("/step3AiTierExplanation", oData.ai_tier_explanation || "");
         that._set("/step3TrainingJobId", oData.job_id);
@@ -742,9 +732,7 @@ sap.ui.define([
             that._trainTimer = null;
             that._set("/step3TrainingStatus", "DONE");
             that._set("/step3TrainingProgress", 100);
-            that._validateStep("wizStep3");
-            that._navigateTo("wizStep4");
-            that._loadStep4Results();
+            that._set("/step3TrainingMessage", "Tréning kész! Kattints az 'Elfogadás és folytatás' gombra.");
           } else if (oData.status === "error") {
             clearInterval(that._trainTimer);
             that._trainTimer = null;
@@ -755,11 +743,22 @@ sap.ui.define([
       }, POLL_INTERVAL_MS);
     },
 
+    onStep3Next: function() {
+      if (this._get("/step3TrainingStatus") !== "DONE") {
+        MessageToast.show("Várj a tréning befejezéséig.");
+        return;
+      }
+      this._validateStep("wizStep3");
+      this._navigateTo("wizStep4");
+      this._loadStep4Results();
+    },
+
     // ─── STEP 4 HANDLERS ─────────────────────────────────────────────────────
 
     onStep4Next: function() {
       this._validateStep("wizStep4");
       this._navigateTo("wizStep5");
+      this._loadStep5SuggestedInputs();
     },
 
     _loadStep4Results: function() {
@@ -768,7 +767,10 @@ sap.ui.define([
       this._set("/step4Busy", true);
 
       AiService.mlWizardStep4Result({ session_id: sSessionId }).then(function(oData) {
-        var aRows = (oData.preview_rows || []).slice(0, 20); // max 20 sor
+        // Előnézet: előrejelzési sorok ha rendelkezésre állnak (jövőbeli előrejelzés), egyébként teszt sorok
+        var aRows = (oData.forecast_rows && oData.forecast_rows.length > 0)
+          ? oData.forecast_rows
+          : (oData.preview_rows || []).slice(0, 20);
         that._set("/step4PreviewRows", aRows);
         that._set("/step4Metrics", oData.metrics || {});
         that._set("/step4CsvDownloadUrl", oData.csv_download_url || "");
@@ -890,6 +892,27 @@ sap.ui.define([
       document.body.appendChild(oLink);
       oLink.click();
       document.body.removeChild(oLink);
+    },
+
+    _loadStep5SuggestedInputs: function() {
+      var sSessionId = this._get("/sessionId");
+      if (!sSessionId) { return; }
+      var sGoal = this._get("/step1SelectedGoalText") || this._get("/step1Goal");
+      var aColumns = (this._get("/step1ColumnPreview") || []).map(function(c) { return c.name; });
+      var that = this;
+      this._set("/step5SuggestedInputsBusy", true);
+      this._set("/step5SuggestedInputs", []);
+      AiService.mlWizardStep5SuggestedInputs({
+        session_id: sSessionId,
+        goal_text: sGoal,
+        column_names: aColumns
+      }).then(function(oData) {
+        that._set("/step5SuggestedInputs", oData.suggested_inputs || []);
+      }).catch(function() {
+        // silently ignore
+      }).finally(function() {
+        that._set("/step5SuggestedInputsBusy", false);
+      });
     },
 
     // ─── STEP 5 HANDLERS ─────────────────────────────────────────────────────

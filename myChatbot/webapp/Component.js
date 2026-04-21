@@ -559,6 +559,8 @@ sap.ui.define([
 				step4CsvDownloadUrl: "",
 				step4Busy: false,
 				// Step 5
+				step5SuggestedInputs: [],
+				step5SuggestedInputsBusy: false,
 				step5SimulationChanges: [],
 				step5SimulationResult: null,
 				step5AiSimulationContext: "",
