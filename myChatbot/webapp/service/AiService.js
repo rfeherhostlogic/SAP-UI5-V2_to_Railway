@@ -1028,7 +1028,9 @@
       body: JSON.stringify({
         session_id: mPayload.session_id || "",
         goal_text: mPayload.goal_text || "",
-        column_names: mPayload.column_names || []
+        column_names: mPayload.column_names || [],
+        date_column: mPayload.date_column || "",
+        group_by_keys: mPayload.group_by_keys || []
       })
     }).then(function(oResponse) {
       if (!oResponse.ok) {
@@ -1097,7 +1099,11 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         session_id: mPayload.session_id || "",
-        model_tier: mPayload.model_tier || "balanced"
+        model_tier: mPayload.model_tier || "balanced",
+        date_column: mPayload.date_column || "",
+        time_level: mPayload.time_level || "",
+        group_by_keys: mPayload.group_by_keys || [],
+        forecast_horizon: mPayload.forecast_horizon || 3
       })
     }).then(function(oResponse) {
       if (!oResponse.ok) {

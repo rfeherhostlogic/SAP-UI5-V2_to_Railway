@@ -40,6 +40,188 @@ sap.ui.define([
     _set: function(sPath, vValue) { this._model().setProperty(sPath, vValue); },
     _get: function(sPath) { return this._model().getProperty(sPath); },
 
+    _normalizeAggregationRecommendation: function(vRecommendation) {
+      var sValue = String(vRecommendation || "").trim().toLowerCase();
+      if (!sValue) {
+        return "";
+      }
+      if (["ajanlott", "ajánlott", "recommended"].indexOf(sValue) >= 0) {
+        return "recommended";
+      }
+      if (["bizonytalan", "uncertain"].indexOf(sValue) >= 0) {
+        return "uncertain";
+      }
+      if (["nem szukseges", "nem szükséges", "not_needed", "not-needed", "not needed", "none"].indexOf(sValue) >= 0) {
+        return "not_needed";
+      }
+      return sValue;
+    },
+
+    _getSelectedGoalText: function() {
+      return this._get("/step1SelectedGoalText") ||
+        this._get("/step1FreeTextRefined") ||
+        this._get("/step1FreeTextGoal") ||
+        this._get("/step1Goal") ||
+        "";
+    },
+
+    _extractForecastHorizon: function(sGoalText) {
+      var sText = String(sGoalText || "").toLowerCase();
+      var aPatterns = [
+        { regex: /(\d+)\s*h[oó]nap/, value: null },
+        { regex: /(\d+)\s*month/, value: null },
+        { regex: /k[oö]vetkez[oő]\s+negyed[eé]v/, value: 3 },
+        { regex: /next\s+quarter/, value: 3 }
+      ];
+      var i;
+      var oMatch;
+
+      for (i = 0; i < aPatterns.length; i++) {
+        oMatch = aPatterns[i].regex.exec(sText);
+        if (oMatch) {
+          if (aPatterns[i].value !== null) {
+            return aPatterns[i].value;
+          }
+          return Math.max(1, parseInt(oMatch[1], 10) || 3);
+        }
+      }
+
+      return 3;
+    },
+
+    _isDateLikeColumn: function(sName) {
+      return /date|_dt|time|datum|d[aá]tum|nap|day|week|h[eé]t|month|h[oó]nap|quarter|negyed|year|[ée]v/i.test(String(sName || ""));
+    },
+
+    _isLikelyIdColumn: function(sName) {
+      return /(^|_|-)(id|key)$|identifier|azonosito|azonosító/i.test(String(sName || ""));
+    },
+
+    _isLikelyDimensionColumn: function(sName, sDtype) {
+      if (this._isDateLikeColumn(sName) || this._isLikelyIdColumn(sName)) {
+        return true;
+      }
+      return /(category|kategoria|kateg[oó]ria|segment|szegmens|group|csoport|region|orszag|ország|country|channel|termek|termék|customer|ugyfel|ügyfél|partner)/i.test(String(sName || "")) ||
+        /char|string|object|category/i.test(String(sDtype || ""));
+    },
+
+    _isLikelyMeasureColumn: function(sName, sDtype) {
+      if (this._isDateLikeColumn(sName) || this._isLikelyIdColumn(sName)) {
+        return false;
+      }
+      if (!/int|float|double|decimal|number|numeric|long|short/i.test(String(sDtype || ""))) {
+        return /(amount|qty|quantity|count|db|darab|sales|revenue|arbev|árbev|bev[eé]tel|profit|cost|ertek|érték|order|rendel)/i.test(String(sName || ""));
+      }
+      return true;
+    },
+
+    _pickTargetColumn: function(aColumns) {
+      var sGoalText = this._getSelectedGoalText().toLowerCase();
+      var aPriorityPatterns = [
+        /(rendel[eé]s|order).*(db|darab|count|qty|quantity)|(db|darab|count|qty|quantity).*(rendel[eé]s|order)/i,
+        /(bev[eé]tel|revenue|sales|forgalom|amount|netamount)/i,
+        /(profit|margin|cost|k[oö]lts[eé]g)/i
+      ];
+      var aMeasures = (aColumns || []).filter(function(oColumn) {
+        return this._isLikelyMeasureColumn(oColumn.name, oColumn.dtype);
+      }.bind(this));
+      var i;
+      var oFound;
+
+      for (i = 0; i < aPriorityPatterns.length; i++) {
+        oFound = aMeasures.find(function(oColumn) {
+          return aPriorityPatterns[i].test(String(oColumn.name || "")) && (!sGoalText || aPriorityPatterns[i].test(sGoalText));
+        });
+        if (oFound) {
+          return oFound.name;
+        }
+      }
+
+      oFound = aMeasures.find(function(oColumn) {
+        return sGoalText && sGoalText.indexOf(String(oColumn.name || "").toLowerCase()) >= 0;
+      });
+      if (oFound) {
+        return oFound.name;
+      }
+
+      return aMeasures.length > 0 ? aMeasures[0].name : "";
+    },
+
+    _prefillStep2Selections: function(oProfile, aFeatureSuggestions) {
+      var aColumns = (oProfile && oProfile.columns) || [];
+      var sTargetColumn = this._get("/step2TargetColumn");
+      var aInputColumns = this._get("/step2InputColumns") || [];
+      var aSelectedFeatures = aFeatureSuggestions || [];
+      var aCandidateInputs;
+      var aSuggestedFeatureNames;
+      var oInputMulti;
+
+      if (!sTargetColumn) {
+        sTargetColumn = this._pickTargetColumn(aColumns);
+        if (sTargetColumn) {
+          this._set("/step2TargetColumn", sTargetColumn);
+        }
+      }
+
+      if (aInputColumns.length === 0) {
+        aCandidateInputs = [];
+
+        if (this._get("/stepAggrDateColumn")) {
+          aCandidateInputs.push(this._get("/stepAggrDateColumn"));
+        }
+        (this._get("/stepAggrGroupKeys") || []).forEach(function(sKey) {
+          if (aCandidateInputs.indexOf(sKey) < 0) {
+            aCandidateInputs.push(sKey);
+          }
+        });
+
+        aSuggestedFeatureNames = aSelectedFeatures
+          .filter(function(oFeature) {
+            return oFeature && oFeature.selected && oFeature.readiness === "ready";
+          })
+          .map(function(oFeature) {
+            return oFeature.name || oFeature.label || "";
+          })
+          .filter(Boolean);
+
+        aColumns.forEach(function(oColumn) {
+          var sName = oColumn.name;
+          var bSuggested = aSuggestedFeatureNames.some(function(sFeatureName) {
+            return sFeatureName.toLowerCase() === String(sName || "").toLowerCase();
+          });
+          var bUsefulByType = this._isDateLikeColumn(sName) || this._isLikelyDimensionColumn(sName, oColumn.dtype);
+          if (sName && sName !== sTargetColumn && (bSuggested || bUsefulByType) && aCandidateInputs.indexOf(sName) < 0) {
+            aCandidateInputs.push(sName);
+          }
+        }.bind(this));
+
+        if (aCandidateInputs.length === 0) {
+          aCandidateInputs = aColumns
+            .filter(function(oColumn) { return oColumn.name && oColumn.name !== sTargetColumn; })
+            .slice(0, 5)
+            .map(function(oColumn) { return oColumn.name; });
+        }
+
+        this._set("/step2InputColumns", aCandidateInputs);
+        oInputMulti = this.byId("inputColumnsMulti");
+        if (oInputMulti) {
+          oInputMulti.setSelectedKeys(aCandidateInputs);
+        }
+      }
+    },
+
+    _goToStep: function(sStepId) {
+      var oWizard = this._getWizard();
+      var oStep = this._getStep(sStepId);
+      if (!oWizard || !oStep) {
+        return;
+      }
+      if (this._stepHistory[this._stepHistory.length - 1] !== sStepId) {
+        this._stepHistory.push(sStepId);
+      }
+      oWizard.goToStep(oStep, false);
+    },
+
     _clearAllTimers: function() {
       if (this._profileTimer) { clearInterval(this._profileTimer); this._profileTimer = null; }
       if (this._trainTimer) { clearInterval(this._trainTimer); this._trainTimer = null; }
@@ -328,7 +510,7 @@ sap.ui.define([
         });
         that._set("/step1AiGoalSuggestions", aSuggestions);
         that._set("/step1EarlyFeatureHints", oData.early_feature_hints || []);
-        that._set("/step1AggregationRecommendation", oData.aggregation_recommendation || "");
+        that._set("/step1AggregationRecommendation", that._normalizeAggregationRecommendation(oData.aggregation_recommendation));
 
         // Ha az AI osztályozást/optimalizációt javasol, auto-beállítjuk
         if (oData.suggested_goal_type && ["prediction","classification","optimization"].indexOf(oData.suggested_goal_type) >= 0) {
@@ -380,7 +562,7 @@ sap.ui.define([
         });
         that._set("/step1AiGoalSuggestions", aSuggestions);
         that._set("/step1EarlyFeatureHints", oData.early_feature_hints || []);
-        that._set("/step1AggregationRecommendation", oData.aggregation_recommendation || "");
+        that._set("/step1AggregationRecommendation", that._normalizeAggregationRecommendation(oData.aggregation_recommendation));
       }).catch(function(err) {
         MessageToast.show("AI javítás hiba: " + (err && err.message ? err.message : String(err)));
       }).finally(function() {
@@ -432,19 +614,25 @@ sap.ui.define([
         var bMultiSource = that._get("/step1CsvFiles").length > 1 ||
           that._get("/step1SelectedTables").length > 1 ||
           (that._get("/step1CsvFiles").length >= 1 && that._get("/step1SelectedTables").length >= 1);
-        var sAggrRec = that._get("/step1AggregationRecommendation");
-        // Hungarian values: "Ajánlott" | "Nem szükséges" | "Bizonytalan"
-        var bNeedAggr = sAggrRec === "Ajánlott" || sAggrRec === "Bizonytalan";
-
+        var sAggrRec = that._normalizeAggregationRecommendation(that._get("/step1AggregationRecommendation"));
+        var bNeedAggr = sAggrRec === "recommended" || sAggrRec === "uncertain";
         that._set("/showStepJoin", bMultiSource);
         that._set("/showStepAggr", bNeedAggr);
+        that._set("/step1AggregationRecommendation", sAggrRec);
 
         // Mindig előkészítjük mindkét lépést (felhasználó mindig látja)
         that._buildJoinSourceOptions();
         that._buildAggrColumns();
+        if (bMultiSource) {
+          that.onLoadJoinAiSuggestion();
+        }
+        if (bNeedAggr) {
+          that.onLoadAggrAiSuggestion();
+        }
 
-        that._stepHistory = ["wizStep1", "wizStepJoin"];
-        that._getWizard().nextStep(); // mindig wizStepJoin következik
+        that._stepHistory = ["wizStep1"];
+        that._goToStep("wizStepJoin");
+        return;
       }).catch(function(err) {
         that._set("/wizardError", "Inicializálási hiba: " + (err && err.message ? err.message : String(err)));
         that._set("/step1Busy", false);
@@ -522,6 +710,7 @@ sap.ui.define([
         });
         that._set("/step2AiFeatureSuggestions", aSuggestions);
         that._set("/step2SelectedFeatures", aSuggestions);
+        that._prefillStep2Selections(oProfile, aSuggestions);
         that._set("/step2Busy", false);
       }).catch(function(err) {
         that._set("/step2Busy", false);
@@ -574,8 +763,8 @@ sap.ui.define([
 
     onStepJoinNext: function() {
       this._validateStep("wizStepJoin");
-      this._stepHistory.push("wizStepAggr");
-      this._getWizard().nextStep(); // mindig wizStepAggr következik
+      this._goToStep("wizStepAggr");
+      return;
     },
 
     // ─── STEP AGGR (1c) HANDLERS ─────────────────────────────────────────────
@@ -601,7 +790,7 @@ sap.ui.define([
 
     onLoadAggrAiSuggestion: function() {
       var sSessionId = this._get("/sessionId");
-      var sSelectedGoal = this._get("/step1SelectedGoalText") || this._get("/step1Goal");
+      var sSelectedGoal = this._getSelectedGoalText();
       if (!sSessionId) { MessageToast.show("Session nem elérhető."); return; }
       this._set("/stepAggrBusy", true);
       var that = this;
@@ -630,9 +819,19 @@ sap.ui.define([
     },
 
     onStepAggrNext: function() {
+      if (this._get("/showStepAggr")) {
+        if (!this._get("/stepAggrUnit")) {
+          MessageToast.show("Add meg az elemzesi egyseget.");
+          return;
+        }
+        if ((this._get("/stepAggrGroupKeys") || []).length === 0) {
+          MessageToast.show("Valassz legalabb egy csoportositasi kulcsot.");
+          return;
+        }
+      }
       this._validateStep("wizStepAggr");
-      this._stepHistory.push("wizStep2");
-      this._getWizard().nextStep();
+      this._goToStep("wizStep2");
+      return;
     },
 
     // ─── STEP 2 HANDLERS ─────────────────────────────────────────────────────
@@ -673,7 +872,7 @@ sap.ui.define([
       }).then(function(oData) {
         that._set("/step2ReadinessSummary", oData.readiness_summary || "");
         that._validateStep("wizStep2");
-        that._navigateTo("wizStep3");
+        that._goToStep("wizStep3");
       }).catch(function(err) {
         that._set("/wizardError", "Feature megerősítési hiba: " + (err && err.message ? err.message : String(err)));
       });
@@ -707,7 +906,7 @@ sap.ui.define([
         date_column: that._get("/stepAggrDateColumn") || "",
         time_level: that._get("/stepAggrTimeLevel") || "monthly",
         group_by_keys: that._get("/stepAggrGroupKeys") || [],
-        forecast_horizon: 3
+        forecast_horizon: that._extractForecastHorizon(that._getSelectedGoalText())
       }).then(function(oData) {
         that._set("/step3AiTierExplanation", oData.ai_tier_explanation || "");
         that._set("/step3TrainingJobId", oData.job_id);
@@ -749,7 +948,7 @@ sap.ui.define([
         return;
       }
       this._validateStep("wizStep3");
-      this._navigateTo("wizStep4");
+      this._goToStep("wizStep4");
       this._loadStep4Results();
     },
 
@@ -757,7 +956,7 @@ sap.ui.define([
 
     onStep4Next: function() {
       this._validateStep("wizStep4");
-      this._navigateTo("wizStep5");
+      this._goToStep("wizStep5");
       this._loadStep5SuggestedInputs();
     },
 
@@ -770,7 +969,7 @@ sap.ui.define([
         // Előnézet: előrejelzési sorok ha rendelkezésre állnak (jövőbeli előrejelzés), egyébként teszt sorok
         var aRows = (oData.forecast_rows && oData.forecast_rows.length > 0)
           ? oData.forecast_rows
-          : (oData.preview_rows || []).slice(0, 20);
+          : (oData.preview_rows || []);
         that._set("/step4PreviewRows", aRows);
         that._set("/step4Metrics", oData.metrics || {});
         that._set("/step4CsvDownloadUrl", oData.csv_download_url || "");
@@ -821,7 +1020,7 @@ sap.ui.define([
 
     _loadExecutiveSummary: function(sSessionId) {
       var that = this;
-      var sSelectedGoal = this._get("/step1SelectedGoalText") || this._get("/step1Goal");
+      var sSelectedGoal = this._getSelectedGoalText();
       this._set("/step4ExecutiveSummaryBusy", true);
       AiService.mlWizardStep4ExecutiveSummary({
         session_id: sSessionId,
@@ -897,7 +1096,7 @@ sap.ui.define([
     _loadStep5SuggestedInputs: function() {
       var sSessionId = this._get("/sessionId");
       if (!sSessionId) { return; }
-      var sGoal = this._get("/step1SelectedGoalText") || this._get("/step1Goal");
+      var sGoal = this._getSelectedGoalText();
       var aColumns = (this._get("/step1ColumnPreview") || []).map(function(c) { return c.name; });
       var that = this;
       this._set("/step5SuggestedInputsBusy", true);
@@ -905,7 +1104,9 @@ sap.ui.define([
       AiService.mlWizardStep5SuggestedInputs({
         session_id: sSessionId,
         goal_text: sGoal,
-        column_names: aColumns
+        column_names: aColumns,
+        date_column: this._get("/stepAggrDateColumn") || "",
+        group_by_keys: this._get("/stepAggrGroupKeys") || []
       }).then(function(oData) {
         that._set("/step5SuggestedInputs", oData.suggested_inputs || []);
       }).catch(function() {

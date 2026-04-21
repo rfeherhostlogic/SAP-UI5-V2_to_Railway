@@ -694,9 +694,10 @@
                 </HBox>
 
                 <!-- Data Preview Table (20 sor) + Eloszlás chart -->
-                <Panel id="previewTablePanel" headerText="Előrejelzési eredmény" expandable="true" expanded="true" class="mlWizardSection">
+                <Panel id="previewTablePanel" headerText="Teljes előrejelzés" expandable="true" expanded="true" class="mlWizardSection">
                   <VBox>
-                    <Table id="mlPreviewTable" fixedLayout="false" growing="true" growingThreshold="20">
+                      <Text text="{= 'Teljes forecast sorok: ' + ${discovery>/step4PreviewRows}.length }" class="sapUiSmallMarginBottom mlWizardHintText"/>
+                      <Table id="mlPreviewTable" fixedLayout="false" growing="true" growingThreshold="200">
                       <columns/>
                       <items/>
                     </Table>
