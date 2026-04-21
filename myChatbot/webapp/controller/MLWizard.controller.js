@@ -694,9 +694,10 @@ sap.ui.define([
       if (sType === "sim" && this._simTimer) { clearInterval(this._simTimer); this._simTimer = null; }
     },
 
-    _loadProfileResult: function() {
+    _loadProfileResult: function(iAttempt) {
       var sSessionId = this._get("/sessionId");
       var that = this;
+      var iRetryCount = typeof iAttempt === "number" ? iAttempt : 0;
       AiService.mlWizardStep2ProfileResult({ session_id: sSessionId }).then(function(oData) {
         var oProfile = oData.profile || {};
         that._set("/step2Profile", oProfile);
@@ -716,6 +717,12 @@ sap.ui.define([
         that._prefillStep2Selections(oProfile, aSuggestions);
         that._set("/step2Busy", false);
       }).catch(function(err) {
+        if (err && err.status === 404 && iRetryCount < 6) {
+          setTimeout(function() {
+            that._loadProfileResult(iRetryCount + 1);
+          }, 1000);
+          return;
+        }
         that._set("/step2Busy", false);
         that._set("/wizardError", "Profil betöltési hiba: " + (err && err.message ? err.message : String(err)));
       });

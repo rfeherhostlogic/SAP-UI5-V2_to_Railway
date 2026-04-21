@@ -1069,7 +1069,11 @@
       method: "GET"
     }).then(function(oResponse) {
       if (!oResponse.ok) {
-        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+        return oResponse.text().then(function(sError) {
+          var oError = new Error("API hiba: " + sError);
+          oError.status = oResponse.status;
+          throw oError;
+        });
       }
       return oResponse.json();
     });
