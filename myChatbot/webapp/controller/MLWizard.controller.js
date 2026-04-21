@@ -410,7 +410,10 @@ sap.ui.define([
 
     onStep1CsvSelected: function(oEvent) {
       var oFileUploader = oEvent.getSource();
-      var oFiles = oFileUploader.oFileUpload && oFileUploader.oFileUpload.files;
+      var oFiles = oEvent.getParameter("files");
+      if (!oFiles || oFiles.length === 0) {
+        oFiles = oFileUploader.oFileUpload && oFileUploader.oFileUpload.files;
+      }
       if (!oFiles || oFiles.length === 0) { return; }
 
       this._csvFiles = Array.from(oFiles);
