@@ -1,0 +1,31 @@
+.feedPage {
+  min-height: 100%;
+}
+
+.feedShell {
+  width: 100%;
+}
+
+.feedChatPanel {
+  min-height: 68vh;
+  height: calc(100vh - 10rem);
+}
+
+.feedBubbleAi {
+  max-width: 88%;
+}
+
+.feedMessageMeta {
+  color: #70839b;
+  font-size: 0.73rem;
+}
+
+@media (max-width: 960px) {
+  .feedChatPanel {
+    height: 70vh;
+  }
+
+  .feedBubbleAi {
+    max-width: 100%;
+  }
+}

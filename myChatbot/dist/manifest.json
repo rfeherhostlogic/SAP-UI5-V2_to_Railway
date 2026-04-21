@@ -82,6 +82,9 @@
           "uri": "css/noah.css"
         },
         {
+          "uri": "css/feed.css"
+        },
+        {
           "uri": "css/login.css"
         }
       ]
@@ -116,6 +119,9 @@
         "type": "sap.ui.model.json.JSONModel"
       },
       "noah2": {
+        "type": "sap.ui.model.json.JSONModel"
+      },
+      "feed": {
         "type": "sap.ui.model.json.JSONModel"
       }
     },

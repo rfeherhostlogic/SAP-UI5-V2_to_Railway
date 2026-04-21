@@ -21,7 +21,7 @@ sap.ui.define([
         this.getOwnerComponent().getRouter().navTo("discoveryHome");
         return;
       }
-      if (sKey === "reports" || sKey === "jokers" || sKey === "noah") {
+      if (sKey === "reports" || sKey === "jokers" || sKey === "noah" || sKey === "feed") {
         this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: sKey });
       }
     },
@@ -56,7 +56,7 @@ sap.ui.define([
 
     _onMainMenuMatched: function(oEvent) {
       var sKey = oEvent.getParameter("arguments").menuKey || "noah";
-      if (sKey !== "reports" && sKey !== "jokers" && sKey !== "discovery" && sKey !== "noah") {
+      if (sKey !== "reports" && sKey !== "jokers" && sKey !== "discovery" && sKey !== "noah" && sKey !== "feed") {
         sKey = "noah";
       }
       this.getView().getModel("app").setProperty("/selectedMenuKey", sKey);
@@ -86,6 +86,7 @@ sap.ui.define([
         reports: this.byId("reportsView"),
         jokers: this.byId("jokersView"),
         discovery: this.byId("discoveryView"),
+        feed: this.byId("feedView"),
         noah: this.byId("noah2View"),
         jokerPrompt: this.byId("jokerPromptView")
       };

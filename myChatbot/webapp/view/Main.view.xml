@@ -21,6 +21,7 @@
         <tnt:item>
           <tnt:NavigationList>
             <tnt:NavigationListItem text="Noah" key="noah" icon="sap-icon://collaborate"/>
+            <tnt:NavigationListItem text="H&#237;rfolyam" key="feed" icon="sap-icon://discussion-2"/>
             <tnt:NavigationListItem text="Jokerek" key="jokers" icon="sap-icon://favorite"/>
             <tnt:NavigationListItem text="Felfedezés" key="discovery" icon="sap-icon://search"/>
           </tnt:NavigationList>
@@ -37,6 +38,7 @@
         <mvc:XMLView id="reportsView" viewName="sap.suite.ui.commons.demo.tutorial.view.Reports"/>
         <mvc:XMLView id="jokersView" viewName="sap.suite.ui.commons.demo.tutorial.view.Jokers"/>
         <mvc:XMLView id="discoveryView" viewName="sap.suite.ui.commons.demo.tutorial.view.MLWizard"/>
+        <mvc:XMLView id="feedView" viewName="sap.suite.ui.commons.demo.tutorial.view.Feed"/>
         <mvc:XMLView id="noah2View" viewName="sap.suite.ui.commons.demo.tutorial.view.Noah2"/>
         <mvc:XMLView id="jokerPromptView" viewName="sap.suite.ui.commons.demo.tutorial.view.JokerPrompt"/>
       </NavContainer>

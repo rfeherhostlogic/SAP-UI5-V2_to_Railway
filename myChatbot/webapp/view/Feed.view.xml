@@ -1,0 +1,44 @@
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  controllerName="sap.suite.ui.commons.demo.tutorial.controller.Feed">
+  <Page title="H&#237;rfolyam" class="sapUiContentPadding noahPage feedPage" showHeader="false">
+    <VBox class="feedShell">
+      <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiTinyMarginBottom" wrap="Wrap">
+        <VBox class="sapUiTinyMarginEnd">
+          <Title text="H&#237;rfolyam" level="H2"/>
+          <Text text="Az utolso 10 idozitett futas AI-uzenetkent jelenik meg itt." wrapping="true"/>
+        </VBox>
+        <ObjectStatus
+          text="{= ${feed>/busy} ? 'Frissites...' : (${feed>/lastUpdatedText} || 'Kesz') }"
+          state="Information"/>
+      </HBox>
+
+      <VBox id="feedChatPanel" class="noahChatPanel feedChatPanel">
+        <List items="{feed>/messages}" showSeparators="None" class="noahMsgList">
+          <CustomListItem>
+            <HBox width="100%" justifyContent="Start">
+              <Avatar initials="AI" displaySize="XS" class="chatAvatar noahAvatar"/>
+              <VBox class="chatBubble chatBubbleAi noahBubbleAi feedBubbleAi">
+                <HBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap">
+                  <Text text="AI" class="chatBubbleMeta"/>
+                  <Text text="{feed>timestampLabel}" class="feedMessageMeta" visible="{= !!${feed>timestampLabel} }"/>
+                </HBox>
+                <Text text="{feed>title}" class="chatBubbleMeta sapUiTinyMarginTop" visible="{= !!${feed>title} }"/>
+                <Text text="{feed>content}" wrapping="true" width="100%" class="sapUiTinyMarginTop"/>
+                <Text text="{feed>subtitle}" wrapping="true" class="feedMessageMeta sapUiTinyMarginTop" visible="{= !!${feed>subtitle} }"/>
+              </VBox>
+            </HBox>
+          </CustomListItem>
+        </List>
+      </VBox>
+
+      <MessageStrip
+        visible="{= !!${feed>/error} }"
+        text="{feed>/error}"
+        type="Error"
+        showIcon="true"
+        class="sapUiSmallMarginTop"/>
+    </VBox>
+  </Page>
+</mvc:View>

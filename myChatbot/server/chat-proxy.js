@@ -4556,6 +4556,48 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function getShieldJokerLabel(jokerId) {
+  switch (String(jokerId || "").trim()) {
+    case "dummy-4":
+      return "Riportok";
+    case "dummy-10":
+      return "Lemorzsolodo ugyfelek azonositasa";
+    case "dummy-11":
+      return "Prompt Epito Asszisztens";
+    default:
+      return String(jokerId || "Idozitett futas");
+  }
+}
+
+function buildShieldFeedEntry(row) {
+  const jokerId = String(row && row.JokerId ? row.JokerId : "").trim();
+  const jokerName = getShieldJokerLabel(jokerId);
+  const config = parseOpenAiReply(String(row && row.ConfigJson ? row.ConfigJson : "{}")) || {};
+  const runAt = String(row && row.RunAt ? row.RunAt : "");
+  let title = jokerName;
+
+  if (jokerId === "dummy-4") {
+    const question = String(config.question || "").trim();
+    if (question) {
+      title = jokerName + " - " + question;
+    }
+  } else if (jokerId === "dummy-11") {
+    const promptTitle = String(config.title || "").trim();
+    if (promptTitle) {
+      title = jokerName + " - " + promptTitle;
+    }
+  }
+
+  return {
+    id: Number(row && row.RunId ? row.RunId : 0),
+    role: "assistant",
+    title: title,
+    content: String(row && row.SummaryText ? row.SummaryText : "Idozitett futas lefutott.").trim(),
+    subtitle: "Pajzs / Idozitesek",
+    timestampLabel: runAt ? new Date(runAt).toLocaleString("hu-HU") : ""
+  };
+}
+
 async function ensureShieldTables() {
   const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
   try {
@@ -6402,6 +6444,35 @@ app.get("/api/reports/schedules", async function(_req, res) {
     res.json({ items: rows });
   } catch (err) {
     res.status(500).json({ error: "Idozites lekeresi hiba", details: err && err.message ? err.message : String(err) });
+  }
+});
+
+app.get("/api/reports/feed", async function(req, res) {
+  try {
+    const parsedLimit = Number(req.query && req.query.limit ? req.query.limit : 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.max(1, Math.min(parsedLimit, 50)) : 10;
+    const db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
+    let rows = [];
+    try {
+      rows = await sqliteAll(db, [
+        "SELECT",
+        "  r.RunId,",
+        "  r.ScheduleId,",
+        "  r.RunAt,",
+        "  r.SummaryText,",
+        "  s.JokerId,",
+        "  s.ConfigJson",
+        "FROM ShieldScheduleRun r",
+        "INNER JOIN ShieldSchedule s ON s.ScheduleId = r.ScheduleId",
+        "ORDER BY r.RunAt DESC, r.RunId DESC",
+        "LIMIT ?"
+      ].join("\n"), [limit]);
+    } finally {
+      await closeSqlite(db);
+    }
+    res.json({ items: rows.map(buildShieldFeedEntry) });
+  } catch (err) {
+    res.status(500).json({ error: "Hirfolyam lekeresi hiba", details: err && err.message ? err.message : String(err) });
   }
 });
 

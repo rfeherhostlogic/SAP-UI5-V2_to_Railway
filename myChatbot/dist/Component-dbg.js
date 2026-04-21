@@ -38,6 +38,13 @@ sap.ui.define([
 				busy: false
 			}), "app");
 
+			this.setModel(new JSONModel({
+				busy: false,
+				error: "",
+				lastUpdatedText: "",
+				messages: []
+			}), "feed");
+
 			// chat model
 			this.setModel(new JSONModel({
 				messages: [{

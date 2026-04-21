@@ -557,6 +557,21 @@
     });
   }
 
+  function reportsListFeed(iLimit) {
+    var iParsedLimit = Number(iLimit || 10);
+    var iSafeLimit = Number.isFinite(iParsedLimit) ? Math.max(1, Math.min(iParsedLimit, 50)) : 10;
+    return fetch("/api/reports/feed?limit=" + encodeURIComponent(String(iSafeLimit)), {
+      method: "GET"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function reportsCreateSchedule(mPayload) {
     return fetch("/api/reports/schedules", {
       method: "POST",
@@ -1168,6 +1183,7 @@
     reportsUpdateWebhook: reportsUpdateWebhook,
     reportsDeleteWebhook: reportsDeleteWebhook,
     reportsListSchedules: reportsListSchedules,
+    reportsListFeed: reportsListFeed,
     reportsCreateSchedule: reportsCreateSchedule,
     reportsUpdateSchedule: reportsUpdateSchedule,
     reportsDeleteSchedule: reportsDeleteSchedule,
@@ -1205,4 +1221,3 @@
     mlWizardStep5SimulationResult: mlWizardStep5SimulationResult
   };
 });
-
