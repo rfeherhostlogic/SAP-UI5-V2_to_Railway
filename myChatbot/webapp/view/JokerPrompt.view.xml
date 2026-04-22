@@ -519,6 +519,16 @@
               text="{= ${jokers>/rpt1Summary} ? ${jokers>/rpt1Summary} : 'Az alapertelmezett chart a jelenlegi cashflow riportot mutatja 2026 Majus, Junius es Julius honapokra.' }"
               wrapping="true"
               class="dummy9ResultText"/>
+            <List items="{jokers>/rpt1ChartRows}" class="sapUiSmallMarginTop" visible="{= ${jokers>/rpt1ChartRows}.length > 0 }">
+              <CustomListItem>
+                <VBox>
+                  <Title text="{jokers>monthLabel}" level="H6"/>
+                  <Text text="{= 'Aktualis: ' + ${jokers>actualCashflowFormatted} }" wrapping="true"/>
+                  <Text text="{= 'Prediktiv resz: ' + ${jokers>predictedIncrementalCashflowFormatted} }" wrapping="true"/>
+                  <Text text="{= 'Aktualis + Prediktiv: ' + ${jokers>predictedCashflowFormatted} }" wrapping="true"/>
+                </VBox>
+              </CustomListItem>
+            </List>
             <VBox id="rpt1ChartHost" class="sapUiMediumMarginTop" visible="{jokers>/rpt1ChartReady}"/>
             <Text
               text="A chart nem erheto el."

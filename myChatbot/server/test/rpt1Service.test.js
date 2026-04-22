@@ -114,7 +114,10 @@ test("buildChartRows merges predicted cashflow into the next three months", func
     dateColumn: "Expected Income date"
   });
 
-  assert.equal(chartRows[0].predictedCashflow, 100);
-  assert.equal(chartRows[1].predictedCashflow, 250);
-  assert.equal(chartRows[2].predictedCashflow, 75);
+  assert.equal(chartRows[0].predictedIncrementalCashflow, 100);
+  assert.equal(chartRows[1].predictedIncrementalCashflow, 250);
+  assert.equal(chartRows[2].predictedIncrementalCashflow, 75);
+  assert.equal(chartRows[0].predictedCashflow, 208262609.73);
+  assert.equal(chartRows[1].predictedCashflow, 20908393.32);
+  assert.equal(chartRows[2].predictedCashflow, 67206.92);
 });

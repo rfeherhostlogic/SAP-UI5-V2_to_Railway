@@ -7429,7 +7429,7 @@ app.post("/api/jokers/rpt1-payment-delay/run", oRpt1Upload.single("file"), async
       dateColumn: "Expected Income date"
     });
     const totalPredictedCashflow = chartRows.reduce(function(sum, row) {
-      return sum + Number(row && row.predictedCashflow ? row.predictedCashflow : 0);
+      return sum + Number(row && row.predictedIncrementalCashflow ? row.predictedIncrementalCashflow : 0);
     }, 0);
     const avgDaysLate = prediction.predictionRows.reduce(function(sum, row) {
       const value = Number(row && row["Predicted Days Late"]);

@@ -309,7 +309,7 @@ sap.ui.define([
       oModel.setProperty("/rpt1Error", "");
       oModel.setProperty("/rpt1PredictionRows", []);
       oModel.setProperty("/rpt1ChartReady", false);
-      oModel.setProperty("/rpt1ChartRows", this._cloneRpt1DefaultChartRows());
+      oModel.setProperty("/rpt1ChartRows", this._decorateRpt1ChartRows(this._cloneRpt1DefaultChartRows()));
       this._resetRpt1Chart();
       this._rebindRpt1PreviewTable();
 
@@ -317,7 +317,7 @@ sap.ui.define([
         var oResult = await AiService.runRpt1PaymentDelay({ file: oFile });
         oModel.setProperty("/rpt1Summary", oResult && oResult.summary ? oResult.summary : "Az RPT1 predikcio sikeresen lefutott.");
         oModel.setProperty("/rpt1PredictionRows", oResult && oResult.predictionRows ? oResult.predictionRows : []);
-        oModel.setProperty("/rpt1ChartRows", oResult && oResult.chartRows ? oResult.chartRows : this._cloneRpt1DefaultChartRows());
+        oModel.setProperty("/rpt1ChartRows", this._decorateRpt1ChartRows(oResult && oResult.chartRows ? oResult.chartRows : this._cloneRpt1DefaultChartRows()));
         this._rebindRpt1PreviewTable();
         this._renderRpt1Chart(oModel.getProperty("/rpt1ChartRows") || []);
       } catch (oError) {
@@ -1011,7 +1011,7 @@ sap.ui.define([
       oModel.setProperty("/rpt1Error", "");
       oModel.setProperty("/rpt1PredictionRows", []);
       oModel.setProperty("/rpt1ChartReady", false);
-      oModel.setProperty("/rpt1ChartRows", this._cloneRpt1DefaultChartRows());
+      oModel.setProperty("/rpt1ChartRows", this._decorateRpt1ChartRows(this._cloneRpt1DefaultChartRows()));
       this._resetRpt1Chart();
 
       var oFileUploader = this.byId("rpt1FileUploader");
@@ -2882,11 +2882,11 @@ sap.ui.define([
         ],
         measures: [
           new MeasureDefinition({
-            name: "Aktualis cashflow",
+            name: "Aktualis cashflow (Ft)",
             value: "{actualCashflow}"
           }),
           new MeasureDefinition({
-            name: "Prediktiv cashflow",
+            name: "Aktualis + Prediktiv cashflow (Ft)",
             value: "{predictedCashflow}"
           })
         ],
@@ -2919,13 +2919,22 @@ sap.ui.define([
       oViz.addFeed(new FeedItem({
         uid: "valueAxis",
         type: "Measure",
-        values: ["Aktualis cashflow", "Prediktiv cashflow"]
+        values: ["Aktualis cashflow (Ft)", "Aktualis + Prediktiv cashflow (Ft)"]
       }));
       oViz.setVizProperties({
         title: { visible: false },
         legend: { visible: true },
+        valueAxis: {
+          title: { visible: true, text: "Osszeg (Ft)" },
+          label: {
+            formatString: "u"
+          }
+        },
         plotArea: {
-          dataLabel: { visible: true }
+          dataLabel: {
+            visible: true,
+            formatString: "u"
+          }
         }
       });
 
@@ -2939,6 +2948,17 @@ sap.ui.define([
         return;
       }
       oHost.removeAllItems();
+    },
+
+    _formatCurrencyFt: function(vValue) {
+      var nValue = this._toNumberOrNull(vValue);
+      if (nValue == null) {
+        return "";
+      }
+      return new Intl.NumberFormat("hu-HU", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(nValue) + " Ft";
     },
 
     _findNumericColumns: function(aRows, aColumns) {
@@ -3386,6 +3406,16 @@ sap.ui.define([
       return (oModel.getProperty("/rpt1DefaultChartRows") || []).map(function(row) {
         return Object.assign({}, row);
       });
+    },
+
+    _decorateRpt1ChartRows: function(aRows) {
+      return (aRows || []).map(function(row) {
+        return Object.assign({}, row, {
+          actualCashflowFormatted: this._formatCurrencyFt(row.actualCashflow),
+          predictedIncrementalCashflowFormatted: this._formatCurrencyFt(row.predictedIncrementalCashflow),
+          predictedCashflowFormatted: this._formatCurrencyFt(row.predictedCashflow)
+        });
+      }.bind(this));
     },
 
     _extractDummy4Columns: function(aRows) {

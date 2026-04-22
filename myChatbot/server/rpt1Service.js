@@ -9,19 +9,22 @@ const DEFAULT_CASHFLOW_ROWS = [
     monthKey: "2026-05",
     monthLabel: "2026 Majus",
     actualCashflow: 208262509.73,
-    predictedCashflow: null
+    predictedIncrementalCashflow: 0,
+    predictedCashflow: 208262509.73
   },
   {
     monthKey: "2026-06",
     monthLabel: "2026 Junius",
     actualCashflow: 20908143.32,
-    predictedCashflow: null
+    predictedIncrementalCashflow: 0,
+    predictedCashflow: 20908143.32
   },
   {
     monthKey: "2026-07",
     monthLabel: "2026 Julius",
     actualCashflow: 67131.92,
-    predictedCashflow: null
+    predictedIncrementalCashflow: 0,
+    predictedCashflow: 67131.92
   }
 ];
 
@@ -357,8 +360,10 @@ function buildChartRows(predictionRows, options) {
   );
 
   return baseRows.map(function(row) {
+    const predictedIncrementalCashflow = roundCurrency(totals[row.monthKey] || 0);
     return Object.assign({}, row, {
-      predictedCashflow: roundCurrency(totals[row.monthKey] || 0)
+      predictedIncrementalCashflow: predictedIncrementalCashflow,
+      predictedCashflow: roundCurrency(Number(row.actualCashflow || 0) + predictedIncrementalCashflow)
     });
   });
 }

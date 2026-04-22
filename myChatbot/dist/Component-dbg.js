@@ -302,14 +302,14 @@ sap.ui.define([
 				rpt1PredictionRows: [],
 				rpt1ChartReady: false,
 				rpt1DefaultChartRows: [
-					{ monthKey: "2026-05", monthLabel: "2026 Majus", actualCashflow: 208262509.73, predictedCashflow: null },
-					{ monthKey: "2026-06", monthLabel: "2026 Junius", actualCashflow: 20908143.32, predictedCashflow: null },
-					{ monthKey: "2026-07", monthLabel: "2026 Julius", actualCashflow: 67131.92, predictedCashflow: null }
+					{ monthKey: "2026-05", monthLabel: "2026 Majus", actualCashflow: 208262509.73, predictedIncrementalCashflow: 0, predictedCashflow: 208262509.73, actualCashflowFormatted: "208.262.509,73 Ft", predictedIncrementalCashflowFormatted: "0,00 Ft", predictedCashflowFormatted: "208.262.509,73 Ft" },
+					{ monthKey: "2026-06", monthLabel: "2026 Junius", actualCashflow: 20908143.32, predictedIncrementalCashflow: 0, predictedCashflow: 20908143.32, actualCashflowFormatted: "20.908.143,32 Ft", predictedIncrementalCashflowFormatted: "0,00 Ft", predictedCashflowFormatted: "20.908.143,32 Ft" },
+					{ monthKey: "2026-07", monthLabel: "2026 Julius", actualCashflow: 67131.92, predictedIncrementalCashflow: 0, predictedCashflow: 67131.92, actualCashflowFormatted: "67.131,92 Ft", predictedIncrementalCashflowFormatted: "0,00 Ft", predictedCashflowFormatted: "67.131,92 Ft" }
 				],
 				rpt1ChartRows: [
-					{ monthKey: "2026-05", monthLabel: "2026 Majus", actualCashflow: 208262509.73, predictedCashflow: null },
-					{ monthKey: "2026-06", monthLabel: "2026 Junius", actualCashflow: 20908143.32, predictedCashflow: null },
-					{ monthKey: "2026-07", monthLabel: "2026 Julius", actualCashflow: 67131.92, predictedCashflow: null }
+					{ monthKey: "2026-05", monthLabel: "2026 Majus", actualCashflow: 208262509.73, predictedIncrementalCashflow: 0, predictedCashflow: 208262509.73, actualCashflowFormatted: "208.262.509,73 Ft", predictedIncrementalCashflowFormatted: "0,00 Ft", predictedCashflowFormatted: "208.262.509,73 Ft" },
+					{ monthKey: "2026-06", monthLabel: "2026 Junius", actualCashflow: 20908143.32, predictedIncrementalCashflow: 0, predictedCashflow: 20908143.32, actualCashflowFormatted: "20.908.143,32 Ft", predictedIncrementalCashflowFormatted: "0,00 Ft", predictedCashflowFormatted: "20.908.143,32 Ft" },
+					{ monthKey: "2026-07", monthLabel: "2026 Julius", actualCashflow: 67131.92, predictedIncrementalCashflow: 0, predictedCashflow: 67131.92, actualCashflowFormatted: "67.131,92 Ft", predictedIncrementalCashflowFormatted: "0,00 Ft", predictedCashflowFormatted: "67.131,92 Ft" }
 				],
 				dummy10Summary: "",
 				dummy10Rows: [],
