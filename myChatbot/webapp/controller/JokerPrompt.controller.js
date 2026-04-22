@@ -308,6 +308,7 @@ sap.ui.define([
       oModel.setProperty("/rpt1Summary", "");
       oModel.setProperty("/rpt1Error", "");
       oModel.setProperty("/rpt1PredictionRows", []);
+      oModel.setProperty("/rpt1HasRun", false);
       oModel.setProperty("/rpt1ChartReady", false);
       oModel.setProperty("/rpt1ChartRows", this._decorateRpt1ChartRows(this._cloneRpt1DefaultChartRows()));
       this._resetRpt1Chart();
@@ -317,6 +318,7 @@ sap.ui.define([
         var oResult = await AiService.runRpt1PaymentDelay({ file: oFile });
         oModel.setProperty("/rpt1Summary", oResult && oResult.summary ? oResult.summary : "Az RPT1 predikcio sikeresen lefutott.");
         oModel.setProperty("/rpt1PredictionRows", oResult && oResult.predictionRows ? oResult.predictionRows : []);
+        oModel.setProperty("/rpt1HasRun", true);
         oModel.setProperty("/rpt1ChartRows", this._decorateRpt1ChartRows(oResult && oResult.chartRows ? oResult.chartRows : this._cloneRpt1DefaultChartRows()));
         this._rebindRpt1PreviewTable();
         this._renderRpt1Chart(oModel.getProperty("/rpt1ChartRows") || []);
@@ -1010,6 +1012,7 @@ sap.ui.define([
       oModel.setProperty("/rpt1Summary", "");
       oModel.setProperty("/rpt1Error", "");
       oModel.setProperty("/rpt1PredictionRows", []);
+      oModel.setProperty("/rpt1HasRun", false);
       oModel.setProperty("/rpt1ChartReady", false);
       oModel.setProperty("/rpt1ChartRows", this._decorateRpt1ChartRows(this._cloneRpt1DefaultChartRows()));
       this._resetRpt1Chart();
@@ -2865,6 +2868,7 @@ sap.ui.define([
     _renderRpt1Chart: function(aRows) {
       var oModel = this.getView().getModel("jokers");
       var oHost = this.byId("rpt1ChartHost");
+      var bHasRun = !!oModel.getProperty("/rpt1HasRun");
 
       this._resetRpt1Chart();
       oModel.setProperty("/rpt1ChartReady", false);
@@ -2884,16 +2888,19 @@ sap.ui.define([
           new MeasureDefinition({
             name: "Aktualis cashflow (Ft)",
             value: "{actualCashflow}"
-          }),
-          new MeasureDefinition({
-            name: "Aktualis + Prediktiv cashflow (Ft)",
-            value: "{predictedCashflow}"
           })
         ],
         data: {
           path: "/rows"
         }
       });
+
+      if (bHasRun) {
+        oDataset.addMeasure(new MeasureDefinition({
+          name: "Aktualis + Prediktiv cashflow (Ft)",
+          value: "{predictedCashflow}"
+        }));
+      }
 
       var oViz = new VizFrame({
         width: "100%",
@@ -2919,7 +2926,7 @@ sap.ui.define([
       oViz.addFeed(new FeedItem({
         uid: "valueAxis",
         type: "Measure",
-        values: ["Aktualis cashflow (Ft)", "Aktualis + Prediktiv cashflow (Ft)"]
+        values: bHasRun ? ["Aktualis cashflow (Ft)", "Aktualis + Prediktiv cashflow (Ft)"] : ["Aktualis cashflow (Ft)"]
       }));
       oViz.setVizProperties({
         title: { visible: false },

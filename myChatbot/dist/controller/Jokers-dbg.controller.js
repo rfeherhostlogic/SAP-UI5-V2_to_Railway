@@ -98,6 +98,7 @@ sap.ui.define([
         oJokersModel.setProperty("/rpt1Summary", "");
         oJokersModel.setProperty("/rpt1Error", "");
         oJokersModel.setProperty("/rpt1PredictionRows", []);
+        oJokersModel.setProperty("/rpt1HasRun", false);
         oJokersModel.setProperty("/rpt1ChartReady", false);
         oJokersModel.setProperty("/rpt1ChartRows", (oJokersModel.getProperty("/rpt1DefaultChartRows") || []).map(function(row) {
           return Object.assign({}, row);

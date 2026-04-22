@@ -300,6 +300,7 @@ sap.ui.define([
 				rpt1Summary: "",
 				rpt1Error: "",
 				rpt1PredictionRows: [],
+				rpt1HasRun: false,
 				rpt1ChartReady: false,
 				rpt1DefaultChartRows: [
 					{ monthKey: "2026-05", monthLabel: "2026 Majus", actualCashflow: 208262509.73, predictedIncrementalCashflow: 0, predictedCashflow: 208262509.73, actualCashflowFormatted: "208.262.509,73 Ft", predictedIncrementalCashflowFormatted: "0,00 Ft", predictedCashflowFormatted: "208.262.509,73 Ft" },

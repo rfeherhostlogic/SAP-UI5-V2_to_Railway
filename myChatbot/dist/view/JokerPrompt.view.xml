@@ -524,8 +524,8 @@
                 <VBox>
                   <Title text="{jokers>monthLabel}" level="H6"/>
                   <Text text="{= 'Aktualis: ' + ${jokers>actualCashflowFormatted} }" wrapping="true"/>
-                  <Text text="{= 'Prediktiv resz: ' + ${jokers>predictedIncrementalCashflowFormatted} }" wrapping="true"/>
-                  <Text text="{= 'Aktualis + Prediktiv: ' + ${jokers>predictedCashflowFormatted} }" wrapping="true"/>
+                  <Text text="{= 'Prediktiv resz: ' + ${jokers>predictedIncrementalCashflowFormatted} }" wrapping="true" visible="{jokers>/rpt1HasRun}"/>
+                  <Text text="{= 'Aktualis + Prediktiv: ' + ${jokers>predictedCashflowFormatted} }" wrapping="true" visible="{jokers>/rpt1HasRun}"/>
                 </VBox>
               </CustomListItem>
             </List>
