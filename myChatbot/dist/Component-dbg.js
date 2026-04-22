@@ -255,6 +255,16 @@ sap.ui.define([
 						footer: "AI Joker 20",
 						description: "Ugyfelszolgalati folyamatok, megkereses-tipusok es SLA-k alapjan chatbot- es workflow-automatizalasi javaslatokat ad.",
 						systemPrompt: "Ertekeld a chatbot- es ugyfelkezelesi folyamatot. Azonositsd az automatizalhato lepeseket, a routing- es SLA-kockazatokat, majd adj rovid, uzletileg ertheto javaslatot a hatekonysag es ugyfelelmeny javitasara."
+					},
+					{
+						id: "dummy-21",
+						title: "RPT1-Fizetesi kesedelem elorejelzes",
+						subtitle: "CSV upload + SAP RPT1 predikcio",
+						primaryTag: "Altalanos",
+						tags: ["Altalanos"],
+						footer: "AI Joker 21",
+						description: "CSV feltoltes utan az RPT1 API a [PREDICT] mezokre elorejelzest ad, majd megjelenik a varhato cashflow a kovetkezo 3 honapra.",
+						systemPrompt: "Futtasd le a fizetesi kesedelem elorejelzest a feltoltott CSV alapjan."
 					}
 				],
 				filteredTiles: [],
@@ -285,6 +295,22 @@ sap.ui.define([
 				dummy9ChartReady: false,
 				dummy9SelectedSource: "",
 				dummy9MatchedFiles: [],
+				rpt1File: null,
+				rpt1FileName: "",
+				rpt1Summary: "",
+				rpt1Error: "",
+				rpt1PredictionRows: [],
+				rpt1ChartReady: false,
+				rpt1DefaultChartRows: [
+					{ monthKey: "2026-05", monthLabel: "2026 Majus", actualCashflow: 208262509.73, predictedCashflow: null },
+					{ monthKey: "2026-06", monthLabel: "2026 Junius", actualCashflow: 20908143.32, predictedCashflow: null },
+					{ monthKey: "2026-07", monthLabel: "2026 Julius", actualCashflow: 67131.92, predictedCashflow: null }
+				],
+				rpt1ChartRows: [
+					{ monthKey: "2026-05", monthLabel: "2026 Majus", actualCashflow: 208262509.73, predictedCashflow: null },
+					{ monthKey: "2026-06", monthLabel: "2026 Junius", actualCashflow: 20908143.32, predictedCashflow: null },
+					{ monthKey: "2026-07", monthLabel: "2026 Julius", actualCashflow: 67131.92, predictedCashflow: null }
+				],
 				dummy10Summary: "",
 				dummy10Rows: [],
 				dummy10SegmentItems: [],
@@ -559,6 +585,8 @@ sap.ui.define([
 				step4CsvDownloadUrl: "",
 				step4Busy: false,
 				// Step 5
+				step5SuggestedInputs: [],
+				step5SuggestedInputsBusy: false,
 				step5SimulationChanges: [],
 				step5SimulationResult: null,
 				step5AiSimulationContext: "",

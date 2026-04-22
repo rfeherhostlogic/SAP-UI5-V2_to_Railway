@@ -280,6 +280,54 @@ sap.ui.define([
       }
     },
 
+    onRpt1FileChange: function(oEvent) {
+      var oModel = this.getView().getModel("jokers");
+      var aFiles = oEvent && oEvent.getParameter ? oEvent.getParameter("files") : [];
+      var oFile = aFiles && aFiles[0] ? aFiles[0] : null;
+
+      if (!oFile) {
+        MessageToast.show("Valassz egy CSV fajlt.");
+        return;
+      }
+
+      oModel.setProperty("/rpt1File", oFile);
+      oModel.setProperty("/rpt1FileName", oFile.name || "");
+      oModel.setProperty("/rpt1Error", "");
+    },
+
+    onRunRpt1Prediction: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var oFile = oModel.getProperty("/rpt1File");
+
+      if (!oFile) {
+        MessageToast.show("Tolts fel egy CSV fajlt a predikciohoz.");
+        return;
+      }
+
+      oModel.setProperty("/generating", true);
+      oModel.setProperty("/rpt1Summary", "");
+      oModel.setProperty("/rpt1Error", "");
+      oModel.setProperty("/rpt1PredictionRows", []);
+      oModel.setProperty("/rpt1ChartReady", false);
+      oModel.setProperty("/rpt1ChartRows", this._cloneRpt1DefaultChartRows());
+      this._resetRpt1Chart();
+      this._rebindRpt1PreviewTable();
+
+      try {
+        var oResult = await AiService.runRpt1PaymentDelay({ file: oFile });
+        oModel.setProperty("/rpt1Summary", oResult && oResult.summary ? oResult.summary : "Az RPT1 predikcio sikeresen lefutott.");
+        oModel.setProperty("/rpt1PredictionRows", oResult && oResult.predictionRows ? oResult.predictionRows : []);
+        oModel.setProperty("/rpt1ChartRows", oResult && oResult.chartRows ? oResult.chartRows : this._cloneRpt1DefaultChartRows());
+        this._rebindRpt1PreviewTable();
+        this._renderRpt1Chart(oModel.getProperty("/rpt1ChartRows") || []);
+      } catch (oError) {
+        oModel.setProperty("/rpt1Error", "Az RPT1 predikcio most nem sikerult. Ellenorizd a CSV tartalmat es a token beallitast.");
+        MessageToast.show(oError && oError.message ? oError.message : "RPT1 hiba tortent.");
+      } finally {
+        oModel.setProperty("/generating", false);
+      }
+    },
+
     onRunDummy10: async function() {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/generating", true);
@@ -860,6 +908,7 @@ sap.ui.define([
       oModel.setProperty("/dummy4Rows", []);
       oModel.setProperty("/dummy4ChartReady", false);
       this._resetDummy9State();
+      this._resetRpt1State();
       this._resetDummy10State();
       this._resetDummy11State();
       this._resetDummy12State();
@@ -871,6 +920,7 @@ sap.ui.define([
       this._resetDummy4LocalChart();
       this._rebindDummy4PreviewTable();
       this._rebindDummy9PreviewTable();
+      this._rebindRpt1PreviewTable();
       this._rebindDummy10PreviewTable();
       this._rebindDummy13PreviewTable("dummy13PlanPreviewTable", "/dummy13PlanPreviewRows");
       this._rebindDummy13PreviewTable("dummy13ActualPreviewTable", "/dummy13ActualPreviewRows");
@@ -905,6 +955,10 @@ sap.ui.define([
         } else if (oSelected.id === "dummy-9") {
           this._resetDummy9State();
           this._rebindDummy9PreviewTable();
+        } else if (oSelected.id === "dummy-21") {
+          this._resetRpt1State();
+          this._rebindRpt1PreviewTable();
+          this._renderRpt1Chart(oModel.getProperty("/rpt1ChartRows") || []);
         } else if (oSelected.id === "dummy-10") {
           this._resetDummy10State();
           this._rebindDummy10PreviewTable();
@@ -944,6 +998,23 @@ sap.ui.define([
       this._resetDummy9LocalChart();
 
       var oFileUploader = this.byId("dummy9FileUploader");
+      if (oFileUploader && oFileUploader.clear) {
+        oFileUploader.clear();
+      }
+    },
+
+    _resetRpt1State: function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/rpt1File", null);
+      oModel.setProperty("/rpt1FileName", "");
+      oModel.setProperty("/rpt1Summary", "");
+      oModel.setProperty("/rpt1Error", "");
+      oModel.setProperty("/rpt1PredictionRows", []);
+      oModel.setProperty("/rpt1ChartReady", false);
+      oModel.setProperty("/rpt1ChartRows", this._cloneRpt1DefaultChartRows());
+      this._resetRpt1Chart();
+
+      var oFileUploader = this.byId("rpt1FileUploader");
       if (oFileUploader && oFileUploader.clear) {
         oFileUploader.clear();
       }
@@ -2791,6 +2862,85 @@ sap.ui.define([
       oHost.removeAllItems();
     },
 
+    _renderRpt1Chart: function(aRows) {
+      var oModel = this.getView().getModel("jokers");
+      var oHost = this.byId("rpt1ChartHost");
+
+      this._resetRpt1Chart();
+      oModel.setProperty("/rpt1ChartReady", false);
+
+      if (!oHost || !(aRows || []).length) {
+        return;
+      }
+
+      var oDataset = new FlattenedDataset({
+        dimensions: [
+          new DimensionDefinition({
+            name: "Honap",
+            value: "{monthLabel}"
+          })
+        ],
+        measures: [
+          new MeasureDefinition({
+            name: "Aktualis cashflow",
+            value: "{actualCashflow}"
+          }),
+          new MeasureDefinition({
+            name: "Prediktiv cashflow",
+            value: "{predictedCashflow}"
+          })
+        ],
+        data: {
+          path: "/rows"
+        }
+      });
+
+      var oViz = new VizFrame({
+        width: "100%",
+        height: "360px",
+        vizType: "column",
+        dataset: oDataset
+      });
+
+      oViz.setModel(new JSONModel({
+        rows: (aRows || []).map(function(row) {
+          return {
+            monthLabel: row.monthLabel,
+            actualCashflow: this._toNumberOrNull(row.actualCashflow) || 0,
+            predictedCashflow: this._toNumberOrNull(row.predictedCashflow) || 0
+          };
+        }.bind(this))
+      }));
+      oViz.addFeed(new FeedItem({
+        uid: "categoryAxis",
+        type: "Dimension",
+        values: ["Honap"]
+      }));
+      oViz.addFeed(new FeedItem({
+        uid: "valueAxis",
+        type: "Measure",
+        values: ["Aktualis cashflow", "Prediktiv cashflow"]
+      }));
+      oViz.setVizProperties({
+        title: { visible: false },
+        legend: { visible: true },
+        plotArea: {
+          dataLabel: { visible: true }
+        }
+      });
+
+      oHost.addItem(oViz);
+      oModel.setProperty("/rpt1ChartReady", true);
+    },
+
+    _resetRpt1Chart: function() {
+      var oHost = this.byId("rpt1ChartHost");
+      if (!oHost) {
+        return;
+      }
+      oHost.removeAllItems();
+    },
+
     _findNumericColumns: function(aRows, aColumns) {
       return (aColumns || []).filter(function(sCol) {
         var bSeen = false;
@@ -2904,6 +3054,43 @@ sap.ui.define([
       oTable.bindItems({
         path: "jokers>/dummy9Rows",
         template: oTemplate,
+        templateShareable: false
+      });
+    },
+
+    _rebindRpt1PreviewTable: function() {
+      var oTable = this.byId("rpt1PreviewTable");
+      var oModel = this.getView().getModel("jokers");
+      var aRows = oModel.getProperty("/rpt1PredictionRows") || [];
+      var aColumns = this._extractDummy4Columns(aRows);
+
+      if (!oTable) {
+        return;
+      }
+
+      oTable.unbindItems();
+      oTable.removeAllColumns();
+
+      if (aColumns.length === 0) {
+        return;
+      }
+
+      aColumns.forEach(function(sColName) {
+        oTable.addColumn(new Column({
+          header: new Text({ text: sColName })
+        }));
+      });
+
+      var aCells = aColumns.map(function(sColName) {
+        return new Text({
+          text: "{jokers>" + sColName + "}",
+          wrapping: true
+        });
+      });
+
+      oTable.bindItems({
+        path: "jokers>/rpt1PredictionRows",
+        template: new ColumnListItem({ cells: aCells }),
         templateShareable: false
       });
     },
@@ -3192,6 +3379,13 @@ sap.ui.define([
         title: { visible: false }
       });
       return oViz;
+    },
+
+    _cloneRpt1DefaultChartRows: function() {
+      var oModel = this.getView().getModel("jokers");
+      return (oModel.getProperty("/rpt1DefaultChartRows") || []).map(function(row) {
+        return Object.assign({}, row);
+      });
     },
 
     _extractDummy4Columns: function(aRows) {

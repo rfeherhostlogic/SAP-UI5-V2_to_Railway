@@ -465,6 +465,84 @@
         </Panel>
       </VBox>
 
+      <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-21' }" width="100%" class="dummy9Shell">
+        <Panel headerText="RPT1 fizetesi kesedelem predikcio" class="dummy9Panel">
+          <VBox class="sapUiSmallMargin">
+            <Text text="Tolts fel egy CSV-t, amelyben a predikcios mezok [PREDICT] ertekkel vannak jelolve. Az SAP RPT1 API elorejelzi a fizetesi kesedelmet es a varhato beveteli datumot." wrapping="true"/>
+
+            <unif:FileUploader
+              id="rpt1FileUploader"
+              width="100%"
+              sameFilenameAllowed="true"
+              multiple="false"
+              uploadOnChange="false"
+              fileType="csv"
+              buttonText="Predikcios CSV kivalasztasa"
+              change=".onRpt1FileChange"/>
+
+            <ObjectStatus
+              text="{= ${jokers>/rpt1FileName} ? 'Kivalasztott fajl: ' + ${jokers>/rpt1FileName} : 'Nincs feltoltott CSV fajl.' }"
+              state="{= ${jokers>/rpt1FileName} ? 'Success' : 'Information' }"
+              class="sapUiSmallMarginTop"/>
+
+            <HBox wrap="Wrap" class="sapUiSmallMarginTop">
+              <Button
+                text="Predikcio futtatasa"
+                type="Emphasized"
+                press=".onRunRpt1Prediction"
+                enabled="{= ${jokers>/generating} ? false : true }"/>
+              <Button
+                text="Cancel"
+                type="Reject"
+                press=".onCancel"
+                enabled="{= ${jokers>/generating} ? false : true }"
+                class="sapUiTinyMarginBegin"/>
+            </HBox>
+
+            <HBox alignItems="Center" visible="{jokers>/generating}" class="sapUiSmallMarginTop">
+              <BusyIndicator size="1rem"/>
+              <Text text="RPT1 predikcio folyamatban..." class="sapUiTinyMarginBegin"/>
+            </HBox>
+
+            <MessageStrip
+              text="{jokers>/rpt1Error}"
+              visible="{= ${jokers>/rpt1Error} ? true : false }"
+              type="Error"
+              showIcon="true"
+              class="sapUiSmallMarginTop"/>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Cashflow chart - kovetkezo 3 honap" class="sapUiMediumMarginTop dummy9Panel">
+          <VBox class="sapUiSmallMargin">
+            <Text
+              text="{= ${jokers>/rpt1Summary} ? ${jokers>/rpt1Summary} : 'Az alapertelmezett chart a jelenlegi cashflow riportot mutatja 2026 Majus, Junius es Julius honapokra.' }"
+              wrapping="true"
+              class="dummy9ResultText"/>
+            <VBox id="rpt1ChartHost" class="sapUiMediumMarginTop" visible="{jokers>/rpt1ChartReady}"/>
+            <Text
+              text="A chart nem erheto el."
+              visible="{= ${jokers>/rpt1ChartReady} ? false : true }"
+              class="sapUiTinyMarginTop"/>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Predikcios preview" class="sapUiMediumMarginTop dummy9Panel">
+          <VBox class="sapUiSmallMargin">
+            <Table
+              id="rpt1PreviewTable"
+              growing="true"
+              growingThreshold="25"
+              inset="false"
+              visible="{= ${jokers>/rpt1PredictionRows}.length > 0 }"/>
+            <Text
+              text="A predikcio utan itt jelennek meg a visszakapott sorok."
+              visible="{= ${jokers>/rpt1PredictionRows}.length === 0 }"
+              class="sapUiTinyMarginTop"/>
+          </VBox>
+        </Panel>
+      </VBox>
+
       <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-11' }" width="100%">
         <Panel headerText="Prompt Epito Asszisztens">
           <VBox class="sapUiSmallMargin">
@@ -1503,7 +1581,7 @@
 
                   <!-- Project insights: "Miért vizsgáld?" -->
                   <Panel headerText="Miért vizsgáld? – Projekt-szintű elemzések" class="sapUiSmallMarginTop" visible="{= ${jokers>/dummy14ProjectInsights}.length > 0 }">
-                    <List items="{jokers>/dummy14ProjectInsights}" separators="Inner">
+                    <List items="{jokers>/dummy14ProjectInsights}" showSeparators="Inner">
                       <CustomListItem>
                         <VBox class="sapUiSmallMargin">
                           <HBox justifyContent="SpaceBetween" alignItems="Start">
@@ -1619,7 +1697,7 @@
       </VBox>
       <!-- ═══════════════════════════════════════════════════ DUMMY 14 END ══ -->
 
-      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-11' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-12' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-13' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-14' }" width="100%">
+      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-11' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-12' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-13' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-14' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-21' }" width="100%">
         <TextArea value="{jokers>/promptInput}" rows="10" growing="true" growingMaxLines="16" width="100%" placeholder="Ide ird a feldolgozando szoveget..."/>
 
         <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">
@@ -1635,4 +1713,3 @@
     </VBox>
   </Page>
 </mvc:View>
-

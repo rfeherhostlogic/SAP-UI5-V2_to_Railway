@@ -13,6 +13,7 @@ const { PDFParse } = require("pdf-parse");
 const PDFDocument = require("pdfkit");
 const { executeDummy4, SQL_PROMPTS, SUMMARY_PROMPTS } = require("./dummy4Service");
 const { parseSchemaHint, validateSelectSql } = require("./sqlValidator");
+const { buildChartRows, cloneDefaultCashflowRows, predictFromCsvBuffer } = require("./rpt1Service");
 const DUMMY12_KPI_DEFINITIONS = require("./dummy12_kpis.json");
 
 const app = express();
@@ -98,6 +99,13 @@ const oDummy11Upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024,
     files: 8
+  }
+});
+const oRpt1Upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 1
   }
 });
 const oDummy12Upload = multer({
@@ -7389,6 +7397,65 @@ app.post("/api/jokers/dummy9/run", oDummy9Upload.array("files", 12), async funct
   } catch (err) {
     res.status(500).json({
       error: "Dummy9 feldolgozasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/rpt1-payment-delay/run", oRpt1Upload.single("file"), async function(req, res) {
+  try {
+    const token = process.env.SAP_RPT1 || process.env["SAP-RPT1"] || "";
+
+    if (!token) {
+      res.status(500).json({ error: "SAP_RPT1 vagy SAP-RPT1 token hianyzik a kornyezeti valtozok kozul." });
+      return;
+    }
+
+    if (!req.file || !req.file.buffer) {
+      res.status(400).json({ error: "CSV fajl kotelezo." });
+      return;
+    }
+
+    const mime = String(req.file.mimetype || "").toLowerCase();
+    const name = String(req.file.originalname || "payment_delay_prediction.csv");
+    if (mime.indexOf("csv") < 0 && !name.toLowerCase().endsWith(".csv")) {
+      res.status(400).json({ error: "Csak CSV fajl tamogatott." });
+      return;
+    }
+
+    const prediction = await predictFromCsvBuffer(req.file.buffer.toString("utf8"), token, fetch);
+    const chartRows = buildChartRows(prediction.predictionRows, {
+      amountColumn: "Invoice Amount",
+      dateColumn: "Expected Income date"
+    });
+    const totalPredictedCashflow = chartRows.reduce(function(sum, row) {
+      return sum + Number(row && row.predictedCashflow ? row.predictedCashflow : 0);
+    }, 0);
+    const avgDaysLate = prediction.predictionRows.reduce(function(sum, row) {
+      const value = Number(row && row["Predicted Days Late"]);
+      return sum + (isFinite(value) ? value : 0);
+    }, 0) / Math.max(1, prediction.predictionRows.length);
+
+    res.json({
+      summary: [
+        "Az RPT1 predikcio " + prediction.queryCount + " query sorra lefutott " + prediction.apiCalls + " API hivassal.",
+        "A kovetkezo 3 honapra becsult cashflow osszesen " + Math.round(totalPredictedCashflow * 100) / 100 + ".",
+        "Az atlagos prediktalt fizetesi kesedelem " + (Math.round(avgDaysLate * 10) / 10) + " nap."
+      ].join(" "),
+      fileName: name,
+      metrics: {
+        queryCount: prediction.queryCount,
+        contextCount: prediction.contextCount,
+        apiCalls: prediction.apiCalls,
+        indexColumn: prediction.indexColumn
+      },
+      predictionRows: prediction.predictionRows,
+      chartRows: chartRows,
+      defaultChartRows: cloneDefaultCashflowRows()
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "RPT1 fizetesi kesedelem predikcios hiba",
       details: err && err.message ? err.message : String(err)
     });
   }

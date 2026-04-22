@@ -112,6 +112,25 @@
     });
   }
 
+  function runRpt1PaymentDelay(mPayload) {
+    var oFormData = new FormData();
+    if (mPayload.file) {
+      oFormData.append("file", mPayload.file);
+    }
+
+    return fetch("/api/jokers/rpt1-payment-delay/run", {
+      method: "POST",
+      body: oFormData
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function evaluateDummy11(mPayload) {
     var oFormData = new FormData();
     oFormData.append("raw_request", mPayload.raw_request || "");
@@ -1021,6 +1040,25 @@
     });
   }
 
+  function mlWizardStep5SuggestedInputs(mPayload) {
+    return fetch("/api/ml-wizard/step5/suggested-inputs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: mPayload.session_id || "",
+        goal_text: mPayload.goal_text || "",
+        column_names: mPayload.column_names || [],
+        date_column: mPayload.date_column || "",
+        group_by_keys: mPayload.group_by_keys || []
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+      }
+      return oResponse.json();
+    });
+  }
+
   function mlWizardStep2Profile(mPayload) {
     return fetch("/api/ml-wizard/step2/profile", {
       method: "POST",
@@ -1050,7 +1088,11 @@
       method: "GET"
     }).then(function(oResponse) {
       if (!oResponse.ok) {
-        return oResponse.text().then(function(sError) { throw new Error("API hiba: " + sError); });
+        return oResponse.text().then(function(sError) {
+          var oError = new Error("API hiba: " + sError);
+          oError.status = oResponse.status;
+          throw oError;
+        });
       }
       return oResponse.json();
     });
@@ -1080,7 +1122,11 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         session_id: mPayload.session_id || "",
-        model_tier: mPayload.model_tier || "balanced"
+        model_tier: mPayload.model_tier || "balanced",
+        date_column: mPayload.date_column || "",
+        time_level: mPayload.time_level || "",
+        group_by_keys: mPayload.group_by_keys || [],
+        forecast_horizon: mPayload.forecast_horizon || 3
       })
     }).then(function(oResponse) {
       if (!oResponse.ok) {
@@ -1157,6 +1203,7 @@
     runDummy4: runDummy4,
     runDummy9: runDummy9,
     runDummy10: runDummy10,
+    runRpt1PaymentDelay: runRpt1PaymentDelay,
     evaluateDummy11: evaluateDummy11,
     saveDummy11Prompt: saveDummy11Prompt,
     runDummy11Prompt: runDummy11Prompt,
@@ -1217,6 +1264,7 @@
     mlWizardStep2ConfirmFeatures: mlWizardStep2ConfirmFeatures,
     mlWizardStep3StartTraining: mlWizardStep3StartTraining,
     mlWizardStep4Result: mlWizardStep4Result,
+    mlWizardStep5SuggestedInputs: mlWizardStep5SuggestedInputs,
     mlWizardStep5Simulate: mlWizardStep5Simulate,
     mlWizardStep5SimulationResult: mlWizardStep5SimulationResult
   };

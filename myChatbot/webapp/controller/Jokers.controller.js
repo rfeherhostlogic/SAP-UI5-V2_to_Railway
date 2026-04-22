@@ -92,6 +92,16 @@ sap.ui.define([
         oJokersModel.setProperty("/dummy9ChartReady", false);
         oJokersModel.setProperty("/dummy9SelectedSource", "");
         oJokersModel.setProperty("/dummy9MatchedFiles", []);
+      } else if (oJoker.id === "dummy-21") {
+        oJokersModel.setProperty("/rpt1File", null);
+        oJokersModel.setProperty("/rpt1FileName", "");
+        oJokersModel.setProperty("/rpt1Summary", "");
+        oJokersModel.setProperty("/rpt1Error", "");
+        oJokersModel.setProperty("/rpt1PredictionRows", []);
+        oJokersModel.setProperty("/rpt1ChartReady", false);
+        oJokersModel.setProperty("/rpt1ChartRows", (oJokersModel.getProperty("/rpt1DefaultChartRows") || []).map(function(row) {
+          return Object.assign({}, row);
+        }));
       } else if (oJoker.id === "dummy-10") {
         oJokersModel.setProperty("/dummy10Summary", "");
         oJokersModel.setProperty("/dummy10Rows", []);
