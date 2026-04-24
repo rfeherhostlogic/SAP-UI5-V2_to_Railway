@@ -8,11 +8,12 @@
 .noahShell {
   gap: 1rem;
   align-items: stretch;
+  flex-wrap: nowrap !important;
 }
 
 .noahMain {
-  flex: 1 1 72%;
-  min-width: 320px;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 2rem);
@@ -44,8 +45,27 @@
   padding: 0.3rem 0.45rem 0.3rem 0.9rem;
 }
 
+/* Toggle button: az outer elem is kapja meg a border-radius-t,
+   hogy a keret és a háttér tökéletesen illeszkedjen */
+.noahToggleButton,
+.noahToggleButton.sapMBtn,
+.noahToggleButton.sapMToggleBtn {
+  border-radius: 999px;
+  overflow: hidden;
+}
+
 .noahToggleButton .sapMBtnInner {
   padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Szöveg + ikon igazítása középre */
+.noahToggleButton .sapMBtnInner .sapMBtnContent {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .noahToggleButton.sapMToggleBtnPressed .sapMBtnInner,
@@ -160,38 +180,43 @@
   box-shadow: none;
 }
 
-.noahComposerInput.sapMInputBase,
-.noahComposerInput .sapMInputBaseContentWrapper,
-.noahComposerInput .sapMInputBaseInner {
+.noahComposerInput.sapMTextArea,
+.noahComposerInput .sapMTextAreaWrapper,
+.noahComposerInput .sapMTextAreaInner {
   width: 100%;
-  border: 0;
-  box-shadow: none;
-  background: transparent;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
   min-height: 2.25rem;
   padding: 0;
-  border-radius: 0;
-  outline: none;
+  border-radius: 0 !important;
+  outline: none !important;
 }
 
 .noahComposerInput:hover,
 .noahComposerInput:focus,
 .noahComposerInput.sapMFocus,
-.noahComposerInput .sapMInputBaseContentWrapper:hover,
-.noahComposerInput .sapMInputBaseContentWrapper:focus-within,
-.noahComposerInput .sapMInputBaseInner:hover,
-.noahComposerInput .sapMInputBaseInner:focus {
-  border-color: transparent;
-  box-shadow: none;
-  outline: none;
+.noahComposerInput .sapMTextAreaWrapper:hover,
+.noahComposerInput .sapMTextAreaWrapper:focus,
+.noahComposerInput .sapMTextAreaWrapper:focus-within,
+.noahComposerInput .sapMTextAreaInner:hover,
+.noahComposerInput .sapMTextAreaInner:focus,
+.noahComposerInput .sapMTextAreaWrapper.sapMFocus {
+  border: 0 !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
-.noahComposerInput .sapMInputBaseContentWrapper {
+.noahComposerInput .sapMTextAreaWrapper {
   padding: 0;
 }
 
-.noahComposerInput .sapMInputBaseInner {
+.noahComposerInput .sapMTextAreaInner {
   padding: 0.35rem 0.1rem;
   color: #314762;
+  resize: none;
+  overflow-y: auto;
 }
 
 .noahComposerMeta {
@@ -208,6 +233,7 @@
   flex: 0 0 auto;
   margin-left: auto;
   align-items: center;
+  white-space: nowrap;
 }
 
 .noahComposer .sapUiFup,
@@ -263,6 +289,10 @@
   .noahSide {
     flex: 1 1 100%;
     position: static;
+  }
+
+  .noahShell {
+    flex-wrap: wrap !important;
   }
 
   .noahChatPanel {

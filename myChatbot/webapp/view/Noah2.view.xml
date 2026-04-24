@@ -5,7 +5,7 @@
   xmlns:unif="sap.ui.unified"
   controllerName="sap.suite.ui.commons.demo.tutorial.controller.Noah2">
   <Page title="Noah" class="sapUiContentPadding noahPage" showHeader="false">
-    <HBox class="noahShell" renderType="Bare" wrap="Wrap">
+    <HBox class="noahShell" renderType="Bare" wrap="NoWrap">
       <VBox class="noahMain">
         <VBox id="noah2ChatPanel" class="noahChatPanel">
           <List id="noah2MessageList" items="{noah2>/messages}" showSeparators="None" class="noahMsgList">
@@ -66,10 +66,13 @@
             </CustomListItem>
           </List>
 
-          <HBox class="noahComposerBar" alignItems="Center">
-            <Input
+          <HBox class="noahComposerBar" alignItems="End">
+            <TextArea
               value="{noah2>/draftMessage}"
               width="100%"
+              rows="1"
+              growing="true"
+              growingMaxLines="6"
               placeholder="{= ${noah2>/dictationActive} ? 'Diktalas folyamatban...' : 'Message Noah...' }"
               class="noahComposerInput"/>
             <HBox class="noahComposerActions" alignItems="Center" justifyContent="End">
