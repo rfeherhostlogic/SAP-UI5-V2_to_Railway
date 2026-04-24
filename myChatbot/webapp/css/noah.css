@@ -13,6 +13,9 @@
 .noahMain {
   flex: 1 1 72%;
   min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 2rem);
 }
 
 .noahSide {
@@ -46,8 +49,9 @@
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 16px 45px rgba(15, 23, 42, 0.08);
   padding: 1rem 1.1rem;
-  min-height: 62vh;
-  height: calc(100vh - 20rem);
+  min-height: 68vh;
+  height: auto;
+  flex: 1 1 auto;
   overflow-y: auto;
 }
 
@@ -112,6 +116,7 @@
 
 .noahComposer {
   padding: 0.25rem 0 0;
+  margin-top: auto;
 }
 
 .noahComposerBar {
@@ -126,6 +131,7 @@
 .noahComposerInput {
   margin: 0;
   flex: 1 1 auto;
+  min-width: 0;
 }
 
 .noahComposerInput .sapMTextAreaInner {
@@ -143,6 +149,12 @@
 
 .noahComposerMeta {
   gap: 0.5rem;
+  align-items: center;
+}
+
+.noahComposerActions {
+  flex: 0 0 auto;
+  margin-left: auto;
   align-items: center;
 }
 
@@ -203,6 +215,6 @@
 
   .noahChatPanel {
     height: auto;
-    min-height: 50vh;
+    min-height: 56vh;
   }
 }

@@ -75,32 +75,33 @@
               growingMaxLines="6"
               placeholder="{= ${noah2>/dictationActive} ? 'Diktalas folyamatban...' : 'Message Noah...' }"
               class="noahComposerInput"/>
-            <unif:FileUploader
-              id="noah2FileUploader"
-              width="2.5rem"
-              sameFilenameAllowed="true"
-              multiple="true"
-              uploadOnChange="false"
-              icon="sap-icon://add-document"
-              iconOnly="true"
-              buttonOnly="true"
-              tooltip="Browse or drop multiple files"
-              change=".onNoah2FileChange"
-              class="sapUiTinyMarginBegin"/>
-            <Button
-              icon="sap-icon://microphone"
-              type="{= ${noah2>/dictationActive} ? 'Emphasized' : 'Transparent' }"
-              tooltip="{= ${noah2>/dictationSupported} ? 'Dictate' : (${noah2>/dictationUnavailableReason} || 'Dictate nem tamogatott') }"
-              press=".onToggleNoah2Dictation"
-              enabled="{noah2>/dictationSupported}"
-              class="sapUiTinyMarginBegin"/>
-            <Button
-              icon="sap-icon://paper-plane"
-              type="Emphasized"
-              tooltip="Kuldes"
-              press=".onSendNoah2"
-              class="sapUiTinyMarginBegin"
-              enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"/>
+            <HBox class="noahComposerActions" alignItems="Center" justifyContent="End">
+              <unif:FileUploader
+                id="noah2FileUploader"
+                width="2.5rem"
+                sameFilenameAllowed="true"
+                multiple="true"
+                uploadOnChange="false"
+                icon="sap-icon://add-document"
+                iconOnly="true"
+                buttonOnly="true"
+                tooltip="Browse or drop multiple files"
+                change=".onNoah2FileChange"/>
+              <Button
+                icon="sap-icon://microphone"
+                type="{= ${noah2>/dictationActive} ? 'Emphasized' : 'Transparent' }"
+                tooltip="{= ${noah2>/dictationSupported} ? 'Dictate' : (${noah2>/dictationUnavailableReason} || 'Dictate nem tamogatott') }"
+                press=".onToggleNoah2Dictation"
+                enabled="{noah2>/dictationSupported}"
+                class="sapUiTinyMarginBegin"/>
+              <Button
+                icon="sap-icon://paper-plane"
+                type="Emphasized"
+                tooltip="Kuldes"
+                press=".onSendNoah2"
+                class="sapUiTinyMarginBegin"
+                enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"/>
+            </HBox>
           </HBox>
 
           <HBox class="sapUiTinyMarginTop noahComposerMeta" alignItems="Center" wrap="Wrap">
