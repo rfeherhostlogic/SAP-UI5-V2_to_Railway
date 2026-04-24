@@ -51,8 +51,7 @@
                 laneId="{flow>id}"
                 iconSrc="{flow>icon}"
                 text="{flow>label}"
-                position="{flow>position}"
-                state="{flow>state}"/>
+                position="{flow>position}"/>
             </suite:lanes>
           </suite:ProcessFlow>
 
