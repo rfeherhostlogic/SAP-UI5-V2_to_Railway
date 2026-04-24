@@ -66,13 +66,10 @@
             </CustomListItem>
           </List>
 
-          <HBox class="noahComposerBar" alignItems="End">
-            <TextArea
+          <HBox class="noahComposerBar" alignItems="Center">
+            <Input
               value="{noah2>/draftMessage}"
               width="100%"
-              rows="1"
-              growing="true"
-              growingMaxLines="6"
               placeholder="{= ${noah2>/dictationActive} ? 'Diktalas folyamatban...' : 'Message Noah...' }"
               class="noahComposerInput"/>
             <HBox class="noahComposerActions" alignItems="Center" justifyContent="End">
@@ -122,22 +119,20 @@
               class="noahPillButton sapUiTinyMarginBegin"
               enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"
               busy="{noah2>/promptImproverBusy}"/>
-            <HBox alignItems="Center" class="noahModePill sapUiTinyMarginBegin">
-              <Text text="Noah Agent" class="sapUiTinyMarginEnd"/>
-              <Switch
-                state="{noah2>/agentEnabled}"
-                change=".onNoah2AgentToggle"
-                customTextOn="ON"
-                customTextOff="OFF"/>
-            </HBox>
-            <HBox alignItems="Center" class="noahModePill sapUiTinyMarginBegin">
-              <Text text="Uzleti AI" class="sapUiTinyMarginEnd"/>
-              <Switch
-                state="{noah2>/businessAiEnabled}"
-                change=".onBusinessAiToggle"
-                customTextOn="ON"
-                customTextOff="OFF"/>
-            </HBox>
+            <ToggleButton
+              text="Noah Agent"
+              icon="sap-icon://activate"
+              pressed="{noah2>/agentEnabled}"
+              press=".onNoah2AgentToggle"
+              type="{= ${noah2>/agentEnabled} ? 'Emphasized' : 'Transparent' }"
+              class="noahToggleButton sapUiTinyMarginBegin"/>
+            <ToggleButton
+              text="Uzleti AI"
+              icon="sap-icon://ai"
+              pressed="{noah2>/businessAiEnabled}"
+              press=".onBusinessAiToggle"
+              type="{= ${noah2>/businessAiEnabled} ? 'Emphasized' : 'Transparent' }"
+              class="noahToggleButton sapUiTinyMarginBegin"/>
             <Button
               text="Megse"
               type="Reject"

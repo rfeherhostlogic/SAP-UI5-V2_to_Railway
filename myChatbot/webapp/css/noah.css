@@ -27,7 +27,8 @@
 }
 
 .noahPillButton .sapMBtnInner,
-.noahModePill {
+.noahModePill,
+.noahToggleButton .sapMBtnInner {
   min-height: 2.75rem;
   border-radius: 999px;
   border: 1px solid #d9e3f0;
@@ -41,6 +42,24 @@
 
 .noahModePill {
   padding: 0.3rem 0.45rem 0.3rem 0.9rem;
+}
+
+.noahToggleButton .sapMBtnInner {
+  padding: 0 1rem;
+}
+
+.noahToggleButton.sapMToggleBtnPressed .sapMBtnInner,
+.noahToggleButton .sapMBtnInner.sapMToggleBtnPressed,
+.noahToggleButton .sapMBtnInner.sapMBtnEmphasized {
+  background: linear-gradient(180deg, #34506f 0%, #223750 100%);
+  border-color: #223750;
+  color: #ffffff;
+}
+
+.noahToggleButton.sapMToggleBtnPressed .sapUiIcon,
+.noahToggleButton .sapMBtnInner.sapMToggleBtnPressed .sapUiIcon,
+.noahToggleButton .sapMBtnInner.sapMBtnEmphasized .sapUiIcon {
+  color: #ffffff;
 }
 
 .noahChatPanel {
@@ -141,39 +160,38 @@
   box-shadow: none;
 }
 
-.noahComposerInput.sapMTextArea,
-.noahComposerInput .sapMTextAreaWrapper {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  outline: none;
-}
-
-.noahComposerInput .sapMTextAreaInner {
+.noahComposerInput.sapMInputBase,
+.noahComposerInput .sapMInputBaseContentWrapper,
+.noahComposerInput .sapMInputBaseInner {
   width: 100%;
   border: 0;
   box-shadow: none;
   background: transparent;
   min-height: 2.25rem;
-  padding: 0.5rem 0.1rem;
+  padding: 0;
   border-radius: 0;
+  outline: none;
 }
 
 .noahComposerInput:hover,
 .noahComposerInput:focus,
 .noahComposerInput.sapMFocus,
-.noahComposerInput .sapMTextAreaWrapper:hover,
-.noahComposerInput .sapMTextAreaWrapper:focus-within,
-.noahComposerInput .sapMTextAreaInner:hover,
-.noahComposerInput .sapMTextAreaInner:focus {
+.noahComposerInput .sapMInputBaseContentWrapper:hover,
+.noahComposerInput .sapMInputBaseContentWrapper:focus-within,
+.noahComposerInput .sapMInputBaseInner:hover,
+.noahComposerInput .sapMInputBaseInner:focus {
   border-color: transparent;
   box-shadow: none;
   outline: none;
 }
 
-.noahComposerInput .sapMTextAreaInner:focus {
-  outline: none;
+.noahComposerInput .sapMInputBaseContentWrapper {
+  padding: 0;
+}
+
+.noahComposerInput .sapMInputBaseInner {
+  padding: 0.35rem 0.1rem;
+  color: #314762;
 }
 
 .noahComposerMeta {

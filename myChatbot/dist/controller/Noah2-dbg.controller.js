@@ -370,7 +370,9 @@ sap.ui.define([
     // ─────────────────────────────────────────────────────────────────
     onNoah2AgentToggle: function(oEvent) {
       var oModel = this.getView().getModel("noah2");
-      var bState = !!(oEvent && oEvent.getParameter ? oEvent.getParameter("state") : false);
+      var bState = !!(oEvent && oEvent.getParameter ? (
+        oEvent.getParameter("pressed") != null ? oEvent.getParameter("pressed") : oEvent.getParameter("state")
+      ) : false);
       oModel.setProperty("/agentEnabled", bState);
       // Agent bekapcsolasanal: kartya valaszto visszaall, kartyapanel eltuntetese
       if (bState) {
@@ -389,7 +391,9 @@ sap.ui.define([
 
     onBusinessAiToggle: function(oEvent) {
       var oModel = this.getView().getModel("noah2");
-      var bState = !!(oEvent && oEvent.getParameter ? oEvent.getParameter("state") : false);
+      var bState = !!(oEvent && oEvent.getParameter ? (
+        oEvent.getParameter("pressed") != null ? oEvent.getParameter("pressed") : oEvent.getParameter("state")
+      ) : false);
       oModel.setProperty("/businessAiEnabled", bState);
       MessageToast.show(bState ? "Uzleti AI bekapcsolva." : "Uzleti AI kikapcsolva.");
     },
