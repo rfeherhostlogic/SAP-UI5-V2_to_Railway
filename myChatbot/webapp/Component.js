@@ -79,12 +79,12 @@ sap.ui.define([
 					}
 				],
 				advisorLanes: [
-					{ id: "discover", icon: "sap-icon://begin", label: "Discover", position: 0, state: "Positive" },
-					{ id: "prepare", icon: "sap-icon://activate", label: "Prepare", position: 1, state: "Positive" },
-					{ id: "explore", icon: "sap-icon://inspect", label: "Explore", position: 2, state: "Positive" },
-					{ id: "realize", icon: "sap-icon://process", label: "Realize", position: 3, state: "Neutral" },
-					{ id: "deploy", icon: "sap-icon://flag", label: "Deploy", position: 4, state: "Positive" },
-					{ id: "run", icon: "sap-icon://customer-history", label: "Run", position: 5, state: "Positive" }
+					{ id: "discover", icon: "sap-icon://begin", label: "Discover", position: 0 },
+					{ id: "prepare", icon: "sap-icon://activate", label: "Prepare", position: 1 },
+					{ id: "explore", icon: "sap-icon://inspect", label: "Explore", position: 2 },
+					{ id: "realize", icon: "sap-icon://process", label: "Realize", position: 3 },
+					{ id: "deploy", icon: "sap-icon://flag", label: "Deploy", position: 4 },
+					{ id: "run", icon: "sap-icon://customer-history", label: "Run", position: 5 }
 				],
 				advisorNodes: [
 					{ id: "discover-1", lane: "discover", title: "Bevezetes es indulas", titleAbbreviation: "Onboarding", children: ["discover-2"], state: "Positive", stateText: "Discover", focused: true, highlighted: false, texts: ["Getting Started & Onboarding"] },
