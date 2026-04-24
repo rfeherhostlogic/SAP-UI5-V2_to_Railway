@@ -134,9 +134,16 @@
   margin: 0;
   flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
+  display: block;
+}
+
+.noahComposerInput .sapMTextAreaWrapper {
+  width: 100%;
 }
 
 .noahComposerInput .sapMTextAreaInner {
+  width: 100%;
   border: 0;
   box-shadow: none;
   background: transparent;
