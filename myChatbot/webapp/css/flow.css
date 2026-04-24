@@ -1,0 +1,48 @@
+.flowPage {
+  background:
+    radial-gradient(circle at 8% 6%, rgba(59, 130, 246, 0.08), transparent 28%),
+    radial-gradient(circle at 92% 12%, rgba(16, 185, 129, 0.08), transparent 30%),
+    linear-gradient(180deg, #f6f9fd 0%, #edf3fb 100%);
+}
+
+.flowShell {
+  max-width: 100%;
+}
+
+.flowIntro {
+  color: #5d7395;
+}
+
+.flowCategoryPanel {
+  border-radius: 1.2rem;
+  border: 1px solid rgba(143, 169, 207, 0.34);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
+}
+
+.flowCategoryPanel .sapMPanelHdr {
+  font-weight: 700;
+}
+
+.flowCategoryContent,
+.flowPlaceholder {
+  padding: 0.35rem 0.2rem 0.2rem;
+}
+
+.flowProcessFlow {
+  border: 1px solid #dbe5f1;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+  padding: 1rem 0.75rem;
+}
+
+.flowLegendHost {
+  gap: 0.5rem;
+}
+
+.flowLegendItem {
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(244, 247, 252, 0.95);
+  border: 1px solid #d9e3f0;
+}

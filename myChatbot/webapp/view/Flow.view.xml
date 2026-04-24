@@ -1,0 +1,96 @@
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:core="sap.ui.core"
+  xmlns:suite="sap.suite.ui.commons"
+  controllerName="sap.suite.ui.commons.demo.tutorial.controller.Flow">
+  <Page title="Flow" class="sapUiContentPadding flowPage" showHeader="false">
+    <VBox class="flowShell" width="100%">
+      <Title text="Flow" level="H2" class="sapUiTinyMarginBottom"/>
+      <Text text="LoB uzleti folyamatok egy helyen, vizualis bontasban. A kategoriak alapertelmezetten ossze vannak zarva." class="flowIntro sapUiSmallMarginBottom"/>
+
+      <Panel
+        id="consultingPanel"
+        headerText="1. Tanacsado"
+        expandable="true"
+        expanded="false"
+        expand=".onConsultingPanelExpand"
+        class="flowCategoryPanel sapUiSmallMarginBottom">
+        <VBox class="flowCategoryContent">
+          <HBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" class="sapUiSmallMarginBottom">
+            <VBox>
+              <Title text="SAP Activate - Tanacsadoi folyamat" level="H4"/>
+              <Text text="A lane-ek a fo fazisokat, a node-ok a resztevekenysegeket mutatjak. A Teszt Migracio node Joker kartya megnyitasara kattinthato." wrapping="true"/>
+            </VBox>
+            <Button text="Teszt Migracio Joker megnyitasa" type="Emphasized" press=".onOpenTestMigrationJoker"/>
+          </HBox>
+
+          <suite:ProcessFlow
+            id="advisorProcessFlow"
+            class="flowProcessFlow"
+            scrollable="true"
+            foldedCorners="true"
+            nodePress=".onAdvisorNodePress"
+            nodes="{flow>/advisorNodes}"
+            lanes="{flow>/advisorLanes}">
+            <suite:nodes>
+              <suite:ProcessFlowNode
+                laneId="{flow>lane}"
+                nodeId="{flow>id}"
+                title="{flow>title}"
+                titleAbbreviation="{flow>titleAbbreviation}"
+                children="{flow>children}"
+                state="{flow>state}"
+                stateText="{flow>stateText}"
+                texts="{flow>texts}"
+                highlighted="{flow>highlighted}"
+                focused="{flow>focused}"/>
+            </suite:nodes>
+            <suite:lanes>
+              <suite:ProcessFlowLaneHeader
+                laneId="{flow>id}"
+                iconSrc="{flow>icon}"
+                text="{flow>label}"
+                position="{flow>position}"
+                state="{flow>state}"/>
+            </suite:lanes>
+          </suite:ProcessFlow>
+
+          <HBox wrap="Wrap" class="sapUiMediumMarginTop">
+            <VBox items="{flow>/advisorLegend}" class="flowLegendHost">
+              <items>
+                <HBox class="flowLegendItem" alignItems="Center">
+                  <ObjectStatus text="{flow>label}" state="{flow>uiState}" class="sapUiTinyMarginEnd"/>
+                </HBox>
+              </items>
+            </VBox>
+          </HBox>
+        </VBox>
+      </Panel>
+
+      <Panel headerText="2. Sales es Marketing" expandable="true" expanded="false" class="flowCategoryPanel sapUiSmallMarginBottom">
+        <VBox class="flowPlaceholder">
+          <Text text="Itt a campaign-to-cash, lead funnel, pricing es ugyfel-eletut folyamatok vizualis bontasa fog megjelenni." wrapping="true"/>
+        </VBox>
+      </Panel>
+
+      <Panel headerText="3. Logisztika" expandable="true" expanded="false" class="flowCategoryPanel sapUiSmallMarginBottom">
+        <VBox class="flowPlaceholder">
+          <Text text="Itt a beszerzes, raktari teljesites, fuvarszervezes es kiszallitas folyamatok lesznek osszegyujtve." wrapping="true"/>
+        </VBox>
+      </Panel>
+
+      <Panel headerText="4. Gyartas" expandable="true" expanded="false" class="flowCategoryPanel sapUiSmallMarginBottom">
+        <VBox class="flowPlaceholder">
+          <Text text="Itt a gyartastervezes, vegrehajtas, minoseg es karbantartas folyamatai kapnak vizualis bontast." wrapping="true"/>
+        </VBox>
+      </Panel>
+
+      <Panel headerText="5. Penzugy" expandable="true" expanded="false" class="flowCategoryPanel">
+        <VBox class="flowPlaceholder">
+          <Text text="Itt a controlling, zarlas, cashflow, riporting es compliance folyamatai lesznek osszekapcsolva." wrapping="true"/>
+        </VBox>
+      </Panel>
+    </VBox>
+  </Page>
+</mvc:View>

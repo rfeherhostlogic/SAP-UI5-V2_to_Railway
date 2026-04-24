@@ -21,9 +21,10 @@
         <tnt:item>
           <tnt:NavigationList>
             <tnt:NavigationListItem text="Noah" key="noah" icon="sap-icon://collaborate"/>
-            <tnt:NavigationListItem text="H&#237;rfolyam" key="feed" icon="sap-icon://discussion-2"/>
+            <tnt:NavigationListItem text="Hirfolyam" key="feed" icon="sap-icon://discussion-2"/>
             <tnt:NavigationListItem text="Jokerek" key="jokers" icon="sap-icon://favorite"/>
-            <tnt:NavigationListItem text="Felfedezés" key="discovery" icon="sap-icon://search"/>
+            <tnt:NavigationListItem text="Flow" key="flow" icon="sap-icon://process"/>
+            <tnt:NavigationListItem text="Felfedezes" key="discovery" icon="sap-icon://search"/>
           </tnt:NavigationList>
         </tnt:item>
         <tnt:fixedItem>
@@ -37,6 +38,7 @@
       <NavContainer id="mainNav">
         <mvc:XMLView id="reportsView" viewName="sap.suite.ui.commons.demo.tutorial.view.Reports"/>
         <mvc:XMLView id="jokersView" viewName="sap.suite.ui.commons.demo.tutorial.view.Jokers"/>
+        <mvc:XMLView id="flowView" viewName="sap.suite.ui.commons.demo.tutorial.view.Flow"/>
         <mvc:XMLView id="discoveryView" viewName="sap.suite.ui.commons.demo.tutorial.view.MLWizard"/>
         <mvc:XMLView id="feedView" viewName="sap.suite.ui.commons.demo.tutorial.view.Feed"/>
         <mvc:XMLView id="noah2View" viewName="sap.suite.ui.commons.demo.tutorial.view.Noah2"/>

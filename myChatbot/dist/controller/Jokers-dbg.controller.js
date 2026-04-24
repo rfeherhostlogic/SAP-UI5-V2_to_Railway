@@ -13,7 +13,8 @@ sap.ui.define([
       "marketing": "Marketing",
       "idozitheto": "Idozitheto",
       "időzíthető": "Idozitheto",
-      "gdc": "GDC"
+      "gdc": "GDC",
+      "tanacsado": "Tanacsado"
     };
     return mMap[sValue] || String(sTag || "").trim();
   }

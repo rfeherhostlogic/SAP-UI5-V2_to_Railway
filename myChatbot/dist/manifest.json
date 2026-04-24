@@ -58,6 +58,7 @@
         "sap.ui.layout": {},
         "sap.tnt": {},
         "sap.ui.comp": {},
+        "sap.suite.ui.commons": {},
         "sap.suite.ui.microchart": {},
         "sap.chart": {},
         "sap.viz": {}
@@ -86,6 +87,9 @@
         },
         {
           "uri": "css/login.css"
+        },
+        {
+          "uri": "css/flow.css"
         }
       ]
     },
@@ -122,6 +126,9 @@
         "type": "sap.ui.model.json.JSONModel"
       },
       "feed": {
+        "type": "sap.ui.model.json.JSONModel"
+      },
+      "flow": {
         "type": "sap.ui.model.json.JSONModel"
       }
     },

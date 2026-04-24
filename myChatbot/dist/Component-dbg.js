@@ -45,6 +45,74 @@ sap.ui.define([
 				messages: []
 			}), "feed");
 
+			this.setModel(new JSONModel({
+				categories: [
+					{
+						id: "consulting",
+						title: "Tanacsado",
+						icon: "sap-icon://customer-financial-fact-sheet",
+						description: "SAP Activate-alapu tanacsadoi folyamatok es projektfazisok."
+					},
+					{
+						id: "sales-marketing",
+						title: "Sales es Marketing",
+						icon: "sap-icon://sales-order",
+						description: "Leadtol a kampanyokig terjedo ertekesitesi es marketing folyamatok."
+					},
+					{
+						id: "logistics",
+						title: "Logisztika",
+						icon: "sap-icon://shipping-status",
+						description: "Beszerzes, raktar, szallitas es teljesitesi folyamatok."
+					},
+					{
+						id: "manufacturing",
+						title: "Gyartas",
+						icon: "sap-icon://factory",
+						description: "Tervezes, vegrehajtas, minoseg es karbantartasi folyamatok."
+					},
+					{
+						id: "finance",
+						title: "Penzugy",
+						icon: "sap-icon://account",
+						description: "Penzugyi tervezes, konyveles, controlling es cashflow folyamatok."
+					}
+				],
+				advisorLanes: [
+					{ id: "discover", icon: "sap-icon://begin", label: "Discover", position: 0, state: "Positive" },
+					{ id: "prepare", icon: "sap-icon://activate", label: "Prepare", position: 1, state: "Positive" },
+					{ id: "explore", icon: "sap-icon://inspect", label: "Explore", position: 2, state: "Positive" },
+					{ id: "realize", icon: "sap-icon://process", label: "Realize", position: 3, state: "Neutral" },
+					{ id: "deploy", icon: "sap-icon://flag", label: "Deploy", position: 4, state: "Positive" },
+					{ id: "run", icon: "sap-icon://customer-history", label: "Run", position: 5, state: "Positive" }
+				],
+				advisorNodes: [
+					{ id: "discover-1", lane: "discover", title: "Bevezetes es indulas", titleAbbreviation: "Onboarding", children: ["discover-2"], state: "Positive", stateText: "Discover", focused: true, highlighted: false, texts: ["Getting Started & Onboarding"] },
+					{ id: "discover-2", lane: "discover", title: "Projektinditas es iranyitas", titleAbbreviation: "Governance", children: ["discover-3"], state: "Positive", stateText: "Discover", focused: false, highlighted: false, texts: ["Project Initiation & Governance"] },
+					{ id: "discover-3", lane: "discover", title: "Felfedezesi ertekeles", titleAbbreviation: "Assessment", children: ["prepare-1"], state: "Positive", stateText: "Discover", focused: false, highlighted: false, texts: ["Discovery Assessment"] },
+					{ id: "prepare-1", lane: "prepare", title: "Projekt szabvanyok es inditas", titleAbbreviation: "Kick-off", children: ["prepare-2"], state: "Positive", stateText: "Prepare", focused: false, highlighted: false, texts: ["Project Standards & Kick-off"] },
+					{ id: "prepare-2", lane: "prepare", title: "Megoldas hatokorenek meghatarozasa", titleAbbreviation: "Scope", children: ["prepare-3"], state: "Positive", stateText: "Prepare", focused: false, highlighted: false, texts: ["Solution Scope"] },
+					{ id: "prepare-3", lane: "prepare", title: "Uzletvezerelt konfiguracios felmeres", titleAbbreviation: "BCA", children: ["explore-1"], state: "Positive", stateText: "Prepare", focused: false, highlighted: false, texts: ["Business Driven Configuration Assessment"] },
+					{ id: "explore-1", lane: "explore", title: "Fit-to-Standard elemzes", titleAbbreviation: "Fit", children: ["explore-2"], state: "Positive", stateText: "Explore", focused: false, highlighted: false, texts: ["Fit-to-Standard analysis"] },
+					{ id: "explore-2", lane: "explore", title: "Fit-to-Standard dokumentacio", titleAbbreviation: "Docs", children: ["explore-3"], state: "Positive", stateText: "Explore", focused: false, highlighted: false, texts: ["Fit-to-Standard documentation"] },
+					{ id: "explore-3", lane: "explore", title: "Integracio tervezese es kialakitasa", titleAbbreviation: "Integration", children: ["realize-1"], state: "Positive", stateText: "Explore", focused: false, highlighted: false, texts: ["Integration Planning and Design"] },
+					{ id: "realize-1", lane: "realize", title: "Sprint tervezes es vegrehajtas", titleAbbreviation: "Sprint", children: ["realize-2"], state: "Neutral", stateText: "Realize", focused: false, highlighted: false, texts: ["Sprint Planning and Execution"] },
+					{ id: "realize-2", lane: "realize", title: "Megoldas konfiguralasa", titleAbbreviation: "Config", children: ["realize-3"], state: "Neutral", stateText: "Realize", focused: false, highlighted: false, texts: ["Solution Configuration"] },
+					{ id: "realize-3", lane: "realize", title: "Teszt Migracio", titleAbbreviation: "Migration", children: ["realize-4"], state: "Critical", stateText: "Joker nyithato", focused: false, highlighted: true, texts: ["Test Migration", "Kattintasra Joker kartya"] },
+					{ id: "realize-4", lane: "realize", title: "Teszt vegrehajtas", titleAbbreviation: "Execution", children: ["deploy-1"], state: "Neutral", stateText: "Realize", focused: false, highlighted: false, texts: ["Test Execution"] },
+					{ id: "deploy-1", lane: "deploy", title: "Eles indulas", titleAbbreviation: "Go-Live", children: ["deploy-2"], state: "Positive", stateText: "Deploy", focused: false, highlighted: false, texts: ["System Go-Live"] },
+					{ id: "deploy-2", lane: "deploy", title: "Elesitesi atallas", titleAbbreviation: "Cutover", children: ["run-1"], state: "Positive", stateText: "Deploy", focused: false, highlighted: false, texts: ["Production Cutover"] },
+					{ id: "run-1", lane: "run", title: "Folyamatos mukodes", titleAbbreviation: "Operations", children: ["run-2"], state: "Positive", stateText: "Run", focused: false, highlighted: false, texts: ["Ongoing Operations"] },
+					{ id: "run-2", lane: "run", title: "Folyamatos fejlesztes", titleAbbreviation: "Improvement", children: ["run-3"], state: "Positive", stateText: "Run", focused: false, highlighted: false, texts: ["Continuous Improvement"] },
+					{ id: "run-3", lane: "run", title: "Kiadasi es frissitesi ciklusok", titleAbbreviation: "Release", children: [], state: "Positive", stateText: "Run", focused: false, highlighted: false, texts: ["Release & Update Cycles"] }
+				],
+				advisorLegend: [
+					{ uiState: "Success", label: "Kesz vagy standard teendo" },
+					{ uiState: "Information", label: "Aktiv megvalositasi lepes" },
+					{ uiState: "Warning", label: "Akcio / Joker kapcsolat" }
+				]
+			}), "flow");
+
 			// chat model
 			this.setModel(new JSONModel({
 				messages: [{
@@ -257,6 +325,16 @@ sap.ui.define([
 						systemPrompt: "Ertekeld a chatbot- es ugyfelkezelesi folyamatot. Azonositsd az automatizalhato lepeseket, a routing- es SLA-kockazatokat, majd adj rovid, uzletileg ertheto javaslatot a hatekonysag es ugyfelelmeny javitasara."
 					},
 					{
+						id: "dummy-22",
+						title: "Teszt Migracio (Test Migration)",
+						subtitle: "Tesztadat es migralasi felkeszules",
+						primaryTag: "Tanacsado",
+						tags: ["Tanacsado", "Altalanos"],
+						footer: "AI Joker 22",
+						description: "Teszt migracios lepesek, ellenorzolista, kockazatok es kovetkezo teendok attekintese.",
+						systemPrompt: "Segits a teszt migracios tevekenysegek megtervezeseben. Adj strukturalt ellenorzolistat, kockazatokat, dontesi pontokat es kovetkezo lepeseket."
+					},
+					{
 						id: "dummy-21",
 						title: "RPT1-Fizetesi kesedelem elorejelzes",
 						subtitle: "CSV upload + SAP RPT1 predikcio",
@@ -268,7 +346,7 @@ sap.ui.define([
 					}
 				],
 				filteredTiles: [],
-				availableTags: ["Osszes", "Altalanos", "Marketing", "Idozitheto", "GDC"],
+				availableTags: ["Osszes", "Altalanos", "Marketing", "Idozitheto", "GDC", "Tanacsado"],
 				activeTags: ["Osszes"],
 				activeTag: "Osszes",
 				selectedJoker: null,
