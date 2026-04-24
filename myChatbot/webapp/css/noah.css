@@ -84,7 +84,9 @@
 }
 
 .noahBubbleUser {
-  max-width: min(36%, 20rem);
+  width: clamp(20rem, 52%, 42rem);
+  max-width: min(52%, 42rem);
+  min-width: 20rem;
   border: 0;
   border-radius: 1rem;
   background: linear-gradient(180deg, #ece8ff 0%, #e6e1ff 100%);
@@ -150,6 +152,11 @@
 .noahComposerMeta {
   gap: 0.5rem;
   align-items: center;
+  border: 1px solid rgba(200, 214, 234, 0.95);
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 20px rgba(91, 108, 255, 0.06);
+  padding: 0.9rem 1rem;
 }
 
 .noahComposerActions {
@@ -216,5 +223,11 @@
   .noahChatPanel {
     height: auto;
     min-height: 56vh;
+  }
+
+  .noahBubbleUser {
+    width: min(100%, 32rem);
+    max-width: min(100%, 32rem);
+    min-width: 0;
   }
 }
