@@ -46,8 +46,15 @@ sap.ui.define([
       this._stopNoah2Dictation(false);
     },
 
+    _getNoah2Model: function() {
+      return this.getView().getModel("noah2") || this.getOwnerComponent().getModel("noah2");
+    },
+
     _setupNoah2DictationSupport: function() {
-      var oModel = this.getView().getModel("noah2");
+      var oModel = this._getNoah2Model();
+      if (!oModel) {
+        return;
+      }
       var SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
       var bSupported = typeof SpeechRecognitionCtor === "function";
       this._speechRecognitionType = SpeechRecognitionCtor || null;
@@ -57,7 +64,10 @@ sap.ui.define([
     },
 
     onToggleNoah2Dictation: function() {
-      var oModel = this.getView().getModel("noah2");
+      var oModel = this._getNoah2Model();
+      if (!oModel) {
+        return;
+      }
       if (!oModel.getProperty("/dictationSupported")) {
         MessageToast.show(oModel.getProperty("/dictationUnavailableReason") || "Dictate nem tamogatott.");
         return;
@@ -122,7 +132,7 @@ sap.ui.define([
     },
 
     _stopNoah2Dictation: function(bShowToast) {
-      var oModel = this.getView().getModel("noah2");
+      var oModel = this._getNoah2Model();
       if (this._speechRecognition) {
         try {
           this._speechRecognition.stop();
@@ -130,14 +140,19 @@ sap.ui.define([
           // noop
         }
       }
-      oModel.setProperty("/dictationActive", false);
+      if (oModel) {
+        oModel.setProperty("/dictationActive", false);
+      }
       if (bShowToast) {
         MessageToast.show("Diktalas leallitva.");
       }
     },
 
     _applyNoah2DictationDraft: function(sText) {
-      var oModel = this.getView().getModel("noah2");
+      var oModel = this._getNoah2Model();
+      if (!oModel) {
+        return;
+      }
       var sCurrent = String(oModel.getProperty("/draftMessage") || "");
       var sBase = sCurrent.replace(/\s*\[[^\]]+\]\s*$/, "").trim();
       var sNext = sText ? sText.trim() : "";
