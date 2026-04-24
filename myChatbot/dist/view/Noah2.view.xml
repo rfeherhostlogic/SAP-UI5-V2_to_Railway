@@ -7,42 +7,6 @@
   <Page title="Noah" class="sapUiContentPadding noahPage" showHeader="false">
     <HBox class="noahShell" renderType="Bare" wrap="Wrap">
       <VBox class="noahMain">
-        <VBox class="noahHero sapUiTinyMarginBottom">
-          <HBox alignItems="Center" justifyContent="SpaceBetween" wrap="Wrap">
-            <VBox>
-              <Title text="Noah" level="H2"/>
-              <Text text="Joule-szeru uzleti asszisztens SAP UI5 elemekkel." class="noahHeroSubtitle"/>
-            </VBox>
-            <HBox alignItems="Center" wrap="Wrap" class="noahTopActions">
-              <Button
-                text="Prompt Javito"
-                icon="sap-icon://edit"
-                press=".onImprovePrompt"
-                type="Transparent"
-                class="noahPillButton"
-                enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"
-                busy="{noah2>/promptImproverBusy}"/>
-              <HBox alignItems="Center" class="noahModePill">
-                <Text text="Noah Agent" class="sapUiTinyMarginEnd"/>
-                <Switch
-                  state="{noah2>/agentEnabled}"
-                  change=".onNoah2AgentToggle"
-                  customTextOn="ON"
-                  customTextOff="OFF"/>
-              </HBox>
-              <HBox alignItems="Center" class="noahModePill">
-                <Text text="Uzleti AI" class="sapUiTinyMarginEnd"/>
-                <Switch
-                  state="{noah2>/businessAiEnabled}"
-                  change=".onBusinessAiToggle"
-                  customTextOn="ON"
-                  customTextOff="OFF"/>
-              </HBox>
-            </HBox>
-          </HBox>
-          <Text text="{noah2>/statusText}" visible="{= ${noah2>/statusText} ? true : false }" class="sapUiTinyMarginTop noahStatusText"/>
-        </VBox>
-
         <VBox id="noah2ChatPanel" class="noahChatPanel">
           <List id="noah2MessageList" items="{noah2>/messages}" showSeparators="None" class="noahMsgList">
             <CustomListItem>
@@ -93,19 +57,6 @@
         </VBox>
 
         <VBox class="noahComposer sapUiSmallMarginTop">
-          <HBox alignItems="Center" justifyContent="SpaceBetween" wrap="Wrap" class="sapUiTinyMarginBottom">
-            <VBox id="noah2DropZone" class="noahDropZone">
-              <Text text="Huzd ide a fajlokat, vagy add hozza a valaszhoz."/>
-            </VBox>
-            <unif:FileUploader
-              id="noah2FileUploader"
-              width="auto"
-              sameFilenameAllowed="true"
-              multiple="true"
-              uploadOnChange="false"
-              buttonText="Fajlok"
-              change=".onNoah2FileChange"/>
-          </HBox>
           <List items="{noah2>/attachments}" visible="{= ${noah2>/attachments}.length > 0 }" class="sapUiTinyMarginBottom">
             <CustomListItem>
               <HBox justifyContent="SpaceBetween" alignItems="Center">
@@ -124,6 +75,18 @@
               growingMaxLines="6"
               placeholder="{= ${noah2>/dictationActive} ? 'Diktalas folyamatban...' : 'Message Noah...' }"
               class="noahComposerInput"/>
+            <unif:FileUploader
+              id="noah2FileUploader"
+              width="2.5rem"
+              sameFilenameAllowed="true"
+              multiple="true"
+              uploadOnChange="false"
+              icon="sap-icon://add-document"
+              iconOnly="true"
+              buttonOnly="true"
+              tooltip="Browse or drop multiple files"
+              change=".onNoah2FileChange"
+              class="sapUiTinyMarginBegin"/>
             <Button
               icon="sap-icon://microphone"
               type="{= ${noah2>/dictationActive} ? 'Emphasized' : 'Transparent' }"
@@ -150,6 +113,30 @@
               items="{noah2>/manualCardOptions}">
               <core:Item key="{noah2>id}" text="{noah2>name}"/>
             </Select>
+            <Button
+              text="Prompt Javito"
+              icon="sap-icon://edit"
+              press=".onImprovePrompt"
+              type="Transparent"
+              class="noahPillButton sapUiTinyMarginBegin"
+              enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"
+              busy="{noah2>/promptImproverBusy}"/>
+            <HBox alignItems="Center" class="noahModePill sapUiTinyMarginBegin">
+              <Text text="Noah Agent" class="sapUiTinyMarginEnd"/>
+              <Switch
+                state="{noah2>/agentEnabled}"
+                change=".onNoah2AgentToggle"
+                customTextOn="ON"
+                customTextOff="OFF"/>
+            </HBox>
+            <HBox alignItems="Center" class="noahModePill sapUiTinyMarginBegin">
+              <Text text="Uzleti AI" class="sapUiTinyMarginEnd"/>
+              <Switch
+                state="{noah2>/businessAiEnabled}"
+                change=".onBusinessAiToggle"
+                customTextOn="ON"
+                customTextOff="OFF"/>
+            </HBox>
             <Button
               text="Megse"
               type="Reject"
