@@ -29,13 +29,119 @@ sap.ui.define([
     onInit: function() {
       this._activeAbortController = null;
       this._boundDropHandlers = false;
+      this._speechRecognition = null;
+      this._speechRecognitionType = null;
+      this._dictationTranscript = "";
       this._loadManualCard2Options();
       this._rebindNoah2Dummy4PreviewTable();
+      this._setupNoah2DictationSupport();
     },
 
     onAfterRendering: function() {
       this._bindDrop2ZoneEvents();
       this._scrollNoah2ChatToBottom();
+    },
+
+    onExit: function() {
+      this._stopNoah2Dictation(false);
+    },
+
+    _setupNoah2DictationSupport: function() {
+      var oModel = this.getView().getModel("noah2");
+      var SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+      var bSupported = typeof SpeechRecognitionCtor === "function";
+      this._speechRecognitionType = SpeechRecognitionCtor || null;
+      oModel.setProperty("/dictationSupported", bSupported);
+      oModel.setProperty("/dictationUnavailableReason",
+        bSupported ? "" : "A bongeszo nem tamogatja a hangdiktalast.");
+    },
+
+    onToggleNoah2Dictation: function() {
+      var oModel = this.getView().getModel("noah2");
+      if (!oModel.getProperty("/dictationSupported")) {
+        MessageToast.show(oModel.getProperty("/dictationUnavailableReason") || "Dictate nem tamogatott.");
+        return;
+      }
+      if (oModel.getProperty("/dictationActive")) {
+        this._stopNoah2Dictation(true);
+        return;
+      }
+
+      var RecognitionCtor = this._speechRecognitionType;
+      if (!RecognitionCtor) {
+        MessageToast.show("A hangdiktalas most nem erheto el.");
+        return;
+      }
+
+      var oRecognition = new RecognitionCtor();
+      this._speechRecognition = oRecognition;
+      this._dictationTranscript = "";
+      oRecognition.lang = "hu-HU";
+      oRecognition.continuous = true;
+      oRecognition.interimResults = true;
+
+      oRecognition.onstart = function() {
+        oModel.setProperty("/dictationActive", true);
+        this._setState2(STATE.IDLE, "Diktalas folyamatban...");
+      }.bind(this);
+
+      oRecognition.onresult = function(oEvent) {
+        var sFinal = "";
+        var sInterim = "";
+        var i;
+        for (i = oEvent.resultIndex; i < oEvent.results.length; i += 1) {
+          if (oEvent.results[i].isFinal) {
+            sFinal += oEvent.results[i][0].transcript + " ";
+          } else {
+            sInterim += oEvent.results[i][0].transcript + " ";
+          }
+        }
+        if (sFinal) {
+          this._dictationTranscript = (this._dictationTranscript + " " + sFinal).trim();
+        }
+        this._applyNoah2DictationDraft((this._dictationTranscript + " " + sInterim).trim());
+      }.bind(this);
+
+      oRecognition.onerror = function() {
+        oModel.setProperty("/dictationActive", false);
+        this._speechRecognition = null;
+        MessageToast.show("A diktalas megszakadt.");
+      }.bind(this);
+
+      oRecognition.onend = function() {
+        var bWasActive = !!oModel.getProperty("/dictationActive");
+        oModel.setProperty("/dictationActive", false);
+        this._speechRecognition = null;
+        if (bWasActive) {
+          this._applyNoah2DictationDraft(this._dictationTranscript);
+          this._setState2(STATE.IDLE, "Diktalas leallitva.");
+        }
+      }.bind(this);
+
+      oRecognition.start();
+    },
+
+    _stopNoah2Dictation: function(bShowToast) {
+      var oModel = this.getView().getModel("noah2");
+      if (this._speechRecognition) {
+        try {
+          this._speechRecognition.stop();
+        } catch (_oError) {
+          // noop
+        }
+      }
+      oModel.setProperty("/dictationActive", false);
+      if (bShowToast) {
+        MessageToast.show("Diktalas leallitva.");
+      }
+    },
+
+    _applyNoah2DictationDraft: function(sText) {
+      var oModel = this.getView().getModel("noah2");
+      var sCurrent = String(oModel.getProperty("/draftMessage") || "");
+      var sBase = sCurrent.replace(/\s*\[[^\]]+\]\s*$/, "").trim();
+      var sNext = sText ? sText.trim() : "";
+      oModel.setProperty("/draftMessage", sBase && sNext ? sBase + " " + sNext : (sNext || sBase));
     },
 
     // ─────────────────────────────────────────────────────────────────
@@ -264,6 +370,40 @@ sap.ui.define([
       this._resetAgent2Plan();
       this._setState2(STATE.IDLE,
         bState ? "Agent mode aktiv. Irj le egy problemat, en lepesenkenti tervet kesztek." : "Automatikus router mod.");
+    },
+
+    onBusinessAiToggle: function(oEvent) {
+      var oModel = this.getView().getModel("noah2");
+      var bState = !!(oEvent && oEvent.getParameter ? oEvent.getParameter("state") : false);
+      oModel.setProperty("/businessAiEnabled", bState);
+      MessageToast.show(bState ? "Uzleti AI bekapcsolva." : "Uzleti AI kikapcsolva.");
+    },
+
+    onToggleNoah2Insights: function() {
+      var oModel = this.getView().getModel("noah2");
+      this._setNoah2InsightState(!oModel.getProperty("/insightsOpen"), Number(oModel.getProperty("/selectedInsightMessageIndex") || -1));
+    },
+
+    onToggleNoah2MessageInfo: function(oEvent) {
+      var oCtx = oEvent.getSource().getBindingContext("noah2");
+      if (!oCtx) {
+        return;
+      }
+      var iIndex = parseInt(String(oCtx.getPath()).split("/").pop(), 10);
+      if (isNaN(iIndex)) {
+        return;
+      }
+      var oModel = this.getView().getModel("noah2");
+      var bIsCurrent = oModel.getProperty("/insightsOpen") && Number(oModel.getProperty("/selectedInsightMessageIndex")) === iIndex;
+      this._setNoah2InsightState(!bIsCurrent, iIndex);
+    },
+
+    onLikeNoah2Message: function(oEvent) {
+      this._setNoah2MessageFeedback(oEvent, "like");
+    },
+
+    onDislikeNoah2Message: function(oEvent) {
+      this._setNoah2MessageFeedback(oEvent, "dislike");
     },
 
     // ─────────────────────────────────────────────────────────────────
@@ -607,6 +747,37 @@ sap.ui.define([
           MessageToast.show("Masolas nem sikerult.");
         }
       }
+    },
+
+    _setNoah2MessageFeedback: function(oEvent, sFeedback) {
+      var oCtx = oEvent.getSource().getBindingContext("noah2");
+      if (!oCtx) {
+        return;
+      }
+      var oModel = this.getView().getModel("noah2");
+      var aMessages = (oModel.getProperty("/messages") || []).slice();
+      var iIndex = parseInt(String(oCtx.getPath()).split("/").pop(), 10);
+      if (isNaN(iIndex) || !aMessages[iIndex]) {
+        return;
+      }
+      var sCurrent = String(aMessages[iIndex].feedback || "");
+      aMessages[iIndex] = Object.assign({}, aMessages[iIndex], {
+        feedback: sCurrent === sFeedback ? "" : sFeedback
+      });
+      oModel.setProperty("/messages", aMessages);
+      MessageToast.show(sFeedback === "like" ? "Visszajelzes rogzitve: tetszik." : "Visszajelzes rogzitve: nem tetszik.");
+    },
+
+    _setNoah2InsightState: function(bOpen, iIndex) {
+      var oModel = this.getView().getModel("noah2");
+      var aMessages = (oModel.getProperty("/messages") || []).map(function(oMessage, iMessageIndex) {
+        return Object.assign({}, oMessage, {
+          infoOpen: !!bOpen && iMessageIndex === iIndex
+        });
+      });
+      oModel.setProperty("/messages", aMessages);
+      oModel.setProperty("/insightsOpen", !!bOpen);
+      oModel.setProperty("/selectedInsightMessageIndex", bOpen ? iIndex : -1);
     },
 
     // ─────────────────────────────────────────────────────────────────
@@ -1107,7 +1278,12 @@ sap.ui.define([
     _appendNoah2Message: function(sRole, sContent) {
       var oModel = this.getView().getModel("noah2");
       var aMessages = oModel.getProperty("/messages") || [];
-      aMessages.push({ role: sRole, content: String(sContent || "") });
+      aMessages.push({
+        role: sRole,
+        content: String(sContent || ""),
+        feedback: "",
+        infoOpen: false
+      });
       oModel.setProperty("/messages", aMessages);
       this._scrollNoah2ChatToBottom();
     },
@@ -1128,7 +1304,9 @@ sap.ui.define([
         selectedSource: sSelectedSource,
         chartAvailable: !!sChartHtml,
         chartHtml: sChartHtml,
-        previewHtml: sPreviewHtml
+        previewHtml: sPreviewHtml,
+        feedback: "",
+        infoOpen: false
       });
       oModel.setProperty("/messages", aMessages);
       this._scrollNoah2ChatToBottom();

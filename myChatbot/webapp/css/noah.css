@@ -1,112 +1,209 @@
 .noahPage {
   background:
-    radial-gradient(circle at 8% 4%, rgba(15, 118, 110, 0.09), transparent 30%),
-    radial-gradient(circle at 92% 10%, rgba(30, 64, 175, 0.08), transparent 35%),
-    linear-gradient(180deg, #f6f9fc 0%, #eef3f9 100%);
+    radial-gradient(circle at 10% 0%, rgba(120, 119, 255, 0.08), transparent 28%),
+    radial-gradient(circle at 100% 18%, rgba(14, 165, 233, 0.08), transparent 30%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
 }
 
 .noahShell {
-  gap: 0.9rem;
-  align-items: flex-start;
+  gap: 1rem;
+  align-items: stretch;
 }
 
 .noahMain {
-  flex: 1 1 68%;
+  flex: 1 1 72%;
   min-width: 320px;
 }
 
 .noahSide {
-  flex: 1 1 30%;
+  flex: 0 0 22rem;
   min-width: 280px;
   position: sticky;
   top: 0.75rem;
   align-self: flex-start;
-  max-height: calc(100vh - 1.5rem);
+}
+
+.noahHero {
+  padding: 1rem 1.15rem;
+  border: 1px solid rgba(143, 169, 207, 0.34);
+  border-radius: 1.35rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(242, 247, 255, 0.96) 100%);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.07);
+}
+
+.noahHeroSubtitle,
+.noahStatusText {
+  color: #5d7395;
+}
+
+.noahTopActions {
+  gap: 0.75rem;
+}
+
+.noahPillButton .sapMBtnInner,
+.noahModePill {
+  min-height: 2.75rem;
+  border-radius: 999px;
+  border: 1px solid #d9e3f0;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(100, 116, 139, 0.08);
+}
+
+.noahPillButton .sapMBtnInner {
+  padding: 0 1rem;
+}
+
+.noahModePill {
+  padding: 0.3rem 0.45rem 0.3rem 0.9rem;
 }
 
 .noahChatPanel {
-  border: 1px solid #d8e1ec;
-  border-radius: 0.8rem;
-  background: #ffffff;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);
-  padding: 0.7rem;
-  min-height: 44vh;
-  height: 52vh;
+  border: 1px solid rgba(143, 169, 207, 0.34);
+  border-radius: 1.6rem;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 16px 45px rgba(15, 23, 42, 0.08);
+  padding: 1rem 1.1rem;
+  min-height: 62vh;
+  height: calc(100vh - 20rem);
   overflow-y: auto;
 }
 
 .noahMsgList {
   background: transparent;
-  padding-right: 0.25rem;
+}
+
+.noahMsgList .sapMLIB {
+  background: transparent;
+  border: 0;
+  padding: 0.2rem 0;
+}
+
+.noahAvatar {
+  margin-top: 0.55rem;
+  margin-right: 0.55rem;
+}
+
+.noahAnswerBlock {
+  max-width: min(74%, 46rem);
 }
 
 .noahBubbleAi {
-  max-width: 76%;
+  max-width: none;
+  border: 0;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #eef3f7 0%, #edf2f7 100%);
+  box-shadow: none;
+  padding: 0.85rem 1rem;
 }
 
 .noahBubbleUser {
-  max-width: 76%;
-  background: linear-gradient(145deg, #d9ecff 0%, #bcdcff 100%);
-  color: #12314f;
+  max-width: min(36%, 20rem);
   border: 0;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #ece8ff 0%, #e6e1ff 100%);
+  box-shadow: none;
+  color: #1e275d;
+  padding: 0.8rem 1rem;
 }
 
 .noahBubbleUser .sapMText,
 .noahBubbleUser .chatBubbleMeta {
-  color: #12314f;
+  color: #1e275d;
+}
+
+.noahBubbleAi .sapMText,
+.noahBubbleAi .chatBubbleMeta {
+  color: #15253d;
+}
+
+.noahMessageActions {
+  gap: 0.25rem;
+  padding: 0.15rem 0 0.75rem 0.15rem;
+}
+
+.noahMessageActions .sapMBtn .sapMBtnInner {
+  min-width: 2rem;
+  height: 2rem;
+  border-radius: 0.7rem;
 }
 
 .noahComposer {
-  background: #ffffff;
-  border: 1px solid #d8e1ec;
-  border-radius: 0.8rem;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);
-  padding: 0.75rem;
+  border: 1px solid rgba(143, 169, 207, 0.34);
+  border-radius: 1.6rem;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+  padding: 1rem;
 }
 
 .noahDropZone {
-  border: 1px dashed #93a5bc;
-  background: #f8fbff;
-  border-radius: 0.65rem;
-  padding: 0.65rem;
+  flex: 1 1 auto;
+  border: 1px dashed #9fb2ce;
+  background: #f7faff;
+  border-radius: 0.9rem;
+  padding: 0.75rem 0.9rem;
 }
 
 .noahDropZoneActive {
-  border-color: #2563eb;
-  background: #e9f2ff;
+  border-color: #5b6cff;
+  background: #eef1ff;
 }
 
-.noahCardPanel {
-  border-radius: 0.8rem;
-  border: 1px solid #d8e1ec;
-  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+.noahComposerBar {
+  align-items: flex-end;
+  border: 1px solid #c8d6ea;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(91, 108, 255, 0.08);
+  padding: 0.35rem 0.35rem 0.35rem 1rem;
 }
 
-.noahAvatar {
-  margin-top: 0.25rem;
+.noahComposerInput {
+  margin: 0;
 }
 
+.noahComposerInput .sapMTextAreaInner {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  min-height: 2.25rem;
+  padding: 0.5rem 0.1rem;
+}
+
+.noahComposerInput .sapMTextAreaInner:focus {
+  outline: none;
+}
+
+.noahComposerMeta {
+  gap: 0.5rem;
+}
+
+.noahInsightsHeader {
+  padding: 0.1rem 0.2rem 0.6rem;
+}
+
+.noahCardPanel,
 .noahRouterPanel {
-  border-radius: 0.8rem;
-  border: 1px solid #d8e1ec;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);
+  border-radius: 1.2rem;
+  border: 1px solid rgba(143, 169, 207, 0.34);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
 }
 
 .noahRouterList {
-  max-height: calc(100vh - 11rem);
+  max-height: calc(100vh - 18rem);
   overflow-y: auto;
   border-top: 1px solid #edf2f7;
   padding-top: 0.4rem;
 }
 
 .noahAgentList {
-  max-height: calc(100vh - 18rem);
+  max-height: calc(100vh - 22rem);
   overflow-y: auto;
 }
 
 .noahRouterItem {
   border: 1px solid #e4ebf3;
-  border-radius: 0.65rem;
+  border-radius: 0.85rem;
   margin-bottom: 0.45rem;
   background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
 }
@@ -116,18 +213,15 @@
   font-size: 0.73rem;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1100px) {
   .noahMain,
   .noahSide {
     flex: 1 1 100%;
-  }
-
-  .noahSide {
     position: static;
-    max-height: none;
   }
 
-  .noahRouterList {
-    max-height: 260px;
+  .noahChatPanel {
+    height: auto;
+    min-height: 50vh;
   }
 }
