@@ -37,6 +37,7 @@
 .noahStartComposerWrap {
   width: min(100%, 90rem);
   gap: 1.4rem;
+  flex-wrap: nowrap;
 }
 
 .noahStartComposerStack {
@@ -45,10 +46,11 @@
 }
 
 .noahStartLogo {
-  width: 5.5rem;
+  width: 7rem;
+  min-width: 7rem;
   max-width: 12vw;
   height: auto;
-  filter: drop-shadow(0 16px 28px rgba(59, 130, 246, 0.16));
+  filter: drop-shadow(0 20px 36px rgba(59, 130, 246, 0.2));
 }
 
 .noahAttachmentList,
@@ -160,6 +162,7 @@
 .noahComposerBar {
   gap: 0.4rem;
   align-items: center;
+  width: 100%;
   border: 1px solid rgba(207, 219, 235, 0.95);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.97);
@@ -180,13 +183,17 @@
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
+  display: block;
   background: transparent;
 }
 
 .noahComposerInput.sapMTextArea,
 .noahComposerInput .sapMTextAreaWrapper,
 .noahComposerInput .sapMTextAreaInner {
+  display: block;
+  flex: 1 1 auto;
   width: 100%;
+  max-width: 100%;
   border: 0 !important;
   box-shadow: none !important;
   background: transparent !important;
@@ -217,11 +224,14 @@
   font-size: 1rem;
   line-height: 1.55;
   resize: none;
+  width: 100% !important;
+  min-width: 0;
   overflow-y: auto;
 }
 
 .noahStartInput .sapMTextAreaInner {
   font-size: 1.08rem;
+  padding-left: 0.35rem;
 }
 
 .noahComposerUtility {
@@ -296,31 +306,31 @@
   padding: 0 1.2rem;
 }
 
-.noahToggleButton,
-.noahToggleButton.sapMBtn,
-.noahToggleButton.sapMToggleBtn {
+.noahToolToggle,
+.noahToolToggle.sapMBtn,
+.noahToolToggle.sapMToggleBtn {
   border-radius: 999px;
   overflow: hidden;
 }
 
-.noahToggleButton .sapMBtnInner {
+.noahToolToggle .sapMBtnInner {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.noahToggleButton.sapMToggleBtnPressed .sapMBtnInner,
-.noahToggleButton .sapMBtnInner.sapMToggleBtnPressed,
-.noahToggleButton .sapMBtnInner.sapMBtnEmphasized {
-  background: linear-gradient(180deg, #34506f 0%, #223750 100%);
-  border-color: #223750;
-  color: #ffffff;
+.noahToolToggle.sapMToggleBtnPressed .sapMBtnInner,
+.noahToolToggle .sapMBtnInner.sapMToggleBtnPressed,
+.noahToolToggle .sapMBtnInner.sapMBtnEmphasized {
+  background: rgba(239, 246, 255, 0.98);
+  border-color: #93c5fd;
+  color: #1d4ed8;
 }
 
-.noahToggleButton.sapMToggleBtnPressed .sapUiIcon,
-.noahToggleButton .sapMBtnInner.sapMToggleBtnPressed .sapUiIcon,
-.noahToggleButton .sapMBtnInner.sapMBtnEmphasized .sapUiIcon {
-  color: #ffffff;
+.noahToolToggle.sapMToggleBtnPressed .sapUiIcon,
+.noahToolToggle .sapMBtnInner.sapMToggleBtnPressed .sapUiIcon,
+.noahToolToggle .sapMBtnInner.sapMBtnEmphasized .sapUiIcon {
+  color: #1d4ed8;
 }
 
 .noahConversationMenuRow {

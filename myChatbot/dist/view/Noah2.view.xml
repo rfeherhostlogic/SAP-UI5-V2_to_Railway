@@ -27,7 +27,7 @@
           </List>
 
           <HBox class="noahStartComposerWrap" alignItems="Center" justifyContent="Center">
-            <Image src="img/Noah_icon.png" decorative="false" alt="Noah" class="noahStartLogo"/>
+            <Image src="img/Noah_transparent.png" decorative="false" alt="Noah" class="noahStartLogo"/>
             <VBox class="noahStartComposerStack">
               <HBox class="noahComposerBar noahComposerBarStart" alignItems="Center">
                 <unif:FileUploader
@@ -47,7 +47,7 @@
                   rows="1"
                   growing="true"
                   growingMaxLines="6"
-                  placeholder="{= ${noah2>/dictationActive} ? 'Diktalas folyamatban...' : 'Kerdezz barmit' }"
+                  placeholder="{= ${noah2>/dictationActive} ? 'Diktalas folyamatban...' : 'Kérdezz bármit' }"
                   class="noahComposerInput noahStartInput"/>
                 <HBox class="noahComposerUtility" alignItems="Center">
                   <HBox class="noahBusinessToggleWrap" alignItems="Center">
@@ -96,7 +96,7 @@
                   pressed="{noah2>/agentEnabled}"
                   press=".onNoah2AgentToggle"
                   type="{= ${noah2>/agentEnabled} ? 'Emphasized' : 'Transparent' }"
-                  class="noahToggleButton noahToolPill"/>
+                  class="noahToolToggle noahToolPill"/>
               </HBox>
             </VBox>
           </HBox>
@@ -108,7 +108,7 @@
               <CustomListItem>
                 <VBox width="100%">
                   <HBox width="100%" justifyContent="Start" visible="{= ${noah2>role} !== 'user' }">
-                    <Avatar src="img/Noah_icon.png" displaySize="XS" class="chatAvatar noahAvatar"/>
+                    <Avatar src="img/Noah_transparent.png" displaySize="XS" class="chatAvatar noahAvatar"/>
                     <VBox class="noahAnswerBlock">
                       <VBox class="chatBubble chatBubbleAi noahBubbleAi">
                         <Text text="Noah" class="chatBubbleMeta"/>
@@ -181,7 +181,7 @@
               pressed="{noah2>/agentEnabled}"
               press=".onNoah2AgentToggle"
               type="{= ${noah2>/agentEnabled} ? 'Emphasized' : 'Transparent' }"
-              class="noahToggleButton noahToolPill"/>
+              class="noahToolToggle noahToolPill"/>
           </HBox>
 
           <VBox class="noahComposer noahComposerSticky">
@@ -216,7 +216,7 @@
                 rows="1"
                 growing="true"
                 growingMaxLines="6"
-                placeholder="{= ${noah2>/dictationActive} ? 'Diktalas folyamatban...' : 'Kerdezz barmit' }"
+                placeholder="{= ${noah2>/dictationActive} ? 'Diktalas folyamatban...' : 'Kérdezz bármit' }"
                 class="noahComposerInput"/>
               <HBox class="noahComposerUtility" alignItems="Center">
                 <HBox class="noahBusinessToggleWrap" alignItems="Center">
