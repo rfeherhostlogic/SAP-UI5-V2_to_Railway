@@ -1,8 +1,9 @@
 .noahPage {
   background:
-    radial-gradient(circle at 10% 0%, rgba(120, 119, 255, 0.08), transparent 28%),
-    radial-gradient(circle at 100% 18%, rgba(14, 165, 233, 0.08), transparent 30%),
-    linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+    radial-gradient(circle at 20% 10%, rgba(96, 165, 250, 0.12), transparent 24%),
+    radial-gradient(circle at 80% 18%, rgba(59, 130, 246, 0.08), transparent 28%),
+    radial-gradient(circle at 50% 70%, rgba(125, 211, 252, 0.08), transparent 32%),
+    linear-gradient(180deg, #f9fbff 0%, #eef4fb 100%);
 }
 
 .noahShell {
@@ -19,134 +20,123 @@
   min-height: calc(100vh - 2rem);
 }
 
-.noahSide {
-  flex: 0 0 22rem;
-  min-width: 280px;
-  position: sticky;
-  top: 0.75rem;
-  align-self: flex-start;
+.noahStartStage {
+  flex: 1 1 auto;
+  min-height: calc(100vh - 4rem);
+  padding: 2rem 1rem;
 }
 
-.noahPillButton .sapMBtnInner,
-.noahModePill,
-.noahToggleButton .sapMBtnInner {
-  min-height: 2.75rem;
-  border-radius: 999px;
-  border: 1px solid #d9e3f0;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 8px 24px rgba(100, 116, 139, 0.08);
+.noahStartTitle {
+  color: #1d4ed8;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  text-align: center;
+  margin-bottom: 1.5rem;
 }
 
-.noahPillButton .sapMBtnInner {
-  padding: 0 1rem;
+.noahStartComposerWrap {
+  width: min(100%, 90rem);
+  gap: 1.4rem;
 }
 
-.noahModePill {
-  padding: 0.3rem 0.45rem 0.3rem 0.9rem;
+.noahStartComposerStack {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-/* Toggle button: az outer elem is kapja meg a border-radius-t,
-   hogy a keret és a háttér tökéletesen illeszkedjen */
-.noahToggleButton,
-.noahToggleButton.sapMBtn,
-.noahToggleButton.sapMToggleBtn {
-  border-radius: 999px;
-  overflow: hidden;
+.noahStartLogo {
+  width: 5.5rem;
+  max-width: 12vw;
+  height: auto;
+  filter: drop-shadow(0 16px 28px rgba(59, 130, 246, 0.16));
 }
 
-.noahToggleButton .sapMBtnInner {
-  padding: 0 1rem;
+.noahAttachmentList,
+.noahAttachmentList .sapMListUl,
+.noahAttachmentList .sapMLIB {
+  background: transparent;
+  border: 0;
+}
+
+.noahStartAttachmentList {
+  width: min(100%, 58rem);
+}
+
+.noahConversationStage {
   display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Szöveg + ikon igazítása középre */
-.noahToggleButton .sapMBtnInner .sapMBtnContent {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.noahToggleButton.sapMToggleBtnPressed .sapMBtnInner,
-.noahToggleButton .sapMBtnInner.sapMToggleBtnPressed,
-.noahToggleButton .sapMBtnInner.sapMBtnEmphasized {
-  background: linear-gradient(180deg, #34506f 0%, #223750 100%);
-  border-color: #223750;
-  color: #ffffff;
-}
-
-.noahToggleButton.sapMToggleBtnPressed .sapUiIcon,
-.noahToggleButton .sapMBtnInner.sapMToggleBtnPressed .sapUiIcon,
-.noahToggleButton .sapMBtnInner.sapMBtnEmphasized .sapUiIcon {
-  color: #ffffff;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: calc(100vh - 2rem);
 }
 
 .noahChatPanel {
-  border: 1px solid rgba(143, 169, 207, 0.34);
-  border-radius: 1.6rem;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 16px 45px rgba(15, 23, 42, 0.08);
-  padding: 1rem 1.1rem;
-  min-height: 68vh;
-  height: auto;
+  position: relative;
   flex: 1 1 auto;
+  min-height: 52vh;
   overflow-y: auto;
+  padding: 1.2rem 1rem 0.75rem;
+  border: 1px solid rgba(200, 214, 234, 0.7);
+  border-radius: 1.75rem;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 20px 48px rgba(104, 127, 170, 0.12);
+  backdrop-filter: blur(12px);
 }
 
-.noahMsgList {
-  background: transparent;
-}
-
+.noahMsgList,
+.noahMsgList .sapMListUl,
 .noahMsgList .sapMLIB {
   background: transparent;
   border: 0;
-  padding: 0.2rem 0;
+}
+
+.noahMsgList .sapMLIB {
+  padding: 0.25rem 0;
 }
 
 .noahAvatar {
   margin-top: 0.55rem;
-  margin-right: 0.55rem;
+  margin-right: 0.7rem;
+  background: transparent;
 }
 
 .noahAnswerBlock {
-  max-width: min(74%, 46rem);
+  max-width: min(74%, 50rem);
 }
 
 .noahBubbleAi {
   max-width: none;
-  border: 0;
-  border-radius: 1rem;
-  background: linear-gradient(180deg, #eef3f7 0%, #edf2f7 100%);
-  box-shadow: none;
-  padding: 0.85rem 1rem;
+  border: 1px solid rgba(214, 225, 241, 0.95);
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 36px rgba(114, 132, 168, 0.1);
+  padding: 0.9rem 1rem;
 }
 
 .noahBubbleUser {
-  width: clamp(20rem, 52%, 42rem);
-  max-width: min(52%, 42rem);
-  min-width: 20rem;
-  border: 0;
-  border-radius: 1rem;
-  background: linear-gradient(180deg, #ece8ff 0%, #e6e1ff 100%);
-  box-shadow: none;
-  color: #1e275d;
-  padding: 0.8rem 1rem;
+  width: clamp(18rem, 40%, 34rem);
+  max-width: min(40%, 34rem);
+  min-width: 18rem;
+  border: 1px solid rgba(215, 226, 242, 0.8);
+  border-radius: 1.2rem;
+  background: linear-gradient(180deg, #e8effd 0%, #deebff 100%);
+  box-shadow: 0 16px 36px rgba(104, 127, 170, 0.08);
+  color: #1e3a5f;
+  padding: 0.9rem 1rem;
 }
 
 .noahBubbleUser .sapMText,
 .noahBubbleUser .chatBubbleMeta {
-  color: #1e275d;
+  color: #1e3a5f;
 }
 
 .noahBubbleAi .sapMText,
 .noahBubbleAi .chatBubbleMeta {
-  color: #15253d;
+  color: #1d2e4a;
 }
 
 .noahMessageActions {
-  gap: 0.25rem;
-  padding: 0.15rem 0 0.75rem 0.15rem;
+  gap: 0.35rem;
+  padding: 0.2rem 0 0.8rem 0.15rem;
 }
 
 .noahMessageActions .sapMBtn .sapMBtnInner {
@@ -156,17 +146,33 @@
 }
 
 .noahComposer {
-  padding: 0.25rem 0 0;
-  margin-top: auto;
+  padding-top: 0.75rem;
+}
+
+.noahComposerSticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  padding-top: 0.75rem;
+  background: linear-gradient(180deg, rgba(238, 244, 251, 0) 0%, rgba(238, 244, 251, 0.8) 24%, rgba(238, 244, 251, 0.98) 100%);
 }
 
 .noahComposerBar {
-  align-items: flex-end;
-  border: 1px solid #c8d6ea;
+  gap: 0.4rem;
+  align-items: center;
+  border: 1px solid rgba(207, 219, 235, 0.95);
   border-radius: 999px;
-  background: #ffffff;
-  box-shadow: 0 10px 24px rgba(91, 108, 255, 0.08);
-  padding: 0.35rem 0.4rem 0.35rem 1rem;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 14px 30px rgba(91, 108, 255, 0.08);
+  padding: 0.45rem 0.55rem 0.45rem 0.85rem;
+}
+
+.noahComposerBarStart {
+  min-height: 5.2rem;
+}
+
+.noahComposerBarChat {
+  min-height: 4.75rem;
 }
 
 .noahComposerInput {
@@ -174,10 +180,7 @@
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
-  display: block;
-  border: 0;
   background: transparent;
-  box-shadow: none;
 }
 
 .noahComposerInput.sapMTextArea,
@@ -187,7 +190,7 @@
   border: 0 !important;
   box-shadow: none !important;
   background: transparent !important;
-  min-height: 2.25rem;
+  min-height: 2.35rem;
   padding: 0;
   border-radius: 0 !important;
   outline: none !important;
@@ -208,44 +211,147 @@
   outline: none !important;
 }
 
-.noahComposerInput .sapMTextAreaWrapper {
-  padding: 0;
-}
-
 .noahComposerInput .sapMTextAreaInner {
-  padding: 0.35rem 0.1rem;
-  color: #314762;
+  padding: 0.45rem 0.25rem;
+  color: #3b4a64;
+  font-size: 1rem;
+  line-height: 1.55;
   resize: none;
   overflow-y: auto;
 }
 
-.noahComposerMeta {
-  gap: 0.5rem;
-  align-items: center;
-  border: 1px solid rgba(200, 214, 234, 0.95);
-  border-radius: 1.2rem;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 8px 20px rgba(91, 108, 255, 0.06);
-  padding: 0.9rem 1rem;
+.noahStartInput .sapMTextAreaInner {
+  font-size: 1.08rem;
 }
 
-.noahComposerActions {
+.noahComposerUtility {
   flex: 0 0 auto;
+  gap: 0.35rem;
   margin-left: auto;
-  align-items: center;
-  white-space: nowrap;
+  padding-left: 0.35rem;
 }
 
-.noahComposer .sapUiFup,
-.noahComposer .sapUiFupBtnOnly {
-  display: inline-flex;
-}
-
-.noahComposer .sapUiFupButtonOnly .sapMBtnInner,
-.noahComposer .sapUiFupBtnOnly .sapMBtnInner {
-  min-width: 2.5rem;
-  height: 2.5rem;
+.noahBusinessToggleWrap {
+  gap: 0.75rem;
+  padding: 0.15rem 0.45rem 0.15rem 0.85rem;
+  border: 1px solid rgba(217, 227, 240, 0.95);
   border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.noahBusinessToggleLabel {
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.noahUtilityIconButton .sapMBtnInner,
+.noahComposer .sapUiFupButtonOnly .sapMBtnInner,
+.noahComposer .sapUiFupBtnOnly .sapMBtnInner,
+.noahStartStage .sapUiFupButtonOnly .sapMBtnInner,
+.noahStartStage .sapUiFupBtnOnly .sapMBtnInner {
+  min-width: 2.8rem;
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 999px;
+  border-color: transparent;
+}
+
+.noahSendButton .sapMBtnInner {
+  min-width: 3rem;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+}
+
+.noahMenuRow,
+.noahToolRow {
+  gap: 1rem;
+}
+
+.noahMenuRow {
+  margin-top: 1.6rem;
+}
+
+.noahToolRow {
+  margin-top: 1rem;
+}
+
+.noahMenuPill .sapMBtnInner,
+.noahToolPill .sapMBtnInner,
+.noahToggleButton .sapMBtnInner {
+  min-height: 3.15rem;
+  border-radius: 999px;
+  border: 1px solid rgba(217, 227, 240, 0.95);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 12px 28px rgba(104, 127, 170, 0.12);
+}
+
+.noahMenuPill .sapMBtnInner {
+  min-width: 12rem;
+  padding: 0 1.15rem;
+}
+
+.noahToolPill .sapMBtnInner {
+  min-width: 12.5rem;
+  padding: 0 1.2rem;
+}
+
+.noahToggleButton,
+.noahToggleButton.sapMBtn,
+.noahToggleButton.sapMToggleBtn {
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.noahToggleButton .sapMBtnInner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.noahToggleButton.sapMToggleBtnPressed .sapMBtnInner,
+.noahToggleButton .sapMBtnInner.sapMToggleBtnPressed,
+.noahToggleButton .sapMBtnInner.sapMBtnEmphasized {
+  background: linear-gradient(180deg, #34506f 0%, #223750 100%);
+  border-color: #223750;
+  color: #ffffff;
+}
+
+.noahToggleButton.sapMToggleBtnPressed .sapUiIcon,
+.noahToggleButton .sapMBtnInner.sapMToggleBtnPressed .sapUiIcon,
+.noahToggleButton .sapMBtnInner.sapMBtnEmphasized .sapUiIcon {
+  color: #ffffff;
+}
+
+.noahConversationMenuRow {
+  margin-top: 1rem;
+}
+
+.noahConversationToolRow {
+  margin-top: 0.8rem;
+}
+
+.noahComposerHint {
+  text-align: center;
+  color: #6c7d95;
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.noahScrollToBottom {
+  position: sticky;
+  bottom: 6.2rem;
+  align-self: center;
+  z-index: 4;
+  margin-top: -2.2rem;
+}
+
+.noahSide {
+  flex: 0 0 22rem;
+  min-width: 300px;
+  position: sticky;
+  top: 0.75rem;
+  align-self: flex-start;
 }
 
 .noahInsightsHeader {
@@ -284,25 +390,85 @@
   font-size: 0.73rem;
 }
 
+@media (max-width: 1280px) {
+  .noahAnswerBlock {
+    max-width: min(82%, 46rem);
+  }
+
+  .noahBubbleUser {
+    width: clamp(16rem, 52%, 32rem);
+    max-width: min(52%, 32rem);
+  }
+
+  .noahStartComposerWrap {
+    flex-direction: column;
+  }
+}
+
 @media (max-width: 1100px) {
+  .noahShell {
+    flex-wrap: wrap !important;
+  }
+
   .noahMain,
   .noahSide {
     flex: 1 1 100%;
     position: static;
   }
 
-  .noahShell {
-    flex-wrap: wrap !important;
+  .noahSide {
+    min-width: 0;
+  }
+
+  .noahStartStage {
+    min-height: auto;
   }
 
   .noahChatPanel {
-    height: auto;
-    min-height: 56vh;
+    min-height: 48vh;
+  }
+}
+
+@media (max-width: 720px) {
+  .noahStartTitle {
+    font-size: 2rem;
   }
 
-  .noahBubbleUser {
-    width: min(100%, 32rem);
-    max-width: min(100%, 32rem);
+  .noahComposerBarStart,
+  .noahComposerBarChat {
+    border-radius: 1.5rem;
+    padding: 0.7rem;
+    align-items: stretch;
+  }
+
+  .noahComposerBarStart,
+  .noahComposerBarChat,
+  .noahComposerUtility,
+  .noahStartComposerWrap {
+    flex-direction: column;
+  }
+
+  .noahComposerUtility {
+    margin-left: 0;
+    padding-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .noahBusinessToggleWrap {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .noahMenuPill .sapMBtnInner,
+  .noahToolPill .sapMBtnInner {
+    min-width: 100%;
+  }
+
+  .noahBubbleUser,
+  .noahAnswerBlock {
+    width: 100%;
+    max-width: 100%;
     min-width: 0;
   }
 }

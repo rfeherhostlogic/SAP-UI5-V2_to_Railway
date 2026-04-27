@@ -2,12 +2,16 @@ sap.ui.define([
   "sap/ui/core/mvc/Controller",
   "sap/m/MessageToast",
   "sap/suite/ui/commons/demo/tutorial/service/AiService",
-  "sap/ui/model/json/JSONModel"
+  "sap/ui/model/json/JSONModel",
+  "sap/m/ActionSheet",
+  "sap/m/Button"
 ], function(
   Controller,
   MessageToast,
   AiService,
-  JSONModel
+  JSONModel,
+  ActionSheet,
+  Button
 ) {
   "use strict";
 
@@ -29,9 +33,12 @@ sap.ui.define([
     onInit: function() {
       this._activeAbortController = null;
       this._boundDropHandlers = false;
+      this._boundChatScroll = false;
+      this._boundComposerInputs = {};
       this._speechRecognition = null;
       this._speechRecognitionType = null;
       this._dictationTranscript = "";
+      this._handleNoah2ComposerKeydownBound = this._handleNoah2ComposerKeydown.bind(this);
       this._loadManualCard2Options();
       this._rebindNoah2Dummy4PreviewTable();
       this._setupNoah2DictationSupport();
@@ -39,15 +46,178 @@ sap.ui.define([
 
     onAfterRendering: function() {
       this._bindDrop2ZoneEvents();
+      this._bindNoah2ChatScroll();
+      this._bindNoah2ComposerInputs();
       this._scrollNoah2ChatToBottom();
     },
 
     onExit: function() {
       this._stopNoah2Dictation(false);
+      this._destroyNoah2ActionSheets();
     },
 
     _getNoah2Model: function() {
       return this.getView().getModel("noah2") || this.getOwnerComponent().getModel("noah2");
+    },
+
+    _markNoah2ConversationStarted: function() {
+      var oModel = this._getNoah2Model();
+      if (!oModel || oModel.getProperty("/hasConversationStarted")) {
+        return;
+      }
+      oModel.setProperty("/hasConversationStarted", true);
+      oModel.setProperty("/autoScrollEnabled", true);
+      oModel.setProperty("/showScrollToBottom", false);
+    },
+
+    _bindNoah2ComposerInputs: function() {
+      var aIds = ["noah2DraftInputStart", "noah2DraftInputChat"];
+      aIds.forEach(function(sId) {
+        var oInput = this.byId(sId);
+        var oDomRef;
+        if (!oInput || this._boundComposerInputs[sId]) {
+          return;
+        }
+        oDomRef = oInput.getFocusDomRef && oInput.getFocusDomRef();
+        if (!oDomRef) {
+          return;
+        }
+        oDomRef.addEventListener("keydown", this._handleNoah2ComposerKeydownBound);
+        this._boundComposerInputs[sId] = true;
+      }.bind(this));
+    },
+
+    _handleNoah2ComposerKeydown: function(oEvent) {
+      if (!oEvent || oEvent.key !== "Enter" || oEvent.shiftKey || oEvent.isComposing) {
+        return;
+      }
+      oEvent.preventDefault();
+      this.onSendNoah2();
+    },
+
+    _bindNoah2ChatScroll: function() {
+      var oPanel = this.byId("noah2ChatPanel");
+      var oDomRef;
+      if (!oPanel) {
+        return;
+      }
+      oDomRef = oPanel.getDomRef();
+      if (!oDomRef || oDomRef.dataset.noahScrollBound === "true") {
+        return;
+      }
+      oDomRef.addEventListener("scroll", this._onNoah2ChatScroll.bind(this));
+      oDomRef.dataset.noahScrollBound = "true";
+    },
+
+    _onNoah2ChatScroll: function() {
+      var oModel = this._getNoah2Model();
+      var oPanel = this.byId("noah2ChatPanel");
+      var oDomRef;
+      var iDistance;
+      if (!oModel || !oPanel || !oPanel.getDomRef()) {
+        return;
+      }
+      oDomRef = oPanel.getDomRef();
+      iDistance = oDomRef.scrollHeight - oDomRef.scrollTop - oDomRef.clientHeight;
+      if (iDistance <= 32) {
+        oModel.setProperty("/autoScrollEnabled", true);
+        oModel.setProperty("/showScrollToBottom", false);
+        return;
+      }
+      oModel.setProperty("/autoScrollEnabled", false);
+      oModel.setProperty("/showScrollToBottom", true);
+    },
+
+    onNoah2ScrollToBottom: function() {
+      var oModel = this._getNoah2Model();
+      if (oModel) {
+        oModel.setProperty("/autoScrollEnabled", true);
+      }
+      this._scrollNoah2ChatToBottom(true);
+    },
+
+    onOpenNoah2FlowMenu: function(oEvent) {
+      var oFlowModel = this.getOwnerComponent().getModel("flow");
+      var aCategories = oFlowModel ? (oFlowModel.getProperty("/categories") || []) : [];
+      this._openNoah2ActionSheet("flow", oEvent.getSource(), aCategories.map(function(oCategory) {
+        return {
+          text: oCategory.title,
+          press: function() {
+            this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: "flow" });
+          }.bind(this)
+        };
+      }.bind(this)));
+    },
+
+    onOpenNoah2JokerMenu: function(oEvent) {
+      var oModel = this._getNoah2Model();
+      var aOptions = oModel ? (oModel.getProperty("/manualCardOptions") || []) : [];
+      this._openNoah2ActionSheet("joker", oEvent.getSource(), aOptions.map(function(oOption) {
+        return {
+          text: oOption.name,
+          press: function() {
+            this._applyManualCard2Selection(oOption.id);
+          }.bind(this)
+        };
+      }.bind(this)));
+    },
+
+    onOpenNoah2AutomationMenu: function(oEvent) {
+      var oOptions = [
+        { key: "immediate", label: "Azonnali" },
+        { key: "daily", label: "Napi" },
+        { key: "weekly", label: "Heti" }
+      ];
+      this._openNoah2ActionSheet("automation", oEvent.getSource(), oOptions.map(function(oOption) {
+        return {
+          text: oOption.label,
+          press: function() {
+            var oModel = this._getNoah2Model();
+            if (!oModel) {
+              return;
+            }
+            oModel.setProperty("/automationMode", oOption.key);
+            oModel.setProperty("/automationLabel", oOption.label);
+            MessageToast.show("Automatizacio mod: " + oOption.label + ".");
+          }.bind(this)
+        };
+      }.bind(this)));
+    },
+
+    _openNoah2ActionSheet: function(sKey, oSource, aItems) {
+      var sStoreKey = "_noah2ActionSheet_" + sKey;
+      var oSheet = this[sStoreKey];
+      if (!oSheet) {
+        oSheet = new ActionSheet({
+          placement: "Bottom",
+          showCancelButton: true
+        });
+        this.getView().addDependent(oSheet);
+        this[sStoreKey] = oSheet;
+      }
+      oSheet.destroyButtons();
+      (aItems || []).forEach(function(oItem) {
+        oSheet.addButton(new Button({
+          text: oItem.text,
+          type: "Transparent",
+          press: function() {
+            oSheet.close();
+            if (typeof oItem.press === "function") {
+              oItem.press();
+            }
+          }
+        }));
+      });
+      oSheet.openBy(oSource);
+    },
+
+    _destroyNoah2ActionSheets: function() {
+      ["_noah2ActionSheet_flow", "_noah2ActionSheet_joker", "_noah2ActionSheet_automation"].forEach(function(sKey) {
+        if (this[sKey]) {
+          this[sKey].destroy();
+          this[sKey] = null;
+        }
+      }.bind(this));
     },
 
     _setupNoah2DictationSupport: function() {
@@ -180,6 +350,7 @@ sap.ui.define([
         return;
       }
 
+      this._markNoah2ConversationStarted();
       this._appendNoah2Message("user", sRaw);
       oModel.setProperty("/draftMessage", "");
       oModel.setProperty("/promptImproverBusy", true);
@@ -241,6 +412,8 @@ sap.ui.define([
       if (!sMessage && aAttachments.length === 0 && !sManualCardId) {
         return;
       }
+
+      this._markNoah2ConversationStarted();
 
       // --- Prompt javito varakozo allapot ---
       if (bImproverAwaiting) {
@@ -377,6 +550,7 @@ sap.ui.define([
       // Agent bekapcsolasanal: kartya valaszto visszaall, kartyapanel eltuntetese
       if (bState) {
         oModel.setProperty("/manualSelectedCardId", "");
+        oModel.setProperty("/selectedJokerLabel", "Automatikus router");
         oModel.setProperty("/activeCard", null);
         oModel.setProperty("/activeCardRuntimeFields", []);
         oModel.setProperty("/dummy4PreviewRows", []);
@@ -658,7 +832,18 @@ sap.ui.define([
 
     onManualCard2SelectChange: async function(oEvent) {
       var sCardId = String(oEvent && oEvent.getSource ? oEvent.getSource().getSelectedKey() : "").trim();
+      await this._applyManualCard2Selection(sCardId);
+    },
+
+    _applyManualCard2Selection: async function(sCardId) {
       var oModel = this.getView().getModel("noah2");
+      var aOptions = oModel.getProperty("/manualCardOptions") || [];
+      var oSelectedOption = aOptions.filter(function(oOption) {
+        return String(oOption.id || "") === String(sCardId || "");
+      })[0];
+
+      oModel.setProperty("/manualSelectedCardId", sCardId);
+      oModel.setProperty("/selectedJokerLabel", oSelectedOption ? oSelectedOption.name : "Automatikus router");
 
       if (!sCardId) {
         oModel.setProperty("/activeCard", null);
@@ -1364,20 +1549,20 @@ sap.ui.define([
       oModel.setProperty("/routerLog", aLog.slice(0, 20));
     },
 
-    _scrollNoah2ChatToBottom: function() {
+    _scrollNoah2ChatToBottom: function(bForce) {
+      var oModel = this._getNoah2Model();
       var oPanel = this.byId("noah2ChatPanel");
-      if (!oPanel || !oPanel.getDomRef()) {
+      if (!oPanel || !oPanel.getDomRef() || !oModel) {
+        return;
+      }
+      if (!bForce && !oModel.getProperty("/autoScrollEnabled")) {
         return;
       }
       setTimeout(function() {
         var dom = oPanel.getDomRef();
         if (dom) {
-          var oLastMessage = dom.querySelector(".sapMLIB:last-child");
-          if (oLastMessage && oLastMessage.scrollIntoView) {
-            oLastMessage.scrollIntoView({ block: "end", inline: "nearest" });
-          } else {
-            dom.scrollTop = dom.scrollHeight + 9999;
-          }
+          dom.scrollTop = dom.scrollHeight + 9999;
+          oModel.setProperty("/showScrollToBottom", false);
         }
       }, 0);
     },

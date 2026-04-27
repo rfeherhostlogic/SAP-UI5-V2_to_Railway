@@ -8,7 +8,7 @@
       <tnt:ToolHeader>
         <Button icon="sap-icon://menu2" type="Transparent" press=".onToggleSideNav"/>
         <HBox alignItems="Center">
-          <Image src="https://techwave.net/wp-content/uploads/2021/12/cropped-cropped-cropped-Techwave.png" height="2rem" decorative="false" alt="Techwave logo"/>
+          <Image src="img/techGPT.png" height="2rem" decorative="false" alt="TechGPT logo"/>
           <Title text="HelloAI Portal" class="sapUiTinyMarginBegin"/>
         </HBox>
         <ToolbarSpacer/>

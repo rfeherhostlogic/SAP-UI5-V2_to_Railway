@@ -7,57 +7,17 @@
   <Page title="Noah" class="sapUiContentPadding noahPage" showHeader="false">
     <HBox class="noahShell" renderType="Bare" wrap="NoWrap">
       <VBox class="noahMain">
-        <VBox id="noah2ChatPanel" class="noahChatPanel">
-          <List id="noah2MessageList" items="{noah2>/messages}" showSeparators="None" class="noahMsgList">
-            <CustomListItem>
-              <VBox width="100%">
-                <HBox width="100%" justifyContent="Start" visible="{= ${noah2>role} !== 'user' }">
-                  <Avatar initials="AI" displaySize="XS" class="chatAvatar noahAvatar"/>
-                  <VBox class="noahAnswerBlock">
-                    <VBox class="chatBubble chatBubbleAi noahBubbleAi">
-                      <Text text="Noah" class="chatBubbleMeta"/>
-                      <Text text="{noah2>content}" wrapping="true" width="100%" visible="{= !${noah2>messageType} }"/>
-                      <VBox visible="{= !!${noah2>messageType} }" width="100%">
-                        <Text text="{= '[' + (${noah2>title} || 'AI') + ']' }" class="chatBubbleMeta"/>
-                        <Text text="{= ${noah2>content} ? 'Osszegzes:\n' + ${noah2>content} : 'Osszegzes nem elerheto.' }" wrapping="true" class="sapUiTinyMarginTop sapUiTinyMarginBottom"/>
-                        <Text text="{= ${noah2>selectedSource} ? 'Forras: ' + ${noah2>selectedSource} : '' }" visible="{= !!${noah2>selectedSource} }" wrapping="true" class="sapUiTinyMarginBottom"/>
-                        <Text text="Chart nem elerheto." visible="{= !${noah2>chartAvailable} }" wrapping="true" class="sapUiTinyMarginBottom"/>
-                        <core:HTML content="{noah2>chartHtml}" visible="{= !!${noah2>chartHtml} }"/>
-                        <core:HTML content="{noah2>previewHtml}" visible="{= !!${noah2>previewHtml} }"/>
-                      </VBox>
-                    </VBox>
-                    <HBox class="noahMessageActions" alignItems="Center" wrap="Wrap">
-                      <Button icon="sap-icon://copy" type="Transparent" tooltip="Masolas" press=".onCopyNoah2Message"/>
-                      <Button
-                        icon="sap-icon://thumb-up"
-                        type="{= ${noah2>feedback} === 'like' ? 'Emphasized' : 'Transparent' }"
-                        tooltip="Tetszik"
-                        press=".onLikeNoah2Message"/>
-                      <Button
-                        icon="sap-icon://thumb-down"
-                        type="{= ${noah2>feedback} === 'dislike' ? 'Emphasized' : 'Transparent' }"
-                        tooltip="Nem tetszik"
-                        press=".onDislikeNoah2Message"/>
-                      <Button
-                        icon="sap-icon://hint"
-                        type="{= ${noah2>infoOpen} ? 'Emphasized' : 'Transparent' }"
-                        tooltip="Insight panel"
-                        press=".onToggleNoah2MessageInfo"/>
-                    </HBox>
-                  </VBox>
-                </HBox>
-                <HBox width="100%" justifyContent="End" visible="{= ${noah2>role} === 'user' }">
-                  <VBox class="chatBubble chatBubbleUser noahBubbleUser">
-                    <Text text="{noah2>content}" wrapping="true" width="100%"/>
-                  </VBox>
-                </HBox>
-              </VBox>
-            </CustomListItem>
-          </List>
-        </VBox>
+        <VBox
+          class="noahStartStage"
+          visible="{= !${noah2>/hasConversationStarted} }"
+          alignItems="Center"
+          justifyContent="Center">
+          <Title text="Kerdezz a ceged adatairol!" level="H1" class="noahStartTitle"/>
 
-        <VBox class="noahComposer sapUiSmallMarginTop">
-          <List items="{noah2>/attachments}" visible="{= ${noah2>/attachments}.length > 0 }" class="sapUiTinyMarginBottom">
+          <List
+            items="{noah2>/attachments}"
+            visible="{= ${noah2>/attachments}.length > 0 }"
+            class="noahAttachmentList noahStartAttachmentList sapUiSmallMarginTop sapUiSmallMarginBottom">
             <CustomListItem>
               <HBox justifyContent="SpaceBetween" alignItems="Center">
                 <Text text="{= ${noah2>name} + ' (' + ${noah2>type} + ', ' + ${noah2>size} + ' B)' }" wrapping="false"/>
@@ -66,16 +26,178 @@
             </CustomListItem>
           </List>
 
-          <HBox class="noahComposerBar" alignItems="End">
-            <TextArea
-              value="{noah2>/draftMessage}"
-              width="100%"
-              rows="1"
-              growing="true"
-              growingMaxLines="6"
-              placeholder="{= ${noah2>/dictationActive} ? 'Diktalas folyamatban...' : 'Message Noah...' }"
-              class="noahComposerInput"/>
-            <HBox class="noahComposerActions" alignItems="Center" justifyContent="End">
+          <HBox class="noahStartComposerWrap" alignItems="Center" justifyContent="Center">
+            <Image src="img/Noah_icon.png" decorative="false" alt="Noah" class="noahStartLogo"/>
+            <VBox class="noahStartComposerStack">
+              <HBox class="noahComposerBar noahComposerBarStart" alignItems="Center">
+                <unif:FileUploader
+                  width="2.5rem"
+                  sameFilenameAllowed="true"
+                  multiple="true"
+                  uploadOnChange="false"
+                  icon="sap-icon://add-document"
+                  iconOnly="true"
+                  buttonOnly="true"
+                  tooltip="Browse or drop multiple files"
+                  change=".onNoah2FileChange"/>
+                <TextArea
+                  id="noah2DraftInputStart"
+                  value="{noah2>/draftMessage}"
+                  width="100%"
+                  rows="1"
+                  growing="true"
+                  growingMaxLines="6"
+                  placeholder="{= ${noah2>/dictationActive} ? 'Diktalas folyamatban...' : 'Kerdezz barmit' }"
+                  class="noahComposerInput noahStartInput"/>
+                <HBox class="noahComposerUtility" alignItems="Center">
+                  <HBox class="noahBusinessToggleWrap" alignItems="Center">
+                    <Text text="Uzleti AI" class="noahBusinessToggleLabel"/>
+                    <Switch
+                      state="{noah2>/businessAiEnabled}"
+                      customTextOn="ON"
+                      customTextOff="OFF"
+                      change=".onBusinessAiToggle"/>
+                  </HBox>
+                  <Button
+                    icon="sap-icon://microphone"
+                    type="{= ${noah2>/dictationActive} ? 'Emphasized' : 'Transparent' }"
+                    tooltip="{= ${noah2>/dictationSupported} ? 'Dictate' : (${noah2>/dictationUnavailableReason} || 'Dictate nem tamogatott') }"
+                    press=".onToggleNoah2Dictation"
+                    enabled="{noah2>/dictationSupported}"
+                    class="noahUtilityIconButton"/>
+                  <Button
+                    icon="sap-icon://paper-plane"
+                    type="Emphasized"
+                    tooltip="Kuldes"
+                    press=".onSendNoah2"
+                    class="noahSendButton"
+                    enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"/>
+                </HBox>
+              </HBox>
+
+              <HBox class="noahMenuRow" alignItems="Center" justifyContent="Center" wrap="Wrap">
+                <Button text="Flows" icon="sap-icon://combine" type="Transparent" class="noahMenuPill" press=".onOpenNoah2FlowMenu"/>
+                <Button text="{noah2>/selectedJokerLabel}" icon="sap-icon://favorite" type="Transparent" class="noahMenuPill" press=".onOpenNoah2JokerMenu"/>
+                <Button text="Automatizacio" icon="sap-icon://workflow-tasks" type="Transparent" class="noahMenuPill" press=".onOpenNoah2AutomationMenu"/>
+              </HBox>
+
+              <HBox class="noahToolRow" alignItems="Center" justifyContent="Center" wrap="Wrap">
+                <Button
+                  text="Prompt javito"
+                  icon="sap-icon://edit"
+                  press=".onImprovePrompt"
+                  type="Transparent"
+                  class="noahToolPill"
+                  enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"
+                  busy="{noah2>/promptImproverBusy}"/>
+                <ToggleButton
+                  text="Noah agent"
+                  icon="sap-icon://activate"
+                  pressed="{noah2>/agentEnabled}"
+                  press=".onNoah2AgentToggle"
+                  type="{= ${noah2>/agentEnabled} ? 'Emphasized' : 'Transparent' }"
+                  class="noahToggleButton noahToolPill"/>
+              </HBox>
+            </VBox>
+          </HBox>
+        </VBox>
+
+        <VBox class="noahConversationStage" visible="{noah2>/hasConversationStarted}">
+          <VBox id="noah2ChatPanel" class="noahChatPanel">
+            <List id="noah2MessageList" items="{noah2>/messages}" showSeparators="None" class="noahMsgList">
+              <CustomListItem>
+                <VBox width="100%">
+                  <HBox width="100%" justifyContent="Start" visible="{= ${noah2>role} !== 'user' }">
+                    <Avatar src="img/Noah_icon.png" displaySize="XS" class="chatAvatar noahAvatar"/>
+                    <VBox class="noahAnswerBlock">
+                      <VBox class="chatBubble chatBubbleAi noahBubbleAi">
+                        <Text text="Noah" class="chatBubbleMeta"/>
+                        <Text text="{noah2>content}" wrapping="true" width="100%" visible="{= !${noah2>messageType} }"/>
+                        <VBox visible="{= !!${noah2>messageType} }" width="100%">
+                          <Text text="{= '[' + (${noah2>title} || 'AI') + ']' }" class="chatBubbleMeta"/>
+                          <Text text="{= ${noah2>content} ? 'Osszegzes:\n' + ${noah2>content} : 'Osszegzes nem elerheto.' }" wrapping="true" class="sapUiTinyMarginTop sapUiTinyMarginBottom"/>
+                          <Text text="{= ${noah2>selectedSource} ? 'Forras: ' + ${noah2>selectedSource} : '' }" visible="{= !!${noah2>selectedSource} }" wrapping="true" class="sapUiTinyMarginBottom"/>
+                          <Text text="Chart nem elerheto." visible="{= !${noah2>chartAvailable} }" wrapping="true" class="sapUiTinyMarginBottom"/>
+                          <core:HTML content="{noah2>chartHtml}" visible="{= !!${noah2>chartHtml} }"/>
+                          <core:HTML content="{noah2>previewHtml}" visible="{= !!${noah2>previewHtml} }"/>
+                        </VBox>
+                      </VBox>
+                      <HBox class="noahMessageActions" alignItems="Center" wrap="Wrap">
+                        <Button icon="sap-icon://copy" type="Transparent" tooltip="Masolas" press=".onCopyNoah2Message"/>
+                        <Button
+                          icon="sap-icon://thumb-up"
+                          type="{= ${noah2>feedback} === 'like' ? 'Emphasized' : 'Transparent' }"
+                          tooltip="Tetszik"
+                          press=".onLikeNoah2Message"/>
+                        <Button
+                          icon="sap-icon://thumb-down"
+                          type="{= ${noah2>feedback} === 'dislike' ? 'Emphasized' : 'Transparent' }"
+                          tooltip="Nem tetszik"
+                          press=".onDislikeNoah2Message"/>
+                        <Button
+                          icon="sap-icon://hint"
+                          type="{= ${noah2>infoOpen} ? 'Emphasized' : 'Transparent' }"
+                          tooltip="Insight panel"
+                          press=".onToggleNoah2MessageInfo"/>
+                      </HBox>
+                    </VBox>
+                  </HBox>
+                  <HBox width="100%" justifyContent="End" visible="{= ${noah2>role} === 'user' }">
+                    <VBox class="chatBubble chatBubbleUser noahBubbleUser">
+                      <Text text="{noah2>content}" wrapping="true" width="100%"/>
+                    </VBox>
+                  </HBox>
+                </VBox>
+              </CustomListItem>
+            </List>
+          </VBox>
+
+          <Button
+            text="Ugras az aljara"
+            icon="sap-icon://navigation-down-arrow"
+            type="Emphasized"
+            visible="{noah2>/showScrollToBottom}"
+            press=".onNoah2ScrollToBottom"
+            class="noahScrollToBottom"/>
+
+          <HBox class="noahMenuRow noahConversationMenuRow" alignItems="Center" justifyContent="Center" wrap="Wrap">
+            <Button text="Flows" icon="sap-icon://combine" type="Transparent" class="noahMenuPill" press=".onOpenNoah2FlowMenu"/>
+            <Button text="{noah2>/selectedJokerLabel}" icon="sap-icon://favorite" type="Transparent" class="noahMenuPill" press=".onOpenNoah2JokerMenu"/>
+            <Button text="Automatizacio" icon="sap-icon://workflow-tasks" type="Transparent" class="noahMenuPill" press=".onOpenNoah2AutomationMenu"/>
+          </HBox>
+
+          <HBox class="noahToolRow noahConversationToolRow" alignItems="Center" justifyContent="Center" wrap="Wrap">
+            <Button
+              text="Prompt javito"
+              icon="sap-icon://edit"
+              press=".onImprovePrompt"
+              type="Transparent"
+              class="noahToolPill"
+              enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"
+              busy="{noah2>/promptImproverBusy}"/>
+            <ToggleButton
+              text="Noah agent"
+              icon="sap-icon://activate"
+              pressed="{noah2>/agentEnabled}"
+              press=".onNoah2AgentToggle"
+              type="{= ${noah2>/agentEnabled} ? 'Emphasized' : 'Transparent' }"
+              class="noahToggleButton noahToolPill"/>
+          </HBox>
+
+          <VBox class="noahComposer noahComposerSticky">
+            <List
+              items="{noah2>/attachments}"
+              visible="{= ${noah2>/attachments}.length > 0 }"
+              class="noahAttachmentList sapUiTinyMarginBottom">
+              <CustomListItem>
+                <HBox justifyContent="SpaceBetween" alignItems="Center">
+                  <Text text="{= ${noah2>name} + ' (' + ${noah2>type} + ', ' + ${noah2>size} + ' B)' }" wrapping="false"/>
+                  <Button icon="sap-icon://decline" type="Transparent" press=".onRemoveAttachment2"/>
+                </HBox>
+              </CustomListItem>
+            </List>
+
+            <HBox class="noahComposerBar noahComposerBarChat" alignItems="End">
               <unif:FileUploader
                 id="noah2FileUploader"
                 width="2.5rem"
@@ -87,66 +209,47 @@
                 buttonOnly="true"
                 tooltip="Browse or drop multiple files"
                 change=".onNoah2FileChange"/>
-              <Button
-                icon="sap-icon://microphone"
-                type="{= ${noah2>/dictationActive} ? 'Emphasized' : 'Transparent' }"
-                tooltip="{= ${noah2>/dictationSupported} ? 'Dictate' : (${noah2>/dictationUnavailableReason} || 'Dictate nem tamogatott') }"
-                press=".onToggleNoah2Dictation"
-                enabled="{noah2>/dictationSupported}"
-                class="sapUiTinyMarginBegin"/>
-              <Button
-                icon="sap-icon://paper-plane"
-                type="Emphasized"
-                tooltip="Kuldes"
-                press=".onSendNoah2"
-                class="sapUiTinyMarginBegin"
-                enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"/>
+              <TextArea
+                id="noah2DraftInputChat"
+                value="{noah2>/draftMessage}"
+                width="100%"
+                rows="1"
+                growing="true"
+                growingMaxLines="6"
+                placeholder="{= ${noah2>/dictationActive} ? 'Diktalas folyamatban...' : 'Kerdezz barmit' }"
+                class="noahComposerInput"/>
+              <HBox class="noahComposerUtility" alignItems="Center">
+                <HBox class="noahBusinessToggleWrap" alignItems="Center">
+                  <Text text="Uzleti AI" class="noahBusinessToggleLabel"/>
+                  <Switch
+                    state="{noah2>/businessAiEnabled}"
+                    customTextOn="ON"
+                    customTextOff="OFF"
+                    change=".onBusinessAiToggle"/>
+                </HBox>
+                <Button
+                  icon="sap-icon://microphone"
+                  type="{= ${noah2>/dictationActive} ? 'Emphasized' : 'Transparent' }"
+                  tooltip="{= ${noah2>/dictationSupported} ? 'Dictate' : (${noah2>/dictationUnavailableReason} || 'Dictate nem tamogatott') }"
+                  press=".onToggleNoah2Dictation"
+                  enabled="{noah2>/dictationSupported}"
+                  class="noahUtilityIconButton"/>
+                <Button
+                  icon="sap-icon://paper-plane"
+                  type="Emphasized"
+                  tooltip="Kuldes"
+                  press=".onSendNoah2"
+                  class="noahSendButton"
+                  enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"/>
+              </HBox>
             </HBox>
-          </HBox>
 
-          <HBox class="sapUiTinyMarginTop noahComposerMeta" alignItems="Center" wrap="Wrap">
-            <Select
-              width="16rem"
-              selectedKey="{noah2>/manualSelectedCardId}"
-              change=".onManualCard2SelectChange"
-              visible="{= !${noah2>/agentEnabled} }"
-              enabled="{= !${noah2>/agentEnabled} &amp;&amp; ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' }"
-              items="{noah2>/manualCardOptions}">
-              <core:Item key="{noah2>id}" text="{noah2>name}"/>
-            </Select>
-            <Button
-              text="Prompt Javito"
-              icon="sap-icon://edit"
-              press=".onImprovePrompt"
-              type="Transparent"
-              class="noahPillButton sapUiTinyMarginBegin"
-              enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"
-              busy="{noah2>/promptImproverBusy}"/>
-            <ToggleButton
-              text="Noah Agent"
-              icon="sap-icon://activate"
-              pressed="{noah2>/agentEnabled}"
-              press=".onNoah2AgentToggle"
-              type="{= ${noah2>/agentEnabled} ? 'Emphasized' : 'Transparent' }"
-              class="noahToggleButton sapUiTinyMarginBegin"/>
-            <ToggleButton
-              text="Uzleti AI"
-              icon="sap-icon://ai"
-              pressed="{noah2>/businessAiEnabled}"
-              press=".onBusinessAiToggle"
-              type="{= ${noah2>/businessAiEnabled} ? 'Emphasized' : 'Transparent' }"
-              class="noahToggleButton sapUiTinyMarginBegin"/>
-            <Button
-              text="Megse"
-              type="Reject"
-              class="sapUiTinyMarginBegin"
-              press=".onCancelRun2"
-              visible="{= ${noah2>/state} === 'ROUTING' || ${noah2>/state} === 'RUNNING_CARD' || ${noah2>/state} === 'CHATTING' }"/>
-          </HBox>
+            <Text text="A Noah AI hibazhat. Ellenorizd a valaszokat." class="noahComposerHint"/>
+          </VBox>
         </VBox>
       </VBox>
 
-      <VBox class="noahSide" visible="{noah2>/insightsOpen}">
+      <VBox class="noahSide" visible="{= ${noah2>/insightsOpen} &amp;&amp; ${noah2>/hasConversationStarted} }">
         <HBox justifyContent="SpaceBetween" alignItems="Center" class="noahInsightsHeader">
           <Title text="Response Insights" level="H3"/>
           <Button text="Close" type="Transparent" press=".onToggleNoah2Insights"/>
