@@ -27,9 +27,9 @@
           </List>
 
           <HBox class="noahStartComposerWrap" alignItems="Center" justifyContent="Center">
-            <Image src="img/Noah_transparent.png" decorative="false" alt="Noah" class="noahStartLogo"/>
             <VBox class="noahStartComposerStack">
               <HBox class="noahComposerBar noahComposerBarStart" alignItems="Center">
+                <Image src="img/Noah_transparent.png" decorative="false" alt="Noah" class="noahStartLogo"/>
                 <unif:FileUploader
                   width="2.5rem"
                   sameFilenameAllowed="true"
@@ -48,7 +48,11 @@
                   growing="true"
                   growingMaxLines="6"
                   placeholder="{= ${noah2>/dictationActive} ? 'Diktalas folyamatban...' : 'Kérdezz bármit' }"
-                  class="noahComposerInput noahStartInput"/>
+                  class="noahComposerInput noahStartInput">
+                  <layoutData>
+                    <FlexItemData growFactor="1" shrinkFactor="1"/>
+                  </layoutData>
+                </TextArea>
                 <HBox class="noahComposerUtility" alignItems="Center">
                   <HBox class="noahBusinessToggleWrap" alignItems="Center">
                     <Text text="Uzleti AI" class="noahBusinessToggleLabel"/>

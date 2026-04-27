@@ -36,8 +36,6 @@
 
 .noahStartComposerWrap {
   width: min(100%, 90rem);
-  gap: 1.4rem;
-  flex-wrap: nowrap;
 }
 
 .noahStartComposerStack {
@@ -46,11 +44,12 @@
 }
 
 .noahStartLogo {
-  width: 7rem;
-  min-width: 7rem;
-  max-width: 12vw;
-  height: auto;
-  filter: drop-shadow(0 20px 36px rgba(59, 130, 246, 0.2));
+  width: 2.2rem;
+  min-width: 2.2rem;
+  max-width: 2.2rem;
+  height: 2.2rem;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 10px 20px rgba(59, 130, 246, 0.22));
 }
 
 .noahAttachmentList,
@@ -168,6 +167,11 @@
   background: rgba(255, 255, 255, 0.97);
   box-shadow: 0 14px 30px rgba(91, 108, 255, 0.08);
   padding: 0.45rem 0.55rem 0.45rem 0.85rem;
+}
+
+.noahComposerBar > .sapMFlexItem:has(.noahComposerInput) {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .noahComposerBarStart {
