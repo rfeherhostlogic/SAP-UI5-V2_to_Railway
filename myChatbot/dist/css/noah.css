@@ -170,8 +170,8 @@
 }
 
 .noahComposerBar > .sapMFlexItem:has(.noahComposerInput) {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
 }
 
 .noahComposerBarStart {
@@ -275,6 +275,7 @@
   width: 3rem;
   height: 3rem;
   border-radius: 999px;
+  align-items: center;
 }
 
 .noahMenuRow,
@@ -298,6 +299,7 @@
   border: 1px solid rgba(217, 227, 240, 0.95);
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 12px 28px rgba(104, 127, 170, 0.12);
+  align-items: center;
 }
 
 .noahMenuPill .sapMBtnInner {
@@ -310,11 +312,20 @@
   padding: 0 1.2rem;
 }
 
+.noahMenuPill .sapMBtnInner .sapMBtnIcon,
+.noahMenuPill .sapMBtnInner .sapMBtnContent,
+.noahToolPill .sapMBtnInner .sapMBtnIcon,
+.noahToolPill .sapMBtnInner .sapMBtnContent {
+  display: flex;
+  align-items: center;
+  line-height: 1;
+}
+
 .noahToolToggle,
 .noahToolToggle.sapMBtn,
 .noahToolToggle.sapMToggleBtn {
   border-radius: 999px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .noahToolToggle .sapMBtnInner {
