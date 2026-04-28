@@ -13,7 +13,7 @@ const { PDFParse } = require("pdf-parse");
 const PDFDocument = require("pdfkit");
 const { executeDummy4, SQL_PROMPTS, SUMMARY_PROMPTS } = require("./dummy4Service");
 const { parseSchemaHint, validateSelectSql } = require("./sqlValidator");
-const { buildChartRows, cloneDefaultCashflowRows, predictFromCsvBuffer } = require("./rpt1Service");
+const { buildChartRows, cloneDefaultCashflowRows, parseCsv, predictFromCsvBuffer } = require("./rpt1Service");
 const DUMMY12_KPI_DEFINITIONS = require("./dummy12_kpis.json");
 
 const app = express();
@@ -7456,6 +7456,87 @@ app.post("/api/jokers/rpt1-payment-delay/run", oRpt1Upload.single("file"), async
   } catch (err) {
     res.status(500).json({
       error: "RPT1 fizetesi kesedelem predikcios hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/discovery/rpt1-generic/run", oRpt1Upload.single("file"), async function(req, res) {
+  function findMatchingHeader(headers, patterns) {
+    const normalized = (headers || []).map(function(header) {
+      return {
+        original: header,
+        value: String(header || "").trim().toLowerCase()
+      };
+    });
+
+    for (let i = 0; i < patterns.length; i += 1) {
+      const match = normalized.find(function(item) {
+        return patterns[i].test(item.value);
+      });
+      if (match) {
+        return match.original;
+      }
+    }
+    return "";
+  }
+
+  try {
+    const token = process.env.SAP_RPT1 || process.env["SAP-RPT1"] || "";
+
+    if (!token) {
+      res.status(500).json({ error: "SAP_RPT1 vagy SAP-RPT1 token hianyzik a kornyezeti valtozok kozul." });
+      return;
+    }
+
+    if (!req.file || !req.file.buffer) {
+      res.status(400).json({ error: "CSV fajl kotelezo." });
+      return;
+    }
+
+    const mime = String(req.file.mimetype || "").toLowerCase();
+    const name = String(req.file.originalname || "structured_ai_input.csv");
+    if (mime.indexOf("csv") < 0 && !name.toLowerCase().endsWith(".csv")) {
+      res.status(400).json({ error: "Csak CSV fajl tamogatott." });
+      return;
+    }
+
+    const csvText = req.file.buffer.toString("utf8");
+    const parsed = parseCsv(csvText);
+    const prediction = await predictFromCsvBuffer(csvText, token, fetch);
+    const amountColumn = findMatchingHeader(parsed.headers, [/invoice amount/, /amount/, /net amount/, /revenue/, /osszeg/, /ertek/]);
+    const dateColumn = findMatchingHeader(parsed.headers, [/expected income date/, /income date/, /payment date/, /due date/, /datum/, /date$/]);
+    const chartRows = amountColumn && dateColumn
+      ? buildChartRows(prediction.predictionRows, {
+          amountColumn: amountColumn,
+          dateColumn: dateColumn
+        })
+      : [];
+
+    res.json({
+      summary: [
+        "Az altalanos RPT1 predikcio " + prediction.queryCount + " query sorra lefutott " + prediction.apiCalls + " API hivassal.",
+        prediction.predictColumns && prediction.predictColumns.length > 0
+          ? ("Prediktalt mezok: " + prediction.predictColumns.join(", ") + ".")
+          : "Prediktalt mezok nem azonosithetok.",
+        amountColumn && dateColumn
+          ? ("Cashflow-szeru aggregacio is keszult a(z) " + amountColumn + " es " + dateColumn + " mezok alapjan.")
+          : "A CSV nem tartalmazott altalanosan felismerheto osszeg + datum mezopart, ezert csak a predikcios tablazat jelenik meg."
+      ].join(" "),
+      fileName: name,
+      metrics: {
+        queryCount: prediction.queryCount,
+        contextCount: prediction.contextCount,
+        apiCalls: prediction.apiCalls,
+        indexColumn: prediction.indexColumn,
+        predictColumns: prediction.predictColumns || []
+      },
+      predictionRows: prediction.predictionRows,
+      chartRows: chartRows
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Altalanos RPT1 strukturalt AI hiba",
       details: err && err.message ? err.message : String(err)
     });
   }
