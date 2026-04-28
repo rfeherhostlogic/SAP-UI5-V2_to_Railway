@@ -10,6 +10,55 @@
   margin: 0 auto;
 }
 
+.discoveryLauncher {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.discoveryLauncherRow {
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.discoveryLauncherRowSingle {
+  margin-top: 1.5rem;
+}
+
+.discoveryLauncherTile {
+  width: 22rem;
+  min-height: 12rem;
+  border-radius: 1rem;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+}
+
+.discoveryLauncherTileHero {
+  width: 28rem;
+}
+
+.discoveryAdvisorShell,
+.discoveryStructuredShell {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.discoveryAdvisorPanel,
+.discoveryStructuredPanel,
+.discoveryAdvisorCard {
+  border: 1px solid #dce5ef;
+  border-radius: 0.9rem;
+  background: #ffffff;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+}
+
+.discoveryAdvisorGrid {
+  gap: 1rem;
+}
+
+.discoveryAdvisorCard {
+  width: 20rem;
+  flex: 1 1 20rem;
+}
+
 .discoveryIntro {
   color: #41546b;
 }

@@ -1,442 +1,173 @@
 <mvc:View
   xmlns:mvc="sap.ui.core.mvc"
   xmlns="sap.m"
-  xmlns:unif="sap.ui.unified"
+  xmlns:core="sap.ui.core"
+  xmlns:unified="sap.ui.unified"
   controllerName="sap.suite.ui.commons.demo.tutorial.controller.Discovery">
-  <Page title="Felfedezes" class="sapUiContentPadding discoveryPage" showHeader="false">
-    <VBox width="100%" class="discoveryShell">
-      <VBox visible="{= ${discovery>/currentPage} === 'selector' }">
-        <Title text="Felfedezes" level="H2"/>
-        <Text
-          text="Valassz egy Discovery modot. A jelenlegi felfedezesi es training folyamat valtozatlanul elerheto a megfelelo kartyarol."
-          wrapping="true"
-          class="discoveryIntro sapUiSmallMarginBottom"/>
-
-        <FlexBox wrap="Wrap" class="discoverySelectorGrid">
-          <GenericTile header="AutoML inditasa" subheader="Kapcsolatfelvetel" press=".onOpenDiscoveryAutoml" class="discoverySelectorTile">
-            <tileContent>
-              <TileContent footer="1">
-                <content>
-                  <ImageContent src="sap-icon://machine"/>
-                </content>
-              </TileContent>
-            </tileContent>
-          </GenericTile>
-
-          <GenericTile header="Felfedezes inditasa" subheader="Meglevo Discovery flow" press=".onOpenDiscoveryStart" class="discoverySelectorTile">
-            <tileContent>
-              <TileContent footer="2">
-                <content>
-                  <ImageContent src="sap-icon://search"/>
-                </content>
-              </TileContent>
-            </tileContent>
-          </GenericTile>
-
-          <GenericTile header="Uzleti problema feltarasa" subheader="Chatbot + training javaslat" press=".onOpenDiscoveryBusiness" class="discoverySelectorTile">
-            <tileContent>
-              <TileContent footer="3">
-                <content>
-                  <ImageContent src="sap-icon://discussion-2"/>
-                </content>
-              </TileContent>
-            </tileContent>
-          </GenericTile>
-        </FlexBox>
-      </VBox>
-
-      <VBox visible="{= ${discovery>/currentPage} === 'automl' }">
-        <HBox alignItems="Center" class="sapUiTinyMarginBottom">
-          <Button icon="sap-icon://nav-back" type="Transparent" press=".onBackToDiscoveryHome"/>
-          <Title text="AutoML inditasa" level="H2" class="sapUiTinyMarginBegin"/>
-        </HBox>
-
-        <Panel class="discoveryCard">
-          <VBox>
-            <Text
-              text="Techwave kollegak felveszik Onnel a kapcsolatot, amennyiben szeretne ezt, nyomja meg a Kapcsolatfelvetel gombot."
-              wrapping="true"
-              class="sapUiSmallMarginBottom"/>
-            <Button text="Kapcsolatfelvetel" type="Emphasized" press=".onContactAutoml"/>
-            <Text text="TODO backend: jelenleg kliens oldali visszajelzes tortenik." class="sapUiSmallMarginTop discoveryIntro"/>
+  <Page id="discoveryPage" showHeader="false" class="discoveryPage">
+    <content>
+      <VBox class="discoveryShell sapUiMediumMargin">
+        <VBox visible="{= ${discovery>/entryMode} === 'launcher' }" class="discoveryLauncher">
+          <VBox class="sapUiSmallMarginBottom">
+            <Title text="Felfedezes" level="H2"/>
+            <Text text="Valassz egy iranyt: AI-alapu otletgyujtes, klasszikus ML trening vagy strukturalt AI modell." class="sapUiTinyMarginTop mlWizardSubtitle"/>
           </VBox>
-        </Panel>
-      </VBox>
 
-      <VBox visible="{= ${discovery>/currentPage} === 'business' }">
-        <HBox alignItems="Center" class="sapUiTinyMarginBottom">
-          <Button icon="sap-icon://nav-back" type="Transparent" press=".onBackToDiscoveryHome"/>
-          <Title text="Uzleti problema feltarasa" level="H2" class="sapUiTinyMarginBegin"/>
-        </HBox>
+          <HBox justifyContent="Center" class="discoveryLauncherRow discoveryLauncherRowSingle">
+            <GenericTile header="1. Felfedezes" subheader="AI altal javasolt uzleti lehetosegek" press=".onOpenDiscoveryAdvisor" class="discoveryLauncherTile discoveryLauncherTileHero">
+              <tileContent>
+                <TileContent footer="Uzleti dontestamogato javaslatok">
+                  <content>
+                    <NumericContent icon="sap-icon://lightbulb" indicator="Up" value="AI"/>
+                  </content>
+                </TileContent>
+              </tileContent>
+            </GenericTile>
+          </HBox>
 
-        <Text
-          text="Ird le az uzleti problemat. A chatbot figyelembe veszi az elerheto SQL semat, es ha kell, CSV feltoltest javasol."
-          wrapping="true"
-          class="discoveryIntro sapUiSmallMarginBottom"/>
+          <HBox justifyContent="Center" wrap="Wrap" class="discoveryLauncherRow">
+            <GenericTile header="2. Klasszikus ML trening" subheader="A jelenlegi wizard teljes folyamata" press=".onOpenDiscoveryClassic" class="discoveryLauncherTile">
+              <tileContent>
+                <TileContent footer="Altalanos ML modellezes">
+                  <content>
+                    <NumericContent icon="sap-icon://machine" indicator="Up" value="ML"/>
+                  </content>
+                </TileContent>
+              </tileContent>
+            </GenericTile>
 
-        <MessageStrip
-          visible="{= ${discovery>/businessError} ? true : false }"
-          text="{discovery>/businessError}"
-          type="Error"
-          showIcon="true"
-          class="sapUiSmallMarginBottom"/>
+            <GenericTile header="3. Strukturalt AI modell (RPT1)" subheader="Altalanos CSV predikcio [PREDICT] mezokre" press=".onOpenDiscoveryStructured" class="discoveryLauncherTile">
+              <tileContent>
+                <TileContent footer="Strukturalt sor-szintu modell">
+                  <content>
+                    <NumericContent icon="sap-icon://ai" indicator="Up" value="RPT1"/>
+                  </content>
+                </TileContent>
+              </tileContent>
+            </GenericTile>
+          </HBox>
+        </VBox>
 
-        <Panel
-          headerText="SQL schema attekintes"
-          class="sapUiSmallMarginBottom"
-          visible="{= ${discovery>/businessSchemaTables}.length > 0 }"
-          expandable="true"
-          expanded="false">
-          <List items="{discovery>/businessSchemaTables}" showSeparators="Inner">
-            <CustomListItem>
-              <VBox>
-                <Title text="{discovery>tableName}" level="H5" class="sapUiTinyMarginBottom"/>
-                <List items="{discovery>columns}" showSeparators="None">
-                  <CustomListItem>
-                    <HBox justifyContent="SpaceBetween" width="100%">
-                      <Text text="{discovery>name}" wrapping="false"/>
-                      <ObjectStatus text="{discovery>type}" state="Information"/>
-                    </HBox>
-                  </CustomListItem>
-                </List>
-              </VBox>
-            </CustomListItem>
-          </List>
-        </Panel>
+        <VBox visible="{= ${discovery>/entryMode} === 'advisor' }" class="discoveryAdvisorShell">
+          <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMarginBottom">
+            <VBox>
+              <Title text="AI Felfedezes" level="H2"/>
+              <Text text="Az elerheto adatforrasok alapjan javaslatokat kapsz arra, milyen uzleti problemakat erdemes AI-jal megoldani." class="sapUiTinyMarginTop mlWizardSubtitle"/>
+            </VBox>
+            <Button text="Vissza a csempekhez" icon="sap-icon://nav-back" type="Transparent" press=".onBackToDiscoveryLauncher"/>
+          </HBox>
 
-        <Panel headerText="Business chatbot" class="sapUiSmallMarginBottom">
-          <VBox>
-            <List items="{discovery>/businessChatMessages}" showSeparators="None" class="discoverySpecChatList">
+          <MessageStrip text="{discovery>/advisorSummary}" type="Information" showCloseButton="false" visible="{= !!${discovery>/advisorSummary} }" class="sapUiSmallMarginBottom"/>
+
+          <Panel headerText="Jelenleg elerheto adatforrasok" class="discoveryAdvisorPanel sapUiSmallMarginBottom">
+            <List items="{discovery>/advisorAvailableSources}" noDataText="Nem sikerult adatforrast beolvasni.">
               <CustomListItem>
-                <HBox width="100%" justifyContent="Start" visible="{= ${discovery>role} !== 'user' }">
-                  <Avatar initials="AI" displaySize="XS" class="chatAvatar discoveryAvatar"/>
-                  <VBox class="chatBubble chatBubbleAi discoveryBubbleAi">
-                    <Text text="AI" class="chatBubbleMeta"/>
-                    <Text text="{discovery>content}" wrapping="true" width="100%"/>
-                  </VBox>
-                </HBox>
-                <HBox width="100%" justifyContent="End" visible="{= ${discovery>role} === 'user' }">
-                  <VBox class="chatBubble chatBubbleUser discoveryBubbleUser">
-                    <Text text="Te" class="chatBubbleMeta"/>
-                    <Text text="{discovery>content}" wrapping="true" width="100%"/>
-                  </VBox>
+                <HBox alignItems="Center" class="sapUiSmallMarginBegin sapUiTinyMarginTopBottom">
+                  <core:Icon src="sap-icon://database" color="#0854a0" class="sapUiTinyMarginEnd"/>
+                  <Text text="{discovery>}"/>
                 </HBox>
               </CustomListItem>
             </List>
+          </Panel>
 
-            <VBox class="sapUiSmallMarginTop">
-              <unif:FileUploader
-                width="100%"
-                sameFilenameAllowed="true"
-                multiple="true"
+          <VBox visible="{discovery>/advisorBusy}" class="mlWizardCenteredBox">
+            <BusyIndicator size="3rem"/>
+            <Text text="AI javaslatok keszulnek..." class="sapUiSmallMarginTop"/>
+          </VBox>
+
+          <FlexBox wrap="Wrap" justifyContent="Center" class="discoveryAdvisorGrid" visible="{= !${discovery>/advisorBusy} }" items="{discovery>/advisorSuggestions}">
+            <items>
+              <Panel headerText="{discovery>problemType}" class="discoveryAdvisorCard">
+                <VBox class="sapUiSmallMargin">
+                  <Title text="{discovery>title}" level="H4"/>
+                  <Text text="{discovery>rationale}" wrapping="true" class="sapUiTinyMarginTop"/>
+                  <MessageStrip
+                    text="{= 'Javasolt modell: ' + ${discovery>modelTitle} + ' - ' + ${discovery>modelDescription} }"
+                    type="Success"
+                    showCloseButton="false"
+                    class="sapUiSmallMarginTop"/>
+                  <List items="{discovery>featureHints}" noDataText="" visible="{= ${discovery>featureHints}.length > 0 }" class="sapUiSmallMarginTop">
+                    <CustomListItem>
+                      <HBox alignItems="Center">
+                        <core:Icon src="sap-icon://hint" color="#e78c07" class="sapUiTinyMarginEnd"/>
+                        <Text text="{discovery>}"/>
+                      </HBox>
+                    </CustomListItem>
+                  </List>
+                  <Button text="Inditas" icon="sap-icon://arrow-right" type="Emphasized" press=".onSelectAdvisorSuggestion" class="sapUiSmallMarginTop"/>
+                </VBox>
+              </Panel>
+            </items>
+          </FlexBox>
+        </VBox>
+
+        <VBox visible="{= ${discovery>/entryMode} === 'structured' }" class="discoveryStructuredShell">
+          <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMarginBottom">
+            <VBox>
+              <Title text="Strukturalt AI modell (RPT1)" level="H2"/>
+              <Text text="Tolts fel barmilyen CSV-t, ahol a prediklando mezok [PREDICT] ertekkel vannak jelolve." class="sapUiTinyMarginTop mlWizardSubtitle"/>
+            </VBox>
+            <Button text="Vissza a csempekhez" icon="sap-icon://nav-back" type="Transparent" press=".onBackToDiscoveryLauncher"/>
+          </HBox>
+
+          <Panel headerText="CSV feltoltes es futtatas" class="discoveryStructuredPanel sapUiSmallMarginBottom">
+            <VBox class="sapUiSmallMargin">
+              <unified:FileUploader
+                id="structuredAiUploader"
                 fileType="csv"
                 uploadOnChange="false"
-                buttonText="CSV fajlok kivalasztasa"
-                change=".onBusinessCsvChange"/>
-
-              <List items="{discovery>/businessCsvFiles}" visible="{= ${discovery>/businessCsvFiles}.length > 0 }" class="sapUiTinyMarginTop">
-                <CustomListItem>
-                  <VBox>
-                    <HBox justifyContent="SpaceBetween" alignItems="Center">
-                      <Text text="{= ${discovery>name} + ' (' + ${discovery>row_count} + ' sor)' }" wrapping="true"/>
-                      <Button icon="sap-icon://decline" type="Transparent" press=".onRemoveBusinessCsv"/>
-                    </HBox>
-                    <List items="{discovery>columns}" showSeparators="None" class="sapUiTinyMarginTop">
-                      <CustomListItem>
-                        <Text text="{discovery>}" wrapping="true"/>
-                      </CustomListItem>
-                    </List>
-                  </VBox>
-                </CustomListItem>
-              </List>
-
-              <TextArea
-                value="{discovery>/businessDraft}"
+                multiple="false"
+                change=".onStructuredAiFileSelected"
+                placeholder="Valassz CSV fajlt"
                 width="100%"
-                rows="4"
-                growing="true"
-                growingMaxLines="8"
-                placeholder="Pl.: szeretnem elore jelezni, mely ugyfelek fognak lemorzsolodni a kovetkezo negyedevben."
-                class="sapUiTinyMarginTop"
-                enabled="{= !${discovery>/businessBusy} }"/>
-
-              <HBox class="sapUiTinyMarginTop" wrap="Wrap">
-                <Button
-                  text="Kuldes"
-                  type="Emphasized"
-                  press=".onSendBusinessMessage"
-                  busy="{discovery>/businessBusy}"
-                  enabled="{= !${discovery>/businessBusy} &amp;&amp; (${discovery>/businessDraft} ? true : false) }"/>
-                <Button
-                  text="Training inditasa"
-                  type="Transparent"
-                  press=".onStartTrainingFromBusiness"
-                  class="sapUiTinyMarginBegin"
-                  enabled="{= ${discovery>/businessSuggestedUseCase} ? true : false }"/>
+                style="Emphasized"/>
+              <Text text="{= ${discovery>/structuredAiFileName} ? 'Kivalasztott fajl: ' + ${discovery>/structuredAiFileName} : '' }" visible="{= !!${discovery>/structuredAiFileName} }" class="sapUiSmallMarginTop"/>
+              <HBox class="sapUiSmallMarginTop">
+                <Button text="Predikcio futtatasa" icon="sap-icon://play" type="Emphasized" press=".onRunStructuredAiPrediction" busy="{discovery>/structuredAiBusy}"/>
               </HBox>
             </VBox>
-          </VBox>
-        </Panel>
+          </Panel>
 
-        <Panel
-          headerText="Aktualis training javaslat"
-          visible="{= ${discovery>/businessSuggestedUseCase} ? true : false }"
-          class="sapUiSmallMarginBottom">
-          <VBox>
-            <Title text="{discovery>/businessSuggestedUseCase/title}" level="H4" class="sapUiTinyMarginBottom"/>
-            <Text text="{discovery>/businessSuggestedUseCase/business_value}" wrapping="true" class="sapUiTinyMarginBottom"/>
-            <ObjectStatus text="{discovery>/businessSuggestedUseCase/ml_type}" state="Success" class="sapUiTinyMarginBottom"/>
-            <List items="{discovery>/businessSuggestedUseCase/required_fields}" showSeparators="None">
+          <MessageStrip text="{discovery>/structuredAiSummary}" type="Information" showCloseButton="false" visible="{= !!${discovery>/structuredAiSummary} }" class="sapUiSmallMarginBottom"/>
+          <MessageStrip text="{discovery>/structuredAiError}" type="Error" showCloseButton="false" visible="{= !!${discovery>/structuredAiError} }" class="sapUiSmallMarginBottom"/>
+
+          <Panel headerText="Predikcios metrikak" class="discoveryStructuredPanel sapUiSmallMarginBottom" visible="{= !!${discovery>/structuredAiMetrics} }">
+            <VBox class="sapUiSmallMargin">
+              <Text text="{= 'Query sorok: ' + ${discovery>/structuredAiMetrics/queryCount} + ', context sorok: ' + ${discovery>/structuredAiMetrics/contextCount} + ', API hivasok: ' + ${discovery>/structuredAiMetrics/apiCalls} }"/>
+              <List items="{discovery>/structuredAiMetrics/predictColumns}" noDataText="" class="sapUiSmallMarginTop">
+                <CustomListItem>
+                  <HBox alignItems="Center">
+                    <core:Icon src="sap-icon://ai" color="#0854a0" class="sapUiTinyMarginEnd"/>
+                    <Text text="{discovery>}"/>
+                  </HBox>
+                </CustomListItem>
+              </List>
+            </VBox>
+          </Panel>
+
+          <Panel headerText="Predikcios eredmenyek" class="discoveryStructuredPanel sapUiSmallMarginBottom" visible="{= ${discovery>/structuredAiPredictionRows}.length > 0 }">
+            <Table id="structuredPredictionTable" fixedLayout="false" growing="true" growingThreshold="100"/>
+          </Panel>
+
+          <Panel headerText="Felismert cashflow aggregacio" class="discoveryStructuredPanel" visible="{= ${discovery>/structuredAiChartRows}.length > 0 }">
+            <List items="{discovery>/structuredAiChartRows}" noDataText="">
               <CustomListItem>
-                <Text text="{discovery>}"/>
+                <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMarginBegin sapUiTinyMarginTopBottom sapUiSmallMarginEnd">
+                  <Text text="{discovery>monthLabel}" class="mlWizardBold"/>
+                  <Text text="{discovery>predictedCashflowFormatted}"/>
+                </HBox>
               </CustomListItem>
             </List>
-          </VBox>
-        </Panel>
-      </VBox>
+          </Panel>
+        </VBox>
 
-      <VBox visible="{= ${discovery>/currentPage} === 'start' }">
-        <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
-          <HBox alignItems="Center">
-            <Button icon="sap-icon://nav-back" type="Transparent" press=".onBackToDiscoveryHome"/>
-            <VBox class="sapUiTinyMarginBegin">
-              <Title text="Felfedezes inditasa" level="H2"/>
-              <Text
-                text="Az AI javaslatot tesz az elerheto adatstrukturak alapjan megvalosithato Machine Learning elemzesekre."
-                wrapping="true"
-                class="discoveryIntro"/>
-            </VBox>
+        <VBox visible="{= ${discovery>/entryMode} === 'classic' }">
+          <HBox justifyContent="End" class="sapUiSmallMarginBottom">
+            <Button text="Vissza a csempekhez" icon="sap-icon://nav-back" type="Transparent" press=".onBackToDiscoveryLauncher"/>
           </HBox>
-          <Button text="Folyamat alaphelyzet" type="Transparent" icon="sap-icon://reset" press=".onResetMlFlow"/>
-        </HBox>
-
-        <HBox alignItems="Center" wrap="Wrap" class="sapUiSmallMarginBottom">
-          <Button
-            text="Felfedezes inditasa"
-            type="Emphasized"
-            icon="sap-icon://search"
-            press=".onStartDiscovery"
-            busy="{discovery>/busy}"
-            enabled="{= !${discovery>/busy} }"/>
-        </HBox>
-
-        <MessageStrip
-          visible="{= ${discovery>/error} ? true : false }"
-          text="{discovery>/error}"
-          type="Error"
-          showIcon="true"
-          class="sapUiSmallMarginBottom"/>
-
-        <Panel
-          headerText="Lekerdezett adattabla metadataok"
-          class="sapUiSmallMarginBottom"
-          visible="{= ${discovery>/schemaTables}.length > 0 }"
-          expandable="true"
-          expanded="false">
-          <List items="{discovery>/schemaTables}" showSeparators="Inner">
-            <CustomListItem>
-              <VBox>
-                <Title text="{discovery>tableName}" level="H4" class="sapUiTinyMarginBottom"/>
-                <List items="{discovery>columns}" showSeparators="None">
-                  <CustomListItem>
-                    <HBox justifyContent="SpaceBetween" width="100%">
-                      <Text text="{discovery>name}" wrapping="false"/>
-                      <ObjectStatus text="{discovery>type}" state="Information"/>
-                    </HBox>
-                  </CustomListItem>
-                </List>
-              </VBox>
-            </CustomListItem>
-          </List>
-        </Panel>
-
-        <List
-          items="{discovery>/suggestions}"
-          showSeparators="None"
-          visible="{= ${discovery>/suggestions}.length > 0 &amp;&amp; !${discovery>/activeUseCase} }"
-          class="discoveryCardList sapUiSmallMarginBottom">
-          <CustomListItem class="discoveryCardItem">
-            <VBox class="discoveryCard">
-              <Title text="{discovery>title}" level="H4" class="sapUiTinyMarginBottom"/>
-              <Text text="{discovery>business_value}" wrapping="true" class="sapUiTinyMarginBottom"/>
-              <ObjectStatus text="{discovery>ml_type}" state="Success" class="sapUiTinyMarginBottom"/>
-
-              <Label text="Szukseges mezok" class="sapUiTinyMarginBottom"/>
-              <List items="{discovery>required_fields}" showSeparators="None" class="sapUiTinyMarginBottom">
-                <CustomListItem>
-                  <Text text="{discovery>}"/>
-                </CustomListItem>
-              </List>
-
-              <Button
-                text="ML modell inditasa"
-                type="Transparent"
-                icon="sap-icon://begin"
-                press=".onStartMlModel"/>
-            </VBox>
-          </CustomListItem>
-        </List>
-
-        <List
-          items="{discovery>/suggestions}"
-          showSeparators="None"
-          visible="{= ${discovery>/activeUseCase} ? true : false }"
-          class="discoveryCardList sapUiSmallMarginBottom">
-          <CustomListItem class="discoveryCardItem" visible="{= ${discovery>/activeUseCase} &amp;&amp; ${discovery>/activeUseCase/title} === ${discovery>title} }">
-            <VBox class="discoveryCard">
-              <Title text="{discovery>title}" level="H4" class="sapUiTinyMarginBottom"/>
-              <Text text="{discovery>business_value}" wrapping="true" class="sapUiTinyMarginBottom"/>
-              <ObjectStatus text="{discovery>ml_type}" state="Success" class="sapUiTinyMarginBottom"/>
-
-              <Label text="Szukseges mezok" class="sapUiTinyMarginBottom"/>
-              <List items="{discovery>required_fields}" showSeparators="None" class="sapUiTinyMarginBottom">
-                <CustomListItem>
-                  <Text text="{discovery>}"/>
-                </CustomListItem>
-              </List>
-
-              <Button
-                text="ML modell inditasa"
-                type="Transparent"
-                icon="sap-icon://begin"
-                press=".onStartMlModel"/>
-            </VBox>
-          </CustomListItem>
-        </List>
-
-        <Panel
-          headerText="ML trening asszisztens"
-          class="sapUiSmallMarginBottom"
-          visible="{= ${discovery>/activeUseCase} ? true : false }">
-          <VBox>
-            <ObjectIdentifier
-              title="{discovery>/activeUseCase/title}"
-              text="{discovery>/activeUseCase/ml_type}"
-              class="sapUiTinyMarginBottom"/>
-            <Text text="{discovery>/activeUseCase/business_value}" wrapping="true" class="sapUiTinyMarginBottom"/>
-
-            <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
-              <ObjectStatus text="{= 'Kerdes: ' + ${discovery>/specStep} + '/' + ${discovery>/specMaxSteps} }" state="Information" visible="{= ${discovery>/specMaxSteps} > 0 }"/>
-              <ObjectStatus text="{= 'Allapot: ' + ${discovery>/trainingStatus} }" state="Information"/>
-            </HBox>
-
-            <List items="{discovery>/specChatMessages}" showSeparators="None" class="discoverySpecChatList">
-              <CustomListItem>
-                <HBox width="100%" justifyContent="Start" visible="{= ${discovery>role} !== 'user' }">
-                  <Avatar initials="AI" displaySize="XS" class="chatAvatar discoveryAvatar"/>
-                  <VBox class="chatBubble chatBubbleAi discoveryBubbleAi">
-                    <Text text="AI" class="chatBubbleMeta"/>
-                    <Text text="{discovery>content}" wrapping="true" width="100%"/>
-                  </VBox>
-                </HBox>
-                <HBox width="100%" justifyContent="End" visible="{= ${discovery>role} === 'user' }">
-                  <VBox class="chatBubble chatBubbleUser discoveryBubbleUser">
-                    <Text text="Te" class="chatBubbleMeta"/>
-                    <Text text="{discovery>content}" wrapping="true" width="100%"/>
-                  </VBox>
-                </HBox>
-              </CustomListItem>
-            </List>
-
-            <HBox class="sapUiTinyMarginTop" visible="{= !${discovery>/specDone} }">
-              <Input
-                value="{discovery>/specAnswerDraft}"
-                placeholder="Ird be az uzleti valaszodat..."
-                submit=".onSubmitSpecAnswer"
-                width="100%"
-                enabled="{= !${discovery>/specBusy} }"/>
-              <Button
-                text="Valasz"
-                type="Emphasized"
-                press=".onSubmitSpecAnswer"
-                class="sapUiTinyMarginBegin"
-                busy="{discovery>/specBusy}"
-                enabled="{= !${discovery>/specBusy} &amp;&amp; (${discovery>/specAnswerDraft} ? true : false) }"/>
-            </HBox>
-          </VBox>
-        </Panel>
-
-        <Panel
-          headerText="Training futas"
-          class="sapUiSmallMarginBottom"
-          visible="{= ${discovery>/trainingStatus} !== 'IDLE' }">
-          <VBox>
-            <Text text="{discovery>/trainingMessage}" wrapping="true" class="sapUiTinyMarginBottom"/>
-            <ProgressIndicator
-              percentValue="{discovery>/trainingProgress}"
-              displayValue="{= ${discovery>/trainingProgress} + '%' }"
-              state="{= ${discovery>/trainingStatus} === 'ERROR' ? 'Error' : (${discovery>/trainingStatus} === 'RESULT_READY' ? 'Success' : 'Information') }"
-              visible="{= ${discovery>/trainingStatus} !== 'SPEC_CHAT' }"/>
-            <Button
-              text="Spec + training ujraprobalasa"
-              type="Transparent"
-              icon="sap-icon://refresh"
-              press=".onRetrySpecGeneration"
-              visible="{= ${discovery>/trainingStatus} === 'ERROR' }"/>
-          </VBox>
-        </Panel>
-
-        <Panel
-          headerText="Generalalt trening specifikacio (YAML)"
-          class="sapUiSmallMarginBottom"
-          visible="{= ${discovery>/trainingSpecYaml} ? true : false }">
-          <TextArea value="{discovery>/trainingSpecYaml}" rows="12" editable="false" width="100%"/>
-        </Panel>
-
-        <Panel
-          headerText="Training eredmeny"
-          class="sapUiSmallMarginBottom"
-          visible="{= ${discovery>/trainingStatus} === 'RESULT_READY' }">
-          <VBox>
-            <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
-              <Title text="Adat preview (max 50 sor)" level="H4"/>
-              <Button text="Teljes CSV letoltese" icon="sap-icon://download" press=".onDownloadTrainingCsv"/>
-            </HBox>
-
-            <Table id="discoveryPreviewTable" growing="true" growingThreshold="50" inset="false" class="sapUiTinyMarginBottom"/>
-
-            <Title text="Metrikak" level="H4" class="sapUiTinyMarginBottom"/>
-            <List items="{discovery>/metricsItems}" showSeparators="Inner" class="sapUiTinyMarginBottom">
-              <CustomListItem>
-                <HBox justifyContent="SpaceBetween" width="100%">
-                  <Text text="{discovery>key}" wrapping="true"/>
-                  <Text text="{discovery>value}" wrapping="true"/>
-                </HBox>
-              </CustomListItem>
-            </List>
-
-            <Title text="Automatikus uzleti ertelmezo osszefoglalo" level="H4" class="sapUiTinyMarginBottom"/>
-            <Text text="{discovery>/businessSummary}" wrapping="true"/>
-          </VBox>
-        </Panel>
-
-        <List
-          items="{discovery>/suggestions}"
-          showSeparators="None"
-          visible="{= ${discovery>/activeUseCase} ? true : false }"
-          class="discoveryCardList sapUiSmallMarginBottom">
-          <CustomListItem class="discoveryCardItem" visible="{= !${discovery>/activeUseCase} || ${discovery>/activeUseCase/title} !== ${discovery>title} }">
-            <VBox class="discoveryCard">
-              <Title text="{discovery>title}" level="H4" class="sapUiTinyMarginBottom"/>
-              <Text text="{discovery>business_value}" wrapping="true" class="sapUiTinyMarginBottom"/>
-              <ObjectStatus text="{discovery>ml_type}" state="Success" class="sapUiTinyMarginBottom"/>
-
-              <Label text="Szukseges mezok" class="sapUiTinyMarginBottom"/>
-              <List items="{discovery>required_fields}" showSeparators="None" class="sapUiTinyMarginBottom">
-                <CustomListItem>
-                  <Text text="{discovery>}"/>
-                </CustomListItem>
-              </List>
-
-              <Button
-                text="ML modell inditasa"
-                type="Transparent"
-                icon="sap-icon://begin"
-                press=".onStartMlModel"/>
-            </VBox>
-          </CustomListItem>
-        </List>
+          <mvc:XMLView id="classicMlWizardView" viewName="sap.suite.ui.commons.demo.tutorial.view.MLWizard"/>
+        </VBox>
       </VBox>
-    </VBox>
+    </content>
   </Page>
 </mvc:View>

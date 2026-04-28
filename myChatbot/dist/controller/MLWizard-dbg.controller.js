@@ -21,6 +21,7 @@ sap.ui.define([
       this._simTimer = null;
       this._stepHistory = [];   // history-alapú back navigációhoz
       this._csvFiles = [];      // FileList tömb
+      this._structuredAiFile = null;
 
       var oModel = this.getView().getModel("discovery");
       if (oModel && !oModel.getProperty("/wizardInitDone")) {
@@ -40,6 +41,35 @@ sap.ui.define([
     _model: function() { return this.getView().getModel("discovery"); },
     _set: function(sPath, vValue) { this._model().setProperty(sPath, vValue); },
     _get: function(sPath) { return this._model().getProperty(sPath); },
+
+    _attachDiscoveryRoutes: function() {
+      var oRouter = this.getOwnerComponent().getRouter();
+      if (!oRouter || this._discoveryRoutesAttached) {
+        return;
+      }
+      oRouter.getRoute("discoveryHome").attachPatternMatched(this._onDiscoveryHomeMatched, this);
+      oRouter.getRoute("discoveryStart").attachPatternMatched(this._onDiscoveryAdvisorMatched, this);
+      oRouter.getRoute("discoveryBusiness").attachPatternMatched(this._onDiscoveryClassicMatched, this);
+      oRouter.getRoute("discoveryAutoml").attachPatternMatched(this._onDiscoveryStructuredMatched, this);
+      this._discoveryRoutesAttached = true;
+    },
+
+    _onDiscoveryHomeMatched: function() {
+      this._set("/entryMode", "launcher");
+    },
+
+    _onDiscoveryAdvisorMatched: function() {
+      this._set("/entryMode", "advisor");
+      this._loadDiscoveryAdvisorSuggestions();
+    },
+
+    _onDiscoveryClassicMatched: function() {
+      this._set("/entryMode", "classic");
+    },
+
+    _onDiscoveryStructuredMatched: function() {
+      this._set("/entryMode", "structured");
+    },
 
     _normalizeAggregationRecommendation: function(vRecommendation) {
       var sValue = String(vRecommendation || "").trim().toLowerCase();
@@ -257,7 +287,20 @@ sap.ui.define([
     _resetModelData: function(oModel) {
       oModel.setData(Object.assign(oModel.getData(), {
         wizardError: "",
+        entryMode: "launcher",
         sessionId: "",
+        advisorBusy: false,
+        advisorAvailableSources: [],
+        advisorSuggestions: [],
+        advisorSummary: "",
+        structuredAiBusy: false,
+        structuredAiFile: null,
+        structuredAiFileName: "",
+        structuredAiSummary: "",
+        structuredAiError: "",
+        structuredAiMetrics: null,
+        structuredAiPredictionRows: [],
+        structuredAiChartRows: [],
         // Step 1
         step1GoalMode: "ai_suggested",
         step1Goal: "prediction",
@@ -390,6 +433,220 @@ sap.ui.define([
     },
 
     onClearError: function() { this._set("/wizardError", ""); },
+
+    onOpenDiscoveryAdvisor: function() {
+      this.getOwnerComponent().getRouter().navTo("discoveryStart");
+    },
+
+    onOpenDiscoveryClassic: function() {
+      this.getOwnerComponent().getRouter().navTo("discoveryBusiness");
+    },
+
+    onOpenDiscoveryStructured: function() {
+      this.getOwnerComponent().getRouter().navTo("discoveryAutoml");
+    },
+
+    onBackToDiscoveryLauncher: function() {
+      this.getOwnerComponent().getRouter().navTo("discoveryHome");
+    },
+
+    _loadDiscoveryAdvisorSuggestions: function() {
+      var that = this;
+      this._set("/advisorBusy", true);
+      this._set("/advisorSuggestions", []);
+      this._set("/advisorSummary", "");
+
+      Promise.all([
+        AiService.mlWizardGetDbTables().catch(function() { return { tables: [] }; }),
+        AiService.getDummy4SchemaHint().catch(function() { return { schemaHint: "" }; })
+      ]).then(function(aResults) {
+        var aTables = Array.isArray(aResults[0] && aResults[0].tables) ? aResults[0].tables.filter(Boolean) : [];
+        var sSchemaHint = String(aResults[1] && aResults[1].schemaHint ? aResults[1].schemaHint : "");
+        var aSchemaColumns = [];
+        var aSchemaSources = [];
+        var aGoals = [
+          { key: "prediction", label: "Elorejelzes" },
+          { key: "classification", label: "Osztalyozas" },
+          { key: "optimization", label: "Optimalizacio" }
+        ];
+
+        sSchemaHint.split("\n").forEach(function(sLine) {
+          var aParts = sLine.split(":");
+          var sSource = String(aParts[0] || "").trim();
+          if (sSource) {
+            aSchemaSources.push(sSource);
+          }
+          if (aParts[1]) {
+            aParts[1].split(",").forEach(function(sColumn) {
+              var sClean = String(sColumn || "").trim();
+              if (sClean) {
+                aSchemaColumns.push(sClean);
+              }
+            });
+          }
+        });
+
+        that._set("/advisorAvailableSources", Array.from(new Set(aTables.concat(aSchemaSources))));
+
+        return Promise.all(aGoals.map(function(oGoal) {
+          return AiService.mlWizardStep1AiSuggestionsFromColumns({
+            goal: oGoal.key,
+            source_type: "db_table",
+            column_names: Array.from(new Set(aSchemaColumns.concat(aTables)))
+          }).then(function(oData) {
+            return that._mapDiscoveryAdvisorSuggestion(oGoal, oData, aSchemaColumns.concat(aTables));
+          }).catch(function() {
+            return that._buildFallbackDiscoverySuggestion(oGoal, aTables);
+          });
+        }));
+      }).then(function(aSuggestions) {
+        that._set("/advisorSuggestions", aSuggestions);
+        that._set("/advisorSummary",
+          "Az elerheto adatforrasok alapjan az AI " + aSuggestions.length +
+          " uzleti iranyt javasol, amelyek kozul valaszthatsz a klasszikus ML trening es a strukturalt AI modell kozott."
+        );
+      }).catch(function(err) {
+        that._set("/wizardError", "Felfedezesi javaslat hiba: " + (err && err.message ? err.message : String(err)));
+      }).finally(function() {
+        that._set("/advisorBusy", false);
+      });
+    },
+
+    _mapDiscoveryAdvisorSuggestion: function(oGoal, oData, aColumns) {
+      var aSuggestions = Array.isArray(oData && oData.goal_suggestions) ? oData.goal_suggestions : [];
+      var oTopSuggestion = aSuggestions.length > 0 ? aSuggestions[0] : {
+        text: oGoal.label + " jellegu uzleti elemzes",
+        rationale: "A jelenlegi adatforrasok alapjan ez a legkezenfekvobb kiindulasi pont."
+      };
+      var sText = typeof oTopSuggestion === "string" ? oTopSuggestion : String(oTopSuggestion.text || "");
+      var sRationale = typeof oTopSuggestion === "string" ? "" : String(oTopSuggestion.rationale || "");
+      var oRecommendation = this._recommendDiscoveryModel(oGoal.key, sText, aColumns);
+
+      return {
+        title: sText,
+        problemType: oGoal.label,
+        rationale: sRationale,
+        modelTitle: oRecommendation.title,
+        modelDescription: oRecommendation.description,
+        routeName: oRecommendation.routeName,
+        featureHints: (oData && oData.early_feature_hints ? oData.early_feature_hints : []).slice(0, 3).map(function(oHint) {
+          return oHint && oHint.name ? oHint.name : "";
+        }).filter(Boolean)
+      };
+    },
+
+    _buildFallbackDiscoverySuggestion: function(oGoal, aTables) {
+      var oRecommendation = this._recommendDiscoveryModel(oGoal.key, oGoal.label, aTables || []);
+      return {
+        title: oGoal.label + " lehetoseg az elerheto forrasokbol",
+        problemType: oGoal.label,
+        rationale: "A rendszer az elerheto adatforrasok alapjan ezt a problematipust tekinti jo kiindulopontnak.",
+        modelTitle: oRecommendation.title,
+        modelDescription: oRecommendation.description,
+        routeName: oRecommendation.routeName,
+        featureHints: []
+      };
+    },
+
+    _recommendDiscoveryModel: function(sGoalKey, sText, aColumns) {
+      var sCorpus = (String(sText || "") + " " + (aColumns || []).join(" ")).toLowerCase();
+      var bStructuredPattern = /(invoice|cashflow|payment|days late|due date|income date|expected income|fizetes|kesedelem)/.test(sCorpus);
+
+      if (sGoalKey === "prediction" && bStructuredPattern) {
+        return {
+          title: "Strukturalt AI modell (RPT1)",
+          description: "Az adatszerkezet alapjan ez jo jelolt strukturalt, sor-szintu predikciohoz.",
+          routeName: "discoveryAutoml"
+        };
+      }
+
+      return {
+        title: "Klasszikus ML trening",
+        description: "A problemahoz a jelenlegi wizard altalanos ML trening folyamata a legjobb kiindulasi pont.",
+        routeName: "discoveryBusiness"
+      };
+    },
+
+    onSelectAdvisorSuggestion: function(oEvent) {
+      var oCtx = oEvent.getSource().getBindingContext("discovery");
+      var oSuggestion = oCtx ? oCtx.getObject() : null;
+      if (!oSuggestion || !oSuggestion.routeName) {
+        return;
+      }
+      this.getOwnerComponent().getRouter().navTo(oSuggestion.routeName);
+    },
+
+    onStructuredAiFileSelected: function(oEvent) {
+      var oUploader = oEvent.getSource();
+      var aFiles = oEvent.getParameter("files");
+      if (!aFiles || aFiles.length === 0) {
+        aFiles = oUploader.oFileUpload && oUploader.oFileUpload.files;
+      }
+      if (!aFiles || aFiles.length === 0) {
+        return;
+      }
+      this._structuredAiFile = aFiles[0];
+      this._set("/structuredAiFileName", String(this._structuredAiFile.name || ""));
+      this._set("/structuredAiError", "");
+    },
+
+    onRunStructuredAiPrediction: function() {
+      var that = this;
+      if (!this._structuredAiFile) {
+        MessageToast.show("Elobb valassz ki egy CSV fajlt.");
+        return;
+      }
+
+      this._set("/structuredAiBusy", true);
+      this._set("/structuredAiError", "");
+
+      AiService.runRpt1Generic({
+        file: this._structuredAiFile
+      }).then(function(oData) {
+        that._set("/structuredAiSummary", String(oData && oData.summary ? oData.summary : ""));
+        that._set("/structuredAiMetrics", oData && oData.metrics ? oData.metrics : null);
+        that._set("/structuredAiPredictionRows", Array.isArray(oData && oData.predictionRows) ? oData.predictionRows : []);
+        that._set("/structuredAiChartRows", Array.isArray(oData && oData.chartRows) ? oData.chartRows.map(function(oRow) {
+          return Object.assign({}, oRow, {
+            predictedCashflowFormatted: Number(oRow && oRow.predictedCashflow ? oRow.predictedCashflow : 0).toLocaleString("hu-HU", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            }) + " Ft"
+          });
+        }) : []);
+        that._buildStructuredPredictionTable(that._get("/structuredAiPredictionRows"));
+      }).catch(function(err) {
+        that._set("/structuredAiError", err && err.message ? err.message : String(err));
+      }).finally(function() {
+        that._set("/structuredAiBusy", false);
+      });
+    },
+
+    _buildStructuredPredictionTable: function(aRows) {
+      var oTable = this.byId("structuredPredictionTable");
+      var aColumns;
+      if (!oTable) {
+        return;
+      }
+      oTable.destroyColumns();
+      oTable.destroyItems();
+      if (!aRows || aRows.length === 0) {
+        return;
+      }
+
+      aColumns = Object.keys(aRows[0]);
+      aColumns.forEach(function(sCol) {
+        oTable.addColumn(new Column({ header: new Text({ text: sCol }) }));
+      });
+
+      aRows.forEach(function(oRow) {
+        var oItem = new ColumnListItem();
+        aColumns.forEach(function(sCol) {
+          oItem.addCell(new Text({ text: String(oRow[sCol] == null ? "" : oRow[sCol]) }));
+        });
+        oTable.addItem(oItem);
+      });
+    },
 
     // ─── STEP 1 HANDLERS ─────────────────────────────────────────────────────
 

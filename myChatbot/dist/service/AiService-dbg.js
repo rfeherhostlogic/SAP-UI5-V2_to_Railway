@@ -131,6 +131,25 @@
     });
   }
 
+  function runRpt1Generic(mPayload) {
+    var oFormData = new FormData();
+    if (mPayload.file) {
+      oFormData.append("file", mPayload.file);
+    }
+
+    return fetch("/api/discovery/rpt1-generic/run", {
+      method: "POST",
+      body: oFormData
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function evaluateDummy11(mPayload) {
     var oFormData = new FormData();
     oFormData.append("raw_request", mPayload.raw_request || "");
@@ -1204,6 +1223,7 @@
     runDummy9: runDummy9,
     runDummy10: runDummy10,
     runRpt1PaymentDelay: runRpt1PaymentDelay,
+    runRpt1Generic: runRpt1Generic,
     evaluateDummy11: evaluateDummy11,
     saveDummy11Prompt: saveDummy11Prompt,
     runDummy11Prompt: runDummy11Prompt,

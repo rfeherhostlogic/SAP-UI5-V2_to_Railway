@@ -587,7 +587,40 @@ sap.ui.define([
 			this.setModel(new JSONModel({
 				wizardInitDone: false,
 				wizardError: "",
+				entryMode: "launcher",
 				sessionId: "",
+				launcherTiles: [
+					{
+						id: "advisor",
+						title: "1. Felfedezes",
+						subtitle: "AI altal javasolt uzleti lehetosegek",
+						icon: "sap-icon://lightbulb"
+					},
+					{
+						id: "classic",
+						title: "2. Klasszikus ML trening",
+						subtitle: "A jelenlegi varazslo teljes folyamata",
+						icon: "sap-icon://machine"
+					},
+					{
+						id: "structured",
+						title: "3. Strukturalt AI modell (RPT1)",
+						subtitle: "Altalanos CSV predikcio strukturalt modellhez",
+						icon: "sap-icon://ai"
+					}
+				],
+				advisorBusy: false,
+				advisorAvailableSources: [],
+				advisorSuggestions: [],
+				advisorSummary: "",
+				structuredAiBusy: false,
+				structuredAiFile: null,
+				structuredAiFileName: "",
+				structuredAiSummary: "",
+				structuredAiError: "",
+				structuredAiMetrics: null,
+				structuredAiPredictionRows: [],
+				structuredAiChartRows: [],
 				// Step 1
 				step1GoalMode: "ai_suggested",
 				step1Goal: "prediction",
