@@ -40,6 +40,7 @@
         <mvc:XMLView id="jokersView" viewName="sap.suite.ui.commons.demo.tutorial.view.Jokers"/>
         <mvc:XMLView id="flowView" viewName="sap.suite.ui.commons.demo.tutorial.view.Flow"/>
         <mvc:XMLView id="discoveryView" viewName="sap.suite.ui.commons.demo.tutorial.view.Discovery"/>
+        <mvc:XMLView id="discoveryClassicView" viewName="sap.suite.ui.commons.demo.tutorial.view.MLWizard"/>
         <mvc:XMLView id="feedView" viewName="sap.suite.ui.commons.demo.tutorial.view.Feed"/>
         <mvc:XMLView id="noah2View" viewName="sap.suite.ui.commons.demo.tutorial.view.Noah2"/>
         <mvc:XMLView id="jokerPromptView" viewName="sap.suite.ui.commons.demo.tutorial.view.JokerPrompt"/>

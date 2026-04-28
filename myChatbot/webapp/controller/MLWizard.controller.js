@@ -1577,6 +1577,10 @@ sap.ui.define([
       }
 
       MessageToast.show("A varázsló visszaállítva.");
+    },
+
+    onBackToDiscoveryLauncher: function() {
+      this.getOwnerComponent().getRouter().navTo("discoveryHome");
     }
   });
 });

@@ -11,7 +11,7 @@ sap.ui.define([
       oRouter.getRoute("jokerPrompt").attachPatternMatched(this._onJokerPromptMatched, this);
       oRouter.getRoute("discoveryHome").attachPatternMatched(this._onDiscoveryRouteMatched, this);
       oRouter.getRoute("discoveryStart").attachPatternMatched(this._onDiscoveryRouteMatched, this);
-      oRouter.getRoute("discoveryBusiness").attachPatternMatched(this._onDiscoveryRouteMatched, this);
+      oRouter.getRoute("discoveryBusiness").attachPatternMatched(this._onDiscoveryClassicRouteMatched, this);
       oRouter.getRoute("discoveryAutoml").attachPatternMatched(this._onDiscoveryRouteMatched, this);
     },
 
@@ -77,6 +77,11 @@ sap.ui.define([
       this._navigateByKey("discovery");
     },
 
+    _onDiscoveryClassicRouteMatched: function() {
+      this.getView().getModel("app").setProperty("/selectedMenuKey", "discovery");
+      this._navigateByKey("discoveryClassic");
+    },
+
     _navigateByKey: function(sKey) {
       var oNav = this.byId("mainNav");
       if (!oNav) {
@@ -87,6 +92,7 @@ sap.ui.define([
         jokers: this.byId("jokersView"),
         flow: this.byId("flowView"),
         discovery: this.byId("discoveryView"),
+        discoveryClassic: this.byId("discoveryClassicView"),
         feed: this.byId("feedView"),
         noah: this.byId("noah2View"),
         jokerPrompt: this.byId("jokerPromptView")

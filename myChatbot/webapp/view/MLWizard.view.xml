@@ -11,11 +11,12 @@
       <VBox class="mlWizardShell sapUiMediumMargin">
 
         <!-- Header -->
-        <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+        <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiSmallMarginBottom">
           <VBox>
             <Title text="ML Tréning Varázsló" level="H2"/>
             <Text text="Általános, domain-független gépi tanulás és AI insight platform" class="sapUiTinyMarginTop mlWizardSubtitle"/>
           </VBox>
+          <Button text="Vissza a csempekhez" icon="sap-icon://nav-back" type="Transparent" press=".onBackToDiscoveryLauncher"/>
         </HBox>
 
         <!-- Error strip -->
