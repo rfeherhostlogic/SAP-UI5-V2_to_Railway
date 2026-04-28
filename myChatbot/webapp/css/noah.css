@@ -294,6 +294,12 @@
   margin-top: 1rem;
 }
 
+.noahToolRow > .sapMFlexItem,
+.noahConversationToolRow > .sapMFlexItem {
+  flex-grow: 1;
+  max-width: 13rem;
+}
+
 .noahActionSwitch {
   position: relative;
   min-height: 10rem;
@@ -377,7 +383,8 @@
 }
 
 .noahToolPill .sapMBtnInner {
-  min-width: 12.5rem;
+  min-width: 11.5rem;
+  width: 100%;
   padding: 0 1.2rem;
 }
 
