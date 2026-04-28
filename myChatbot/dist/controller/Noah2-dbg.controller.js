@@ -572,6 +572,36 @@ sap.ui.define([
       MessageToast.show(bState ? "Uzleti AI bekapcsolva." : "Uzleti AI kikapcsolva.");
     },
 
+    onSelectNoah2ImageMode: function() {
+      this._applyNoah2QuickAction(
+        "Kepgeneralas mod aktiv.",
+        "Kepgeneralas: Ird le pontosan, milyen kepet szeretnel."
+      );
+    },
+
+    onSelectNoah2WebMode: function() {
+      this._applyNoah2QuickAction(
+        "Web kereses mod aktiv.",
+        "Web kereses: Ird le, mire szeretnel friss forrasalapu valaszt kapni."
+      );
+    },
+
+    onSelectNoah2DeepResearchMode: function() {
+      this._applyNoah2QuickAction(
+        "Melykutatas mod aktiv.",
+        "Melykutatas: Ird le a temat es a kivant kutatasi melyseget."
+      );
+    },
+
+    _applyNoah2QuickAction: function(sToast, sDraft) {
+      var oModel = this._getNoah2Model();
+      if (!oModel) {
+        return;
+      }
+      oModel.setProperty("/draftMessage", String(sDraft || ""));
+      MessageToast.show(String(sToast || ""));
+    },
+
     onToggleNoah2Insights: function() {
       var oModel = this.getView().getModel("noah2");
       this._setNoah2InsightState(!oModel.getProperty("/insightsOpen"), Number(oModel.getProperty("/selectedInsightMessageIndex") || -1));

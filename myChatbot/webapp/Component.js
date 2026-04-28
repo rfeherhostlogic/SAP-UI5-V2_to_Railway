@@ -721,7 +721,7 @@ sap.ui.define([
 				promptImproverImprovedPrompt: "",
 				promptImproverAwaitingRun: false,
 				agentEnabled: false,
-				businessAiEnabled: false,
+				businessAiEnabled: true,
 				automationMode: "immediate",
 				automationLabel: "Azonnali",
 				agentBusy: false,

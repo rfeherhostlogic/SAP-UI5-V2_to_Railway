@@ -24,6 +24,7 @@
   flex: 1 1 auto;
   min-height: calc(100vh - 4rem);
   padding: 2rem 1rem;
+  transition: background-color 220ms ease, transform 220ms ease, opacity 220ms ease;
 }
 
 .noahStartTitle {
@@ -81,6 +82,7 @@
   background: rgba(255, 255, 255, 0.8);
   box-shadow: 0 20px 48px rgba(104, 127, 170, 0.12);
   backdrop-filter: blur(12px);
+  transition: background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
 }
 
 .noahMsgList,
@@ -251,6 +253,7 @@
   border: 1px solid rgba(217, 227, 240, 0.95);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.94);
+  transition: background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
 }
 
 .noahBusinessToggleLabel {
@@ -289,6 +292,72 @@
 
 .noahToolRow {
   margin-top: 1rem;
+}
+
+.noahActionSwitch {
+  position: relative;
+  min-height: 10rem;
+}
+
+.noahConversationActionSwitch {
+  min-height: 9.2rem;
+}
+
+.noahActionDeck {
+  transition: opacity 180ms ease, transform 220ms ease, max-height 220ms ease;
+}
+
+.noahActionDeckOff {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateY(0.35rem);
+}
+
+.noahShell[data-business-mode="business-on"] .noahActionDeckOn {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 12rem;
+  pointer-events: auto;
+}
+
+.noahShell[data-business-mode="business-on"] .noahActionDeckOff {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.35rem);
+}
+
+.noahShell[data-business-mode="business-off"] .noahActionDeckOn {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateY(-0.35rem);
+}
+
+.noahShell[data-business-mode="business-off"] .noahActionDeckOff {
+  max-height: 12rem;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.noahShell[data-business-mode="business-off"] .noahStartStage {
+  background: #eff4f9;
+  border-radius: 1.8rem;
+}
+
+.noahShell[data-business-mode="business-off"] .noahChatPanel {
+  background: #eff4f9;
+  border-color: rgba(205, 215, 226, 0.92);
+  box-shadow: 0 18px 36px rgba(148, 163, 184, 0.16);
+}
+
+.noahShell[data-business-mode="business-off"] .noahBusinessToggleWrap {
+  background: #eff4f9;
+  border-color: rgba(205, 215, 226, 0.96);
 }
 
 .noahMenuPill .sapMBtnInner,

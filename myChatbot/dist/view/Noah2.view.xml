@@ -6,6 +6,9 @@
   controllerName="sap.suite.ui.commons.demo.tutorial.controller.Noah2">
   <Page title="Noah" class="sapUiContentPadding noahPage" showHeader="false">
     <HBox class="noahShell" renderType="Bare" wrap="NoWrap">
+      <customData>
+        <core:CustomData key="business-mode" value="{= ${noah2>/businessAiEnabled} ? 'business-on' : 'business-off' }" writeToDom="true"/>
+      </customData>
       <VBox class="noahMain">
         <VBox
           class="noahStartStage"
@@ -79,29 +82,54 @@
                 </HBox>
               </HBox>
 
-              <HBox class="noahMenuRow" alignItems="Center" justifyContent="Center" wrap="Wrap">
-                <Button text="Flows" icon="sap-icon://combine" type="Transparent" class="noahMenuPill" press=".onOpenNoah2FlowMenu"/>
-                <Button text="{noah2>/selectedJokerLabel}" icon="sap-icon://favorite" type="Transparent" class="noahMenuPill" press=".onOpenNoah2JokerMenu"/>
-                <Button text="Automatizacio" icon="sap-icon://workflow-tasks" type="Transparent" class="noahMenuPill" press=".onOpenNoah2AutomationMenu"/>
-              </HBox>
+              <VBox class="noahActionSwitch">
+                <VBox class="noahActionDeck noahActionDeckOn">
+                  <HBox class="noahMenuRow" alignItems="Center" justifyContent="Center" wrap="Wrap">
+                    <Button text="Flows" icon="sap-icon://combine" type="Transparent" class="noahMenuPill" press=".onOpenNoah2FlowMenu"/>
+                    <Button text="{noah2>/selectedJokerLabel}" icon="sap-icon://favorite" type="Transparent" class="noahMenuPill" press=".onOpenNoah2JokerMenu"/>
+                    <Button text="Automatizacio" icon="sap-icon://workflow-tasks" type="Transparent" class="noahMenuPill" press=".onOpenNoah2AutomationMenu"/>
+                  </HBox>
 
-              <HBox class="noahToolRow" alignItems="Center" justifyContent="Center" wrap="Wrap">
-                <Button
-                  text="Prompt javito"
-                  icon="sap-icon://edit"
-                  press=".onImprovePrompt"
-                  type="Transparent"
-                  class="noahToolPill"
-                  enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"
-                  busy="{noah2>/promptImproverBusy}"/>
-                <ToggleButton
-                  text="Noah agent"
-                  icon="sap-icon://activate"
-                  pressed="{noah2>/agentEnabled}"
-                  press=".onNoah2AgentToggle"
-                  type="{= ${noah2>/agentEnabled} ? 'Emphasized' : 'Transparent' }"
-                  class="noahToolToggle noahToolPill"/>
-              </HBox>
+                  <HBox class="noahToolRow" alignItems="Center" justifyContent="Center" wrap="Wrap">
+                    <Button
+                      text="Prompt javito"
+                      icon="sap-icon://edit"
+                      press=".onImprovePrompt"
+                      type="Transparent"
+                      class="noahToolPill"
+                      enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"
+                      busy="{noah2>/promptImproverBusy}"/>
+                    <ToggleButton
+                      text="Noah agent"
+                      icon="sap-icon://activate"
+                      pressed="{noah2>/agentEnabled}"
+                      press=".onNoah2AgentToggle"
+                      type="{= ${noah2>/agentEnabled} ? 'Emphasized' : 'Transparent' }"
+                      class="noahToolToggle noahToolPill"/>
+                  </HBox>
+                </VBox>
+
+                <HBox class="noahToolRow noahActionDeck noahActionDeckOff" alignItems="Center" justifyContent="Center" wrap="Wrap">
+                  <Button text="Kepgeneralas" icon="sap-icon://background" type="Transparent" class="noahToolPill" press=".onSelectNoah2ImageMode"/>
+                  <Button text="Web kereses" icon="sap-icon://world" type="Transparent" class="noahToolPill" press=".onSelectNoah2WebMode"/>
+                  <Button text="Melykutatas" icon="sap-icon://search" type="Transparent" class="noahToolPill" press=".onSelectNoah2DeepResearchMode"/>
+                  <Button
+                    text="Prompt javito"
+                    icon="sap-icon://edit"
+                    press=".onImprovePrompt"
+                    type="Transparent"
+                    class="noahToolPill"
+                    enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"
+                    busy="{noah2>/promptImproverBusy}"/>
+                  <ToggleButton
+                    text="Agent mod"
+                    icon="sap-icon://activate"
+                    pressed="{noah2>/agentEnabled}"
+                    press=".onNoah2AgentToggle"
+                    type="{= ${noah2>/agentEnabled} ? 'Emphasized' : 'Transparent' }"
+                    class="noahToolToggle noahToolPill"/>
+                </HBox>
+              </VBox>
             </VBox>
           </HBox>
         </VBox>
@@ -164,29 +192,54 @@
             press=".onNoah2ScrollToBottom"
             class="noahScrollToBottom"/>
 
-          <HBox class="noahMenuRow noahConversationMenuRow" alignItems="Center" justifyContent="Center" wrap="Wrap">
-            <Button text="Flows" icon="sap-icon://combine" type="Transparent" class="noahMenuPill" press=".onOpenNoah2FlowMenu"/>
-            <Button text="{noah2>/selectedJokerLabel}" icon="sap-icon://favorite" type="Transparent" class="noahMenuPill" press=".onOpenNoah2JokerMenu"/>
-            <Button text="Automatizacio" icon="sap-icon://workflow-tasks" type="Transparent" class="noahMenuPill" press=".onOpenNoah2AutomationMenu"/>
-          </HBox>
+          <VBox class="noahActionSwitch noahConversationActionSwitch">
+            <VBox class="noahActionDeck noahActionDeckOn">
+              <HBox class="noahMenuRow noahConversationMenuRow" alignItems="Center" justifyContent="Center" wrap="Wrap">
+                <Button text="Flows" icon="sap-icon://combine" type="Transparent" class="noahMenuPill" press=".onOpenNoah2FlowMenu"/>
+                <Button text="{noah2>/selectedJokerLabel}" icon="sap-icon://favorite" type="Transparent" class="noahMenuPill" press=".onOpenNoah2JokerMenu"/>
+                <Button text="Automatizacio" icon="sap-icon://workflow-tasks" type="Transparent" class="noahMenuPill" press=".onOpenNoah2AutomationMenu"/>
+              </HBox>
 
-          <HBox class="noahToolRow noahConversationToolRow" alignItems="Center" justifyContent="Center" wrap="Wrap">
-            <Button
-              text="Prompt javito"
-              icon="sap-icon://edit"
-              press=".onImprovePrompt"
-              type="Transparent"
-              class="noahToolPill"
-              enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"
-              busy="{noah2>/promptImproverBusy}"/>
-            <ToggleButton
-              text="Noah agent"
-              icon="sap-icon://activate"
-              pressed="{noah2>/agentEnabled}"
-              press=".onNoah2AgentToggle"
-              type="{= ${noah2>/agentEnabled} ? 'Emphasized' : 'Transparent' }"
-              class="noahToolToggle noahToolPill"/>
-          </HBox>
+              <HBox class="noahToolRow noahConversationToolRow" alignItems="Center" justifyContent="Center" wrap="Wrap">
+                <Button
+                  text="Prompt javito"
+                  icon="sap-icon://edit"
+                  press=".onImprovePrompt"
+                  type="Transparent"
+                  class="noahToolPill"
+                  enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"
+                  busy="{noah2>/promptImproverBusy}"/>
+                <ToggleButton
+                  text="Noah agent"
+                  icon="sap-icon://activate"
+                  pressed="{noah2>/agentEnabled}"
+                  press=".onNoah2AgentToggle"
+                  type="{= ${noah2>/agentEnabled} ? 'Emphasized' : 'Transparent' }"
+                  class="noahToolToggle noahToolPill"/>
+              </HBox>
+            </VBox>
+
+            <HBox class="noahToolRow noahConversationToolRow noahActionDeck noahActionDeckOff" alignItems="Center" justifyContent="Center" wrap="Wrap">
+              <Button text="Kepgeneralas" icon="sap-icon://background" type="Transparent" class="noahToolPill" press=".onSelectNoah2ImageMode"/>
+              <Button text="Web kereses" icon="sap-icon://world" type="Transparent" class="noahToolPill" press=".onSelectNoah2WebMode"/>
+              <Button text="Melykutatas" icon="sap-icon://search" type="Transparent" class="noahToolPill" press=".onSelectNoah2DeepResearchMode"/>
+              <Button
+                text="Prompt javito"
+                icon="sap-icon://edit"
+                press=".onImprovePrompt"
+                type="Transparent"
+                class="noahToolPill"
+                enabled="{= ${noah2>/state} !== 'ROUTING' &amp;&amp; ${noah2>/state} !== 'RUNNING_CARD' &amp;&amp; ${noah2>/state} !== 'CHATTING' &amp;&amp; !${noah2>/promptImproverBusy} }"
+                busy="{noah2>/promptImproverBusy}"/>
+              <ToggleButton
+                text="Agent mod"
+                icon="sap-icon://activate"
+                pressed="{noah2>/agentEnabled}"
+                press=".onNoah2AgentToggle"
+                type="{= ${noah2>/agentEnabled} ? 'Emphasized' : 'Transparent' }"
+                class="noahToolToggle noahToolPill"/>
+            </HBox>
+          </VBox>
 
           <VBox class="noahComposer noahComposerSticky">
             <List
