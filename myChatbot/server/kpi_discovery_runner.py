@@ -3,6 +3,7 @@ import argparse
 import json
 import sqlite3
 from datetime import datetime
+from statistics import median
 
 
 def quote_ident(name):
@@ -46,7 +47,16 @@ def is_numeric(col):
     name = str(col.get("name") or "").lower()
     if "INT" in col_type or "REAL" in col_type or "NUM" in col_type or "DEC" in col_type or "DOUBLE" in col_type or "FLOAT" in col_type:
         return True
-    return any(token in name for token in ["amount", "price", "revenue", "qty", "quantity", "total", "value", "cost", "margin"])
+    return any(token in name for token in ["amount", "price", "revenue", "qty", "quantity", "total", "value", "margin"])
+
+
+def is_business_measure(col):
+    name = str(col.get("name") or "").lower()
+    if col.get("pk") or name == "id" or name.endswith("id") or name.endswith("_id"):
+        return False
+    if name in ["year", "fiscalyear", "period", "periodstart", "costelement"]:
+        return False
+    return is_numeric(col)
 
 
 def is_date(col):
@@ -87,6 +97,17 @@ def add_suggestion(items, item):
         items.append(item)
 
 
+def make_suggestion(kpi_id, title, description, why, comparison, chart_type="bar"):
+    return {
+        "id": kpi_id,
+        "title": title,
+        "description": description,
+        "why": why,
+        "comparison": comparison,
+        "chartType": chart_type
+    }
+
+
 def discover_kpis(tables):
     suggestions = []
     sales = find_table(tables, "SalesOrder")
@@ -95,73 +116,80 @@ def discover_kpis(tables):
     if sales:
         cols = has_columns(sales, ["SalesOrderId", "NetAmount"])
         if cols:
-            add_suggestion(suggestions, {
-                "id": "sales_total_revenue",
-                "title": "Teljes arbevetel",
-                "description": "A SalesOrder tabla NetAmount osszege, teljes rendelesei volumennel.",
-                "why": "Alap penzugyi teljesitmeny KPI, azonnal mutatja a teljes forgalmat.",
-                "chartType": "bar"
-            })
+            add_suggestion(suggestions, make_suggestion(
+                "sales_revenue_vs_best_month",
+                "Arbevetel a legjobb honaphoz kepest",
+                "Aktualis havi NetAmount osszeg osszevetese a historikus legjobb honappal.",
+                "Nem csak az osszforgalmat mutatja, hanem azt is, mennyire kozelitjuk a sajat maximumot.",
+                "Legjobb korabbi havi ertek",
+                "bar"
+            ))
 
         cols = has_columns(sales, ["OrderDate", "NetAmount"])
         if cols:
-            add_suggestion(suggestions, {
-                "id": "sales_monthly_revenue",
-                "title": "Havi arbevetel trend",
-                "description": "NetAmount havi bontasban, rendeles darabszammal.",
-                "why": "Segit latni a szezonalitast, visszaesest vagy novekedest.",
-                "chartType": "line"
-            })
+            add_suggestion(suggestions, make_suggestion(
+                "sales_revenue_vs_previous_month",
+                "Arbevetel elozo honaphoz kepest",
+                "Legutolso lezart/adott honap arbevetele az elozo honappal osszevetve.",
+                "KPI-kent a trendirany a lenyeg: javult vagy romlott az elozo idoszakhoz kepest.",
+                "Elozo honap",
+                "line"
+            ))
 
         cols = has_columns(sales, ["CustomerId", "NetAmount"])
         if cols:
-            add_suggestion(suggestions, {
-                "id": "sales_top_customers",
-                "title": "Top ugyfelek arbevetel szerint",
-                "description": "Legnagyobb forgalmu ugyfelek, Customer tablaval osszekotve ha elerheto.",
-                "why": "Megmutatja a koncentracios kockazatot es a legfontosabb ugyfeleket.",
-                "chartType": "bar"
-            })
+            add_suggestion(suggestions, make_suggestion(
+                "sales_top_customer_vs_median",
+                "Top ugyfel a median ugyfelhez kepest",
+                "A legnagyobb ugyfel forgalma osszevetve a median ugyfelforgalommal.",
+                "Megmutatja a koncentracios kockazatot: mennyire huzza egy ugyfel a teljesitmenyt.",
+                "Median ugyfelforgalom",
+                "bar"
+            ))
 
-            add_suggestion(suggestions, {
-                "id": "sales_avg_order_value",
-                "title": "Atlagos rendeleseertek",
-                "description": "NetAmount atlag es rendelesei darabszam.",
-                "why": "Gyors kepet ad a kosarertekrol es pricing hatasokrol.",
-                "chartType": "bar"
-            })
+            add_suggestion(suggestions, make_suggestion(
+                "sales_avg_order_vs_median_order",
+                "Atlagos rendeles a medianhoz kepest",
+                "Atlagos NetAmount osszevetese a rendelesek median ertekevel.",
+                "A kulonbseg jelzi, hogy nehany nagy rendeles torzitja-e az atlagot.",
+                "Median rendelesertek",
+                "bar"
+            ))
 
     if customer:
         segment_cols = has_columns(customer, ["Segment", "CustomerId"])
         if segment_cols:
-            add_suggestion(suggestions, {
-                "id": "customer_segment_count",
-                "title": "Ugyfelek szegmens szerint",
-                "description": "Customer rekordok megoszlasa Segment szerint.",
-                "why": "Lathatova teszi az ugyfelbazis szerkezetet.",
-                "chartType": "bar"
-            })
+            add_suggestion(suggestions, make_suggestion(
+                "customer_largest_segment_vs_median",
+                "Legnagyobb szegmens a medianhoz kepest",
+                "A legnagyobb ugyfelszegmens merete osszevetve a szegmensek median meretevel.",
+                "Segit latni, hogy kiegyensulyozott vagy egyetlen szegmensre nehezedik az ugyfelbazis.",
+                "Median szegmensmeret",
+                "bar"
+            ))
 
     for table in tables:
-        numeric_cols = [c for c in table["columns"] if is_numeric(c) and not c.get("pk")]
+        numeric_cols = [c for c in table["columns"] if is_business_measure(c)]
         date_cols = [c for c in table["columns"] if is_date(c)]
         if numeric_cols:
             col = numeric_cols[0]["name"]
-            add_suggestion(suggestions, {
-                "id": "generic_sum__" + table["name"] + "__" + col,
-                "title": table["name"] + " - " + col + " osszeg",
-                "description": table["name"] + "." + col + " osszesitett erteke.",
-                "why": "Numerikus uzleti mezo, erdemes aggregaltan kovetni.",
-                "chartType": "bar"
-            })
+            add_suggestion(suggestions, make_suggestion(
+                "generic_sum_vs_average_row__" + table["name"] + "__" + col,
+                table["name"] + " - " + col + " osszeg vs atlagos sor",
+                table["name"] + "." + col + " osszesitett erteke az atlagos sorszintu ertekhez viszonyitva.",
+                "Altalanos KPI, ami megmutatja az aggregalt nagysagrendet es a tipikus rekord erteket.",
+                "Atlagos rekord ertek",
+                "bar"
+            ))
         if numeric_cols and date_cols:
-            add_suggestion(suggestions, {
-                "id": "generic_monthly_sum__" + table["name"] + "__" + numeric_cols[0]["name"] + "__" + date_cols[0]["name"],
-                "title": table["name"] + " - havi " + numeric_cols[0]["name"],
-                "description": numeric_cols[0]["name"] + " havi trend " + date_cols[0]["name"] + " alapjan.",
-                "why": "Idosoros KPI, ami trendet es torpontokat mutat.",
-                "chartType": "line"
-            })
+            add_suggestion(suggestions, make_suggestion(
+                "generic_monthly_sum_vs_previous__" + table["name"] + "__" + numeric_cols[0]["name"] + "__" + date_cols[0]["name"],
+                table["name"] + " - havi " + numeric_cols[0]["name"] + " vs elozo idoszak",
+                numeric_cols[0]["name"] + " legutolso havi osszege az elozo idoszakhoz viszonyitva.",
+                "Idosoros KPI, ahol a valtozas iranya es merteke fontosabb, mint a puszta ertek.",
+                "Elozo idoszak",
+                "line"
+            ))
 
     return suggestions[:12]
 
@@ -178,22 +206,60 @@ def metric(label, value, unit=""):
     return {"label": label, "value": value, "unit": unit}
 
 
+def numeric_sql_expr(col):
+    return "CAST(REPLACE(" + quote_ident(col) + ", ',', '.') AS REAL)"
+
+
+def pct_delta(current, reference):
+    ref = float(reference or 0)
+    if abs(ref) < 1e-9:
+        return None
+    return round(((float(current or 0) - ref) / abs(ref)) * 100, 2)
+
+
+def build_comparison(label, current, reference, reference_label, unit="", higher_is_better=True):
+    current = round(float(current or 0), 2)
+    reference = round(float(reference or 0), 2)
+    delta = round(current - reference, 2)
+    delta_pct = pct_delta(current, reference)
+    status = "Neutral"
+    if abs(delta) > 1e-9:
+        is_good = delta > 0 if higher_is_better else delta < 0
+        status = "Good" if is_good else "Warning"
+    return {
+        "label": label,
+        "current": current,
+        "reference": reference,
+        "referenceLabel": reference_label,
+        "delta": delta,
+        "deltaPct": delta_pct,
+        "unit": unit,
+        "status": status
+    }
+
+
+def comparison_summary(cmp):
+    pct = "n/a" if cmp.get("deltaPct") is None else f"{cmp['deltaPct']}%"
+    unit = (" " + cmp.get("unit", "")) if cmp.get("unit") else ""
+    return (
+        f"{cmp['label']}: aktualis {cmp['current']:,.2f}{unit}, "
+        f"viszonyitasi alap ({cmp['referenceLabel']}) {cmp['reference']:,.2f}{unit}, "
+        f"elteres {cmp['delta']:,.2f}{unit} ({pct})."
+    )
+
+
+def comparison_chart(cmp):
+    return [
+        {"label": "Aktualis", "value": cmp["current"]},
+        {"label": cmp["referenceLabel"], "value": cmp["reference"]}
+    ]
+
+
 def run_kpi(conn, tables, kpi_id):
     customer = find_table(tables, "Customer")
     has_customer = customer and has_columns(customer, ["CustomerId", "CustomerName"])
 
-    if kpi_id == "sales_total_revenue":
-        rows = execute_sql(conn, "SELECT ROUND(SUM(NetAmount), 2) AS value, COUNT(*) AS order_count FROM SalesOrder")
-        value = float(rows[0]["value"] or 0) if rows else 0.0
-        count = int(rows[0]["order_count"] or 0) if rows else 0
-        return {
-            "summary": f"Teljes arbevetel: {value:,.2f} EUR, {count} rendeles alapjan.",
-            "metrics": [metric("Arbevetel", round(value, 2), "EUR"), metric("Rendelesek", count)],
-            "chart": [{"label": "Arbevetel", "value": round(value, 2)}],
-            "rows": rows
-        }
-
-    if kpi_id == "sales_monthly_revenue":
+    if kpi_id == "sales_revenue_vs_best_month":
         rows = execute_sql(conn, """
             SELECT substr(OrderDate, 1, 7) AS label,
                    ROUND(SUM(NetAmount), 2) AS value,
@@ -203,15 +269,39 @@ def run_kpi(conn, tables, kpi_id):
             GROUP BY substr(OrderDate, 1, 7)
             ORDER BY label
         """)
-        total = sum(float(r["value"] or 0) for r in rows)
+        current = float(rows[-1]["value"] or 0) if rows else 0.0
+        best = max([float(r["value"] or 0) for r in rows], default=0.0)
+        cmp = build_comparison("Havi arbevetel", current, best, "Legjobb honap", "EUR")
         return {
-            "summary": f"Havi arbevetel trend lefutott. Osszesen {total:,.2f} EUR {len(rows)} idoszakban.",
-            "metrics": [metric("Osszes arbevetel", round(total, 2), "EUR"), metric("Honapok", len(rows))],
+            "summary": comparison_summary(cmp),
+            "comparison": cmp,
+            "metrics": [metric("Aktualis", cmp["current"], "EUR"), metric("Legjobb honap", cmp["reference"], "EUR")],
+            "chart": comparison_chart(cmp),
+            "rows": rows
+        }
+
+    if kpi_id == "sales_revenue_vs_previous_month":
+        rows = execute_sql(conn, """
+            SELECT substr(OrderDate, 1, 7) AS label,
+                   ROUND(SUM(NetAmount), 2) AS value,
+                   COUNT(*) AS order_count
+            FROM SalesOrder
+            WHERE OrderDate IS NOT NULL
+            GROUP BY substr(OrderDate, 1, 7)
+            ORDER BY label
+        """)
+        current = float(rows[-1]["value"] or 0) if rows else 0.0
+        previous = float(rows[-2]["value"] or 0) if len(rows) > 1 else 0.0
+        cmp = build_comparison("Havi arbevetel", current, previous, "Elozo honap", "EUR")
+        return {
+            "summary": comparison_summary(cmp),
+            "comparison": cmp,
+            "metrics": [metric("Aktualis", cmp["current"], "EUR"), metric("Elozo honap", cmp["reference"], "EUR")],
             "chart": [{"label": r["label"], "value": float(r["value"] or 0)} for r in rows],
             "rows": rows
         }
 
-    if kpi_id == "sales_top_customers":
+    if kpi_id == "sales_top_customer_vs_median":
         if has_customer:
             rows = execute_sql(conn, """
                 SELECT c.CustomerName AS label,
@@ -233,26 +323,33 @@ def run_kpi(conn, tables, kpi_id):
                 ORDER BY value DESC
                 LIMIT 10
             """)
-        leader = rows[0]["label"] if rows else "nincs adat"
+        values = [float(r["value"] or 0) for r in rows]
+        current = values[0] if values else 0.0
+        ref = median(values) if values else 0.0
+        cmp = build_comparison("Top ugyfel forgalma", current, ref, "Median ugyfel", "EUR")
         return {
-            "summary": "Top ugyfel arbevetel szerint: " + str(leader) + ".",
-            "metrics": [metric("Top lista elemszam", len(rows))],
-            "chart": [{"label": r["label"], "value": float(r["value"] or 0)} for r in rows],
+            "summary": comparison_summary(cmp),
+            "comparison": cmp,
+            "metrics": [metric("Top ugyfel", cmp["current"], "EUR"), metric("Median ugyfel", cmp["reference"], "EUR")],
+            "chart": comparison_chart(cmp),
             "rows": rows
         }
 
-    if kpi_id == "sales_avg_order_value":
-        rows = execute_sql(conn, "SELECT ROUND(AVG(NetAmount), 2) AS value, COUNT(*) AS order_count FROM SalesOrder")
-        value = float(rows[0]["value"] or 0) if rows else 0.0
-        count = int(rows[0]["order_count"] or 0) if rows else 0
+    if kpi_id == "sales_avg_order_vs_median_order":
+        detail_rows = execute_sql(conn, "SELECT ROUND(NetAmount, 2) AS value FROM SalesOrder ORDER BY value")
+        values = [float(r["value"] or 0) for r in detail_rows]
+        avg_value = sum(values) / len(values) if values else 0.0
+        median_value = median(values) if values else 0.0
+        cmp = build_comparison("Atlagos rendelesertek", avg_value, median_value, "Median rendeles", "EUR")
         return {
-            "summary": f"Atlagos rendeleseertek: {value:,.2f} EUR.",
-            "metrics": [metric("Atlagos rendeles", round(value, 2), "EUR"), metric("Rendelesek", count)],
-            "chart": [{"label": "Atlagos rendeles", "value": round(value, 2)}],
-            "rows": rows
+            "summary": comparison_summary(cmp),
+            "comparison": cmp,
+            "metrics": [metric("Atlag", cmp["current"], "EUR"), metric("Median", cmp["reference"], "EUR")],
+            "chart": comparison_chart(cmp),
+            "rows": detail_rows
         }
 
-    if kpi_id == "customer_segment_count":
+    if kpi_id == "customer_largest_segment_vs_median":
         rows = execute_sql(conn, """
             SELECT COALESCE(Segment, 'Nincs szegmens') AS label,
                    COUNT(CustomerId) AS value
@@ -260,41 +357,52 @@ def run_kpi(conn, tables, kpi_id):
             GROUP BY COALESCE(Segment, 'Nincs szegmens')
             ORDER BY value DESC
         """)
+        values = [float(r["value"] or 0) for r in rows]
+        cmp = build_comparison("Legnagyobb szegmens merete", values[0] if values else 0, median(values) if values else 0, "Median szegmens")
         return {
-            "summary": "Ugyfelszegmens megoszlas kiszamolva.",
-            "metrics": [metric("Szegmensek", len(rows))],
-            "chart": [{"label": r["label"], "value": int(r["value"] or 0)} for r in rows],
+            "summary": comparison_summary(cmp),
+            "comparison": cmp,
+            "metrics": [metric("Legnagyobb", cmp["current"]), metric("Median", cmp["reference"])],
+            "chart": comparison_chart(cmp),
             "rows": rows
         }
 
-    if kpi_id.startswith("generic_sum__"):
+    if kpi_id.startswith("generic_sum_vs_average_row__"):
         _prefix, table, col = kpi_id.split("__", 2)
-        sql = "SELECT ROUND(SUM(" + quote_ident(col) + "), 2) AS value, COUNT(*) AS row_count FROM " + quote_ident(table)
+        expr = numeric_sql_expr(col)
+        sql = "SELECT ROUND(SUM(" + expr + "), 2) AS value, ROUND(AVG(" + expr + "), 2) AS reference, COUNT(*) AS row_count FROM " + quote_ident(table)
         rows = execute_sql(conn, sql)
         value = float(rows[0]["value"] or 0) if rows else 0.0
+        reference = float(rows[0]["reference"] or 0) if rows else 0.0
+        cmp = build_comparison(table + "." + col + " osszeg", value, reference, "Atlagos rekord")
         return {
-            "summary": f"{table}.{col} osszeg: {value:,.2f}.",
-            "metrics": [metric("Osszeg", round(value, 2)), metric("Sorok", int(rows[0]["row_count"] or 0) if rows else 0)],
-            "chart": [{"label": col, "value": round(value, 2)}],
+            "summary": comparison_summary(cmp),
+            "comparison": cmp,
+            "metrics": [metric("Osszeg", cmp["current"]), metric("Atlagos rekord", cmp["reference"])],
+            "chart": comparison_chart(cmp),
             "rows": rows
         }
 
-    if kpi_id.startswith("generic_monthly_sum__"):
+    if kpi_id.startswith("generic_monthly_sum_vs_previous__"):
         _prefix, table, rest = kpi_id.split("__", 2)
         col, date_col = rest.split("__", 1)
+        expr = numeric_sql_expr(col)
         sql = (
             "SELECT substr(" + quote_ident(date_col) + ", 1, 7) AS label, "
-            "ROUND(SUM(" + quote_ident(col) + "), 2) AS value, COUNT(*) AS row_count "
+            "ROUND(SUM(" + expr + "), 2) AS value, COUNT(*) AS row_count "
             "FROM " + quote_ident(table) + " "
             "WHERE " + quote_ident(date_col) + " IS NOT NULL "
             "GROUP BY substr(" + quote_ident(date_col) + ", 1, 7) "
             "ORDER BY label"
         )
         rows = execute_sql(conn, sql)
-        total = sum(float(r["value"] or 0) for r in rows)
+        current = float(rows[-1]["value"] or 0) if rows else 0.0
+        previous = float(rows[-2]["value"] or 0) if len(rows) > 1 else 0.0
+        cmp = build_comparison(table + "." + col, current, previous, "Elozo idoszak")
         return {
-            "summary": f"{table}.{col} havi trend lefutott. Osszesen {total:,.2f}.",
-            "metrics": [metric("Osszeg", round(total, 2)), metric("Idoszakok", len(rows))],
+            "summary": comparison_summary(cmp),
+            "comparison": cmp,
+            "metrics": [metric("Aktualis", cmp["current"]), metric("Elozo idoszak", cmp["reference"])],
             "chart": [{"label": r["label"], "value": float(r["value"] or 0)} for r in rows],
             "rows": rows
         }

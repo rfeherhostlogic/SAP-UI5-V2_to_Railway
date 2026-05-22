@@ -414,6 +414,7 @@ sap.ui.define([
 				kpiDiscoverySuggestions: [],
 				kpiDiscoverySelectedId: "",
 				kpiDiscoverySummary: "",
+				kpiDiscoveryComparison: null,
 				kpiDiscoveryMetrics: [],
 				kpiDiscoveryChartRows: [],
 				kpiDiscoveryRows: [],

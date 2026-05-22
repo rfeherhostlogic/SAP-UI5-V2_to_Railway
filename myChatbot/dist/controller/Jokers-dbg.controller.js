@@ -114,6 +114,7 @@ sap.ui.define([
         oJokersModel.setProperty("/kpiDiscoverySuggestions", []);
         oJokersModel.setProperty("/kpiDiscoverySelectedId", "");
         oJokersModel.setProperty("/kpiDiscoverySummary", "");
+        oJokersModel.setProperty("/kpiDiscoveryComparison", null);
         oJokersModel.setProperty("/kpiDiscoveryMetrics", []);
         oJokersModel.setProperty("/kpiDiscoveryChartRows", []);
         oJokersModel.setProperty("/kpiDiscoveryRows", []);

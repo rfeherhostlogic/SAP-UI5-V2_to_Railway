@@ -368,6 +368,7 @@ sap.ui.define([
       oModel.setProperty("/kpiDiscoveryBusy", true);
       oModel.setProperty("/kpiDiscoveryError", "");
       oModel.setProperty("/kpiDiscoverySummary", "");
+      oModel.setProperty("/kpiDiscoveryComparison", null);
       oModel.setProperty("/kpiDiscoveryMetrics", []);
       oModel.setProperty("/kpiDiscoveryChartRows", []);
       oModel.setProperty("/kpiDiscoveryRows", []);
@@ -410,6 +411,7 @@ sap.ui.define([
       oModel.setProperty("/kpiDiscoveryBusy", true);
       oModel.setProperty("/kpiDiscoveryError", "");
       oModel.setProperty("/kpiDiscoverySummary", "");
+      oModel.setProperty("/kpiDiscoveryComparison", null);
       oModel.setProperty("/kpiDiscoveryMetrics", []);
       oModel.setProperty("/kpiDiscoveryChartRows", []);
       oModel.setProperty("/kpiDiscoveryRows", []);
@@ -421,6 +423,7 @@ sap.ui.define([
         var oRun = oResp && oResp.run ? oResp.run : {};
         var aChartRows = Array.isArray(oRun.chart) ? oRun.chart : [];
         oModel.setProperty("/kpiDiscoverySummary", String(oRun.summary || ""));
+        oModel.setProperty("/kpiDiscoveryComparison", oRun.comparison || null);
         oModel.setProperty("/kpiDiscoveryMetrics", Array.isArray(oRun.metrics) ? oRun.metrics : []);
         oModel.setProperty("/kpiDiscoveryChartRows", aChartRows);
         oModel.setProperty("/kpiDiscoveryRows", Array.isArray(oRun.rows) ? oRun.rows : []);
@@ -1120,6 +1123,7 @@ sap.ui.define([
       oModel.setProperty("/kpiDiscoverySuggestions", []);
       oModel.setProperty("/kpiDiscoverySelectedId", "");
       oModel.setProperty("/kpiDiscoverySummary", "");
+      oModel.setProperty("/kpiDiscoveryComparison", null);
       oModel.setProperty("/kpiDiscoveryMetrics", []);
       oModel.setProperty("/kpiDiscoveryChartRows", []);
       oModel.setProperty("/kpiDiscoveryRows", []);
