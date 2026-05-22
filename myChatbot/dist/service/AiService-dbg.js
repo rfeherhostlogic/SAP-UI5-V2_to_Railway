@@ -377,6 +377,38 @@
     });
   }
 
+  function getKpiDiscoverySuggestions() {
+    return fetch("/api/jokers/kpi-discovery/suggestions", {
+      method: "GET"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function runKpiDiscovery(mPayload) {
+    return fetch("/api/jokers/kpi-discovery/run", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        kpiId: mPayload.kpiId || ""
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function uploadDummy5Pdf(oFile) {
     var oFormData = new FormData();
     oFormData.append("file", oFile);
@@ -1238,6 +1270,8 @@
     runDummy14Analysis: runDummy14Analysis,
     getDummy14Status: getDummy14Status,
     getDummy4SchemaHint: getDummy4SchemaHint,
+    getKpiDiscoverySuggestions: getKpiDiscoverySuggestions,
+    runKpiDiscovery: runKpiDiscovery,
     uploadDummy5Pdf: uploadDummy5Pdf,
     summarizeDummy5: summarizeDummy5,
     askDummy5: askDummy5,

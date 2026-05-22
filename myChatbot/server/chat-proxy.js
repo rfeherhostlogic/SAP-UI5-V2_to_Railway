@@ -51,6 +51,9 @@ const DUMMY13_RUNNER_PY = path.resolve(
 const DUMMY14_RUNNER_PY = path.resolve(
   process.env.DUMMY14_RUNNER_PY || path.join(__dirname, "dummy14_plan_actual_runner.py")
 );
+const KPI_DISCOVERY_RUNNER_PY = path.resolve(
+  process.env.KPI_DISCOVERY_RUNNER_PY || path.join(__dirname, "kpi_discovery_runner.py")
+);
 const DUMMY12_PROMPT_PATH = path.resolve(
   process.env.DUMMY12_PROMPT_PATH || path.join(__dirname, "competition_analysis_prompt.txt")
 );
@@ -4802,6 +4805,49 @@ function buildRfmSummaryText(rfmResult) {
   return "RFM szegmentacio lefutott. " + (parts.length > 0 ? parts.join(", ") : "Nincs szegmens adat.");
 }
 
+function runKpiDiscoveryPython(mode, kpiId) {
+  return new Promise(function(resolve, reject) {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kpi-discovery-"));
+    const outputPath = path.join(tempDir, "kpi.json");
+    const pyExec = process.env.PYTHON_BIN || (process.platform === "win32" ? "python" : "python3");
+    const args = [
+      KPI_DISCOVERY_RUNNER_PY,
+      "--db-path",
+      DISCOVERY_DB_PATH,
+      "--output",
+      outputPath,
+      "--mode",
+      mode || "discover"
+    ];
+    if (mode === "run") {
+      args.push("--kpi-id", String(kpiId || ""));
+    }
+    const child = spawn(pyExec, args);
+    let stderr = "";
+
+    child.stderr.on("data", function(chunk) {
+      stderr += String(chunk || "");
+    });
+    child.on("error", function(err) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      reject(err);
+    });
+    child.on("close", function(code) {
+      try {
+        if (Number(code) !== 0) {
+          throw new Error(stderr.trim() || ("KPI discovery python hiba (exit: " + code + ")"));
+        }
+        const raw = fs.readFileSync(outputPath, "utf8");
+        resolve(JSON.parse(raw));
+      } catch (err) {
+        reject(err);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+  });
+}
+
 async function computeRfmTransitions(scheduleId, rows) {
   const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
   try {
@@ -6679,6 +6725,37 @@ app.get("/api/jokers/dummy4/schema-hint", async function(_req, res) {
   } catch (err) {
     res.status(500).json({
       error: "Dummy4 schema hint lekeresi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.get("/api/jokers/kpi-discovery/suggestions", async function(_req, res) {
+  try {
+    await ensureSeedData();
+    const result = await runKpiDiscoveryPython("discover");
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      error: "KPI felfedezes hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/kpi-discovery/run", async function(req, res) {
+  try {
+    await ensureSeedData();
+    const kpiId = String(req.body && req.body.kpiId ? req.body.kpiId : "").trim();
+    if (!kpiId) {
+      res.status(400).json({ error: "kpiId kotelezo." });
+      return;
+    }
+    const result = await runKpiDiscoveryPython("run", kpiId);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      error: "KPI futtatas hiba",
       details: err && err.message ? err.message : String(err)
     });
   }

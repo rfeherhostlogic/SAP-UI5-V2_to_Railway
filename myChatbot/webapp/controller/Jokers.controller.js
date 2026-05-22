@@ -108,6 +108,15 @@ sap.ui.define([
         oJokersModel.setProperty("/dummy10Summary", "");
         oJokersModel.setProperty("/dummy10Rows", []);
         oJokersModel.setProperty("/dummy10SegmentItems", []);
+      } else if (oJoker.id === "kpi-discovery") {
+        oJokersModel.setProperty("/kpiDiscoveryError", "");
+        oJokersModel.setProperty("/kpiDiscoverySchemaSummary", "");
+        oJokersModel.setProperty("/kpiDiscoverySuggestions", []);
+        oJokersModel.setProperty("/kpiDiscoverySelectedId", "");
+        oJokersModel.setProperty("/kpiDiscoverySummary", "");
+        oJokersModel.setProperty("/kpiDiscoveryMetrics", []);
+        oJokersModel.setProperty("/kpiDiscoveryChartRows", []);
+        oJokersModel.setProperty("/kpiDiscoveryRows", []);
       }
 
       this.getOwnerComponent().getRouter().navTo("jokerPrompt", {

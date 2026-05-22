@@ -13,7 +13,10 @@ sap.ui.define([
   "sap/viz/ui5/data/FlattenedDataset",
   "sap/viz/ui5/data/DimensionDefinition",
   "sap/viz/ui5/data/MeasureDefinition",
-  "sap/viz/ui5/controls/common/feeds/FeedItem"
+  "sap/viz/ui5/controls/common/feeds/FeedItem",
+  "sap/m/Panel",
+  "sap/m/VBox",
+  "sap/m/ObjectStatus"
 ], function(
   Controller,
   MessageToast,
@@ -29,7 +32,10 @@ sap.ui.define([
   FlattenedDataset,
   DimensionDefinition,
   MeasureDefinition,
-  FeedItem
+  FeedItem,
+  Panel,
+  VBox,
+  ObjectStatus
 ) {
   "use strict";
 
@@ -354,6 +360,77 @@ sap.ui.define([
         MessageToast.show(oError && oError.message ? oError.message : "Dummy10 hiba tortent.");
       } finally {
         oModel.setProperty("/generating", false);
+      }
+    },
+
+    onDiscoverKpis: async function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/kpiDiscoveryBusy", true);
+      oModel.setProperty("/kpiDiscoveryError", "");
+      oModel.setProperty("/kpiDiscoverySummary", "");
+      oModel.setProperty("/kpiDiscoveryMetrics", []);
+      oModel.setProperty("/kpiDiscoveryChartRows", []);
+      oModel.setProperty("/kpiDiscoveryRows", []);
+      this._resetKpiDiscoveryChart();
+      this._rebindKpiDiscoveryTable();
+
+      try {
+        var oResp = await AiService.getKpiDiscoverySuggestions();
+        var aSuggestions = Array.isArray(oResp && oResp.suggestions) ? oResp.suggestions : [];
+        oModel.setProperty("/kpiDiscoverySchemaSummary", String(oResp && oResp.schemaSummary ? oResp.schemaSummary : ""));
+        oModel.setProperty("/kpiDiscoverySuggestions", aSuggestions);
+        oModel.setProperty("/kpiDiscoverySelectedId", aSuggestions.length ? String(aSuggestions[0].id || "") : "");
+        MessageToast.show(aSuggestions.length ? "KPI javaslatok elkeszultek." : "Nem talaltam KPI javaslatot.");
+      } catch (oError) {
+        oModel.setProperty("/kpiDiscoveryError", oError && oError.message ? oError.message : "KPI felfedezesi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "KPI felfedezesi hiba.");
+      } finally {
+        oModel.setProperty("/kpiDiscoveryBusy", false);
+      }
+    },
+
+    onSelectKpiSuggestion: function(oEvent) {
+      var oContext = oEvent.getSource().getBindingContext("jokers");
+      var oModel = this.getView().getModel("jokers");
+      if (!oContext) {
+        return;
+      }
+      oModel.setProperty("/kpiDiscoverySelectedId", String(oContext.getObject().id || ""));
+    },
+
+    onRunSelectedKpi: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var sKpiId = String(oModel.getProperty("/kpiDiscoverySelectedId") || "").trim();
+
+      if (!sKpiId) {
+        MessageToast.show("Valassz KPI-t a listabol.");
+        return;
+      }
+
+      oModel.setProperty("/kpiDiscoveryBusy", true);
+      oModel.setProperty("/kpiDiscoveryError", "");
+      oModel.setProperty("/kpiDiscoverySummary", "");
+      oModel.setProperty("/kpiDiscoveryMetrics", []);
+      oModel.setProperty("/kpiDiscoveryChartRows", []);
+      oModel.setProperty("/kpiDiscoveryRows", []);
+      this._resetKpiDiscoveryChart();
+      this._rebindKpiDiscoveryTable();
+
+      try {
+        var oResp = await AiService.runKpiDiscovery({ kpiId: sKpiId });
+        var oRun = oResp && oResp.run ? oResp.run : {};
+        var aChartRows = Array.isArray(oRun.chart) ? oRun.chart : [];
+        oModel.setProperty("/kpiDiscoverySummary", String(oRun.summary || ""));
+        oModel.setProperty("/kpiDiscoveryMetrics", Array.isArray(oRun.metrics) ? oRun.metrics : []);
+        oModel.setProperty("/kpiDiscoveryChartRows", aChartRows);
+        oModel.setProperty("/kpiDiscoveryRows", Array.isArray(oRun.rows) ? oRun.rows : []);
+        this._renderKpiDiscoveryChart(aChartRows);
+        this._rebindKpiDiscoveryTable();
+      } catch (oError) {
+        oModel.setProperty("/kpiDiscoveryError", oError && oError.message ? oError.message : "KPI futtatasi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "KPI futtatasi hiba.");
+      } finally {
+        oModel.setProperty("/kpiDiscoveryBusy", false);
       }
     },
 
@@ -924,6 +1001,7 @@ sap.ui.define([
       this._rebindDummy9PreviewTable();
       this._rebindRpt1PreviewTable();
       this._rebindDummy10PreviewTable();
+      this._rebindKpiDiscoveryTable();
       this._rebindDummy13PreviewTable("dummy13PlanPreviewTable", "/dummy13PlanPreviewRows");
       this._rebindDummy13PreviewTable("dummy13ActualPreviewTable", "/dummy13ActualPreviewRows");
       this._rebindSmartSegResultTable();
@@ -965,6 +1043,9 @@ sap.ui.define([
           this._resetDummy10State();
           this._rebindDummy10PreviewTable();
           this._loadJokerSchedule("dummy-10", "dummy10");
+        } else if (oSelected.id === "kpi-discovery") {
+          this._resetKpiDiscoveryState();
+          this._rebindKpiDiscoveryTable();
         } else if (oSelected.id === "dummy-11") {
           this._resetDummy11State();
           this._loadJokerSchedule("dummy-11", "dummy11");
@@ -1029,6 +1110,21 @@ sap.ui.define([
       oModel.setProperty("/dummy10Rows", []);
       oModel.setProperty("/dummy10SegmentItems", []);
       this._rebindDummy10PreviewTable();
+    },
+
+    _resetKpiDiscoveryState: function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/kpiDiscoveryBusy", false);
+      oModel.setProperty("/kpiDiscoveryError", "");
+      oModel.setProperty("/kpiDiscoverySchemaSummary", "");
+      oModel.setProperty("/kpiDiscoverySuggestions", []);
+      oModel.setProperty("/kpiDiscoverySelectedId", "");
+      oModel.setProperty("/kpiDiscoverySummary", "");
+      oModel.setProperty("/kpiDiscoveryMetrics", []);
+      oModel.setProperty("/kpiDiscoveryChartRows", []);
+      oModel.setProperty("/kpiDiscoveryRows", []);
+      this._resetKpiDiscoveryChart();
+      this._rebindKpiDiscoveryTable();
     },
 
     _loadJokerSchedule: async function(sJokerId, sPrefix) {
@@ -2957,6 +3053,76 @@ sap.ui.define([
       oHost.removeAllItems();
     },
 
+    _renderKpiDiscoveryChart: function(aRows) {
+      var oHost = this.byId("kpiDiscoveryChartHost");
+      this._resetKpiDiscoveryChart();
+
+      if (!oHost || !(aRows || []).length) {
+        return;
+      }
+
+      var aChartRows = (aRows || []).map(function(oRow) {
+        return {
+          label: String(oRow && oRow.label ? oRow.label : ""),
+          value: Number(oRow && oRow.value ? oRow.value : 0)
+        };
+      });
+
+      var oDataset = new FlattenedDataset({
+        dimensions: [
+          new DimensionDefinition({
+            name: "KPI",
+            value: "{label}"
+          })
+        ],
+        measures: [
+          new MeasureDefinition({
+            name: "Ertek",
+            value: "{value}"
+          })
+        ],
+        data: {
+          path: "/rows"
+        }
+      });
+
+      var oViz = new VizFrame({
+        width: "100%",
+        height: "340px",
+        vizType: aChartRows.length > 1 ? "column" : "bar",
+        dataset: oDataset
+      });
+
+      oViz.setModel(new JSONModel({ rows: aChartRows }));
+      oViz.addFeed(new FeedItem({
+        uid: "categoryAxis",
+        type: "Dimension",
+        values: ["KPI"]
+      }));
+      oViz.addFeed(new FeedItem({
+        uid: "valueAxis",
+        type: "Measure",
+        values: ["Ertek"]
+      }));
+      oViz.setVizProperties({
+        title: { visible: false },
+        legend: { visible: false },
+        plotArea: {
+          dataLabel: { visible: true }
+        }
+      });
+
+      oHost.addItem(oViz);
+    },
+
+    _resetKpiDiscoveryChart: function() {
+      var oHost = this.byId("kpiDiscoveryChartHost");
+      if (!oHost) {
+        return;
+      }
+      oHost.removeAllItems();
+    },
+
     _formatCurrencyFt: function(vValue) {
       var nValue = this._toNumberOrNull(vValue);
       if (nValue == null) {
@@ -3161,6 +3327,45 @@ sap.ui.define([
       });
     },
 
+    _rebindKpiDiscoveryTable: function() {
+      var oTable = this.byId("kpiDiscoveryResultTable");
+      var oModel = this.getView().getModel("jokers");
+      var aRows = oModel.getProperty("/kpiDiscoveryRows") || [];
+      var aColumns = this._extractDummy4Columns(aRows);
+
+      if (!oTable) {
+        return;
+      }
+
+      oTable.unbindItems();
+      oTable.removeAllColumns();
+
+      if (aColumns.length === 0) {
+        return;
+      }
+
+      aColumns.forEach(function(sColName) {
+        oTable.addColumn(new Column({
+          header: new Text({ text: sColName })
+        }));
+      });
+
+      var aCells = aColumns.map(function(sColName) {
+        return new Text({
+          text: "{jokers>" + sColName + "}",
+          wrapping: true
+        });
+      });
+
+      oTable.bindItems({
+        path: "jokers>/kpiDiscoveryRows",
+        template: new ColumnListItem({
+          cells: aCells
+        }),
+        templateShareable: false
+      });
+    },
+
     _rebindDummy13PreviewTable: function(sTableId, sRowsPath) {
       var oTable = this.byId(sTableId);
       var oModel = this.getView().getModel("jokers");
@@ -3256,21 +3461,21 @@ sap.ui.define([
       }
 
       aItems.slice(0, 8).forEach(function(oItem) {
-        var oPanel = new sap.m.Panel({
+        var oPanel = new Panel({
           headerText: String(oItem.name || "KPI"),
           width: "20rem"
         }).addStyleClass("sapUiTinyMarginEnd sapUiTinyMarginBottom");
 
-        var oVBox = new sap.m.VBox({
+        var oVBox = new VBox({
           items: [
-            new sap.m.ObjectStatus({
+            new ObjectStatus({
               text: String(oItem.category || ""),
               state: oItem.color === "Good" ? "Success" : (oItem.color === "Error" ? "Error" : "Information")
             }).addStyleClass("sapUiTinyMarginBottom"),
-            new sap.m.Text({
+            new Text({
               text: "Sajat ceg: " + String(oItem.ownDisplayValue || "-")
             }),
-            new sap.m.Text({
+            new Text({
               text: "Versenytars atlag: " + String(oItem.benchmarkDisplayValue || "-")
             }).addStyleClass("sapUiTinyMarginBottom"),
             new ComparisonMicroChart({
@@ -3289,7 +3494,7 @@ sap.ui.define([
                 })
               ]
             }),
-            new sap.m.Text({
+            new Text({
               text: String(oItem.formulaLabel || "")
             }).addStyleClass("sapUiTinyMarginTop")
           ]

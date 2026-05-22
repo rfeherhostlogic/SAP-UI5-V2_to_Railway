@@ -465,6 +465,56 @@
         </Panel>
       </VBox>
 
+      <VBox visible="{= ${jokers>/selectedJoker/id} === 'kpi-discovery' }" width="100%">
+        <Panel headerText="KPI felfedezes">
+          <VBox class="sapUiSmallMargin">
+            <Text text="A rendszer a SQLite adatbazis tablait olvassa, KPI jelolteket keszit, majd a kivalasztott KPI-t Python szamolassal futtatja." wrapping="true"/>
+            <HBox class="sapUiSmallMarginTop" wrap="Wrap" alignItems="Center">
+              <Button text="KPI otletek keresese" icon="sap-icon://lightbulb" type="Emphasized" press=".onDiscoverKpis" busy="{jokers>/kpiDiscoveryBusy}" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }"/>
+              <Button text="Kivalasztott KPI futtatasa" icon="sap-icon://play" type="Transparent" press=".onRunSelectedKpi" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : (${jokers>/kpiDiscoverySelectedId} ? true : false) }" class="sapUiTinyMarginBegin"/>
+              <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }" class="sapUiTinyMarginBegin"/>
+            </HBox>
+            <MessageStrip text="{jokers>/kpiDiscoveryError}" type="Error" showIcon="true" visible="{= ${jokers>/kpiDiscoveryError} ? true : false }" class="sapUiSmallMarginTop"/>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Adatbazis sema" expandable="true" expanded="false" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoverySchemaSummary} ? true : false }">
+          <Text text="{jokers>/kpiDiscoverySchemaSummary}" wrapping="true" class="sapUiSmallMargin"/>
+        </Panel>
+
+        <Panel headerText="Javasolt KPI-ok" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
+          <List items="{jokers>/kpiDiscoverySuggestions}" mode="None">
+            <CustomListItem>
+              <VBox class="sapUiSmallMargin">
+                <HBox justifyContent="SpaceBetween" alignItems="Start" wrap="Wrap">
+                  <VBox>
+                    <Title text="{jokers>title}" level="H5"/>
+                    <Text text="{jokers>description}" wrapping="true" class="sapUiTinyMarginTop"/>
+                    <Text text="{= 'Miert erdemes figyelni: ' + ${jokers>why} }" wrapping="true" class="sapUiTinyMarginTop"/>
+                  </VBox>
+                  <Button text="Kivalaszt" icon="sap-icon://accept" type="{= ${jokers>id} === ${jokers>/kpiDiscoverySelectedId} ? 'Emphasized' : 'Transparent' }" press=".onSelectKpiSuggestion"/>
+                </HBox>
+              </VBox>
+            </CustomListItem>
+          </List>
+        </Panel>
+
+        <Panel headerText="KPI eredmeny" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoverySummary} ? true : false }">
+          <VBox class="sapUiSmallMargin">
+            <Text text="{jokers>/kpiDiscoverySummary}" wrapping="true"/>
+            <HBox wrap="Wrap" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryMetrics}.length > 0 }">
+              <ObjectStatus text="{= ${jokers>/kpiDiscoveryMetrics/0/label} ? ${jokers>/kpiDiscoveryMetrics/0/label} + ': ' + ${jokers>/kpiDiscoveryMetrics/0/value} + ' ' + (${jokers>/kpiDiscoveryMetrics/0/unit} || '') : '' }" state="Success" class="sapUiTinyMarginEnd"/>
+              <ObjectStatus text="{= ${jokers>/kpiDiscoveryMetrics/1/label} ? ${jokers>/kpiDiscoveryMetrics/1/label} + ': ' + ${jokers>/kpiDiscoveryMetrics/1/value} + ' ' + (${jokers>/kpiDiscoveryMetrics/1/unit} || '') : '' }" state="Information"/>
+            </HBox>
+            <VBox id="kpiDiscoveryChartHost" class="sapUiSmallMarginTop"/>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Szamitasi reszletek" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryRows}.length > 0 }">
+          <Table id="kpiDiscoveryResultTable" growing="true" growingThreshold="50" inset="false"/>
+        </Panel>
+      </VBox>
+
       <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-21' }" width="100%" class="dummy9Shell">
         <Panel headerText="RPT1 fizetesi kesedelem predikcio" class="dummy9Panel">
           <VBox class="sapUiSmallMargin">
@@ -1707,7 +1757,7 @@
       </VBox>
       <!-- ═══════════════════════════════════════════════════ DUMMY 14 END ══ -->
 
-      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-11' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-12' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-13' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-14' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-21' }" width="100%">
+      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' &amp;&amp; ${jokers>/selectedJoker/id} !== 'kpi-discovery' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-11' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-12' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-13' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-14' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-21' }" width="100%">
         <TextArea value="{jokers>/promptInput}" rows="10" growing="true" growingMaxLines="16" width="100%" placeholder="Ide ird a feldolgozando szoveget..."/>
 
         <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">

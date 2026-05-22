@@ -225,6 +225,16 @@ sap.ui.define([
 						systemPrompt: "Adj rovid osszegzest az RFM szegmentaciorol."
 					},
 					{
+						id: "kpi-discovery",
+						title: "KPI felfedezes",
+						subtitle: "Adatbazis -> KPI javaslatok",
+						primaryTag: "Altalanos",
+						tags: ["Altalanos"],
+						footer: "AI Joker KPI",
+						description: "Az adatbazis tablait atnezve hasznos KPI-okat javasol, majd a kivalasztott KPI-t Python alapu szamitassal futtatja es diagramon is megjeleniti.",
+						systemPrompt: "KPI felfedezes es determinisztikus Python KPI futtatas."
+					},
+					{
 						id: "dummy-11",
 						title: "Prompt Epito Asszisztens",
 						subtitle: "Gyenge otletbol jo prompt",
@@ -398,6 +408,15 @@ sap.ui.define([
 				dummy10ScheduleFrequency: "immediate",
 				dummy10ScheduleWeeklyDay: 1,
 				dummy10ScheduleTime: "09:00",
+				kpiDiscoveryBusy: false,
+				kpiDiscoveryError: "",
+				kpiDiscoverySchemaSummary: "",
+				kpiDiscoverySuggestions: [],
+				kpiDiscoverySelectedId: "",
+				kpiDiscoverySummary: "",
+				kpiDiscoveryMetrics: [],
+				kpiDiscoveryChartRows: [],
+				kpiDiscoveryRows: [],
 				dummy11RawRequest: "",
 				dummy11Title: "",
 				dummy11ReplyDraft: "",
