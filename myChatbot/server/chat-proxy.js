@@ -4563,6 +4563,151 @@ function buildSchemaHintFromTables(tables) {
   return rows.join("\n");
 }
 
+function findMetadataTable(tables, tableName) {
+  const expected = String(tableName || "").trim().toLowerCase();
+  return (tables || []).find(function(table) {
+    return String(table && table.tableName ? table.tableName : "").trim().toLowerCase() === expected;
+  }) || null;
+}
+
+function metadataHasColumns(table, columnNames) {
+  const available = {};
+  (table && Array.isArray(table.columns) ? table.columns : []).forEach(function(col) {
+    const name = String(col && col.name ? col.name : "").trim();
+    if (name) {
+      available[name.toLowerCase()] = true;
+    }
+  });
+  return (columnNames || []).every(function(name) {
+    return !!available[String(name || "").trim().toLowerCase()];
+  });
+}
+
+function isReportMeasureColumn(col) {
+  const name = String(col && col.name ? col.name : "").trim().toLowerCase();
+  const type = String(col && col.type ? col.type : "").trim().toLowerCase();
+  if (!name || name === "id" || name.endsWith("id") || name.endsWith("_id")) {
+    return false;
+  }
+  if (name === "period" || name === "periodstart" || name === "fiscalyear" || name === "year") {
+    return false;
+  }
+  return (
+    type.indexOf("int") >= 0 ||
+    type.indexOf("real") >= 0 ||
+    type.indexOf("num") >= 0 ||
+    type.indexOf("dec") >= 0 ||
+    ["amount", "price", "revenue", "qty", "quantity", "total", "value", "margin"].some(function(token) {
+      return name.indexOf(token) >= 0;
+    })
+  );
+}
+
+function isReportDateColumn(col) {
+  const name = String(col && col.name ? col.name : "").trim().toLowerCase();
+  const type = String(col && col.type ? col.type : "").trim().toLowerCase();
+  return type.indexOf("date") >= 0 || name.indexOf("date") >= 0 || name.indexOf("time") >= 0;
+}
+
+function addDummy4Suggestion(items, suggestion) {
+  const question = String(suggestion && suggestion.question ? suggestion.question : "").trim();
+  if (!question || items.some(function(item) { return item.question === question; })) {
+    return;
+  }
+  items.push({
+    title: String(suggestion.title || question),
+    question: question,
+    reason: String(suggestion.reason || "")
+  });
+}
+
+function buildDummy4DiscoverySuggestions(tables) {
+  const suggestions = [];
+  const sales = findMetadataTable(tables, "SalesOrder");
+  const customer = findMetadataTable(tables, "Customer");
+  const ksb1 = findMetadataTable(tables, "ksb1");
+
+  if (sales && metadataHasColumns(sales, ["NetAmount"])) {
+    addDummy4Suggestion(suggestions, {
+      title: "Teljes arbevetel",
+      question: "Mennyi volt a teljes NetAmount osszesen?",
+      reason: "Gyors osszesitett forgalmi riport."
+    });
+  }
+  if (sales && metadataHasColumns(sales, ["OrderDate", "NetAmount"])) {
+    addDummy4Suggestion(suggestions, {
+      title: "Havi arbevetel",
+      question: "Havi bontasban mennyi volt a NetAmount OrderDate alapjan?",
+      reason: "Idosoros trend a rendelesekbol."
+    });
+  }
+  if (sales && metadataHasColumns(sales, ["CustomerId", "NetAmount"])) {
+    addDummy4Suggestion(suggestions, {
+      title: "Top ugyfelek forgalom szerint",
+      question: "Melyik 5 ugyfel hozta a legnagyobb NetAmount osszeget?",
+      reason: "Koncentracio es legfontosabb ugyfelek azonositasahoz."
+    });
+  }
+  if (sales && customer && metadataHasColumns(sales, ["CustomerId", "NetAmount"]) && metadataHasColumns(customer, ["CustomerId", "Country"])) {
+    addDummy4Suggestion(suggestions, {
+      title: "Forgalom orszagonkent",
+      question: "Orszagonkent mennyi volt a NetAmount osszege?",
+      reason: "Teruleti teljesitmeny osszehasonlitasahoz."
+    });
+  }
+  if (sales && metadataHasColumns(sales, ["Currency", "NetAmount"])) {
+    addDummy4Suggestion(suggestions, {
+      title: "Forgalom devizankent",
+      question: "Devizankent mennyi volt a NetAmount osszege?",
+      reason: "Devizanemi bontas gyors ellenorzesere."
+    });
+  }
+  if (ksb1 && metadataHasColumns(ksb1, ["CostCenter", "AmountInCompanyCodeCurrency"])) {
+    addDummy4Suggestion(suggestions, {
+      title: "Koltseghely osszegzes",
+      question: "CostCenterenkent mennyi az AmountInCompanyCodeCurrency osszege a ksb1 tablaban?",
+      reason: "Koltseghelyi teljesitmeny es elteresek attekintesehez."
+    });
+  }
+  if (ksb1 && metadataHasColumns(ksb1, ["PostingDate", "AmountInCompanyCodeCurrency"])) {
+    addDummy4Suggestion(suggestions, {
+      title: "Havi ksb1 osszeg",
+      question: "Havi bontasban mennyi az AmountInCompanyCodeCurrency osszege PostingDate alapjan a ksb1 tablaban?",
+      reason: "Konyvelesi idosoros trendekhez."
+    });
+  }
+  if (ksb1 && metadataHasColumns(ksb1, ["DocumentType", "AmountInCompanyCodeCurrency"])) {
+    addDummy4Suggestion(suggestions, {
+      title: "Dokumentumtipus bontas",
+      question: "DocumentType szerint mennyi az AmountInCompanyCodeCurrency osszege a ksb1 tablaban?",
+      reason: "Konyvelesi forrastipusok szerinti bontashoz."
+    });
+  }
+
+  (tables || []).forEach(function(table) {
+    const tableName = String(table && table.tableName ? table.tableName : "").trim();
+    const columns = Array.isArray(table && table.columns) ? table.columns : [];
+    const measure = columns.find(isReportMeasureColumn);
+    const dateColumn = columns.find(isReportDateColumn);
+    if (tableName && measure && suggestions.length < 10) {
+      addDummy4Suggestion(suggestions, {
+        title: tableName + " osszegzes",
+        question: "Mennyi a " + measure.name + " osszege a " + tableName + " tablaban?",
+        reason: "A tabla fo numerikus ertekenek gyors osszegzese."
+      });
+    }
+    if (tableName && measure && dateColumn && suggestions.length < 10) {
+      addDummy4Suggestion(suggestions, {
+        title: tableName + " idosor",
+        question: "Havi bontasban mennyi a " + measure.name + " osszege " + dateColumn.name + " alapjan a " + tableName + " tablaban?",
+        reason: "Idobeli trend feltarasahoz."
+      });
+    }
+  });
+
+  return suggestions.slice(0, 10);
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -6725,6 +6870,24 @@ app.get("/api/jokers/dummy4/schema-hint", async function(_req, res) {
   } catch (err) {
     res.status(500).json({
       error: "Dummy4 schema hint lekeresi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.get("/api/jokers/dummy4/discovery-suggestions", async function(_req, res) {
+  try {
+    await ensureSeedData();
+    const tables = await loadSqlTableMetadata(DISCOVERY_DB_PATH);
+    const schemaHint = buildSchemaHintFromTables(tables);
+    const suggestions = buildDummy4DiscoverySuggestions(tables);
+    res.json({
+      schemaHint: schemaHint,
+      suggestions: suggestions
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Dummy4 felfedezesi javaslat hiba",
       details: err && err.message ? err.message : String(err)
     });
   }

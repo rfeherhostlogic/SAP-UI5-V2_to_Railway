@@ -213,6 +213,41 @@ sap.ui.define([
       }
     },
 
+    onDiscoverDummy4Questions: async function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy4DiscoveryBusy", true);
+      oModel.setProperty("/dummy4DiscoverySuggestions", []);
+
+      try {
+        var oResp = await AiService.getDummy4DiscoverySuggestions();
+        var aSuggestions = Array.isArray(oResp && oResp.suggestions) ? oResp.suggestions : [];
+        if (oResp && oResp.schemaHint) {
+          oModel.setProperty("/dummy4SchemaHint", oResp.schemaHint);
+          oModel.setProperty("/dummy9SchemaHint", oResp.schemaHint);
+        }
+        oModel.setProperty("/dummy4DiscoverySuggestions", aSuggestions);
+        MessageToast.show(aSuggestions.length ? "Riport javaslatok elkeszultek." : "Nem talaltam riport javaslatot.");
+      } catch (oError) {
+        MessageToast.show(oError && oError.message ? oError.message : "Riport felfedezesi hiba.");
+      } finally {
+        oModel.setProperty("/dummy4DiscoveryBusy", false);
+      }
+    },
+
+    onRunDummy4Suggestion: async function(oEvent) {
+      var oContext = oEvent && oEvent.getSource ? oEvent.getSource().getBindingContext("jokers") : null;
+      var oSuggestion = oContext ? oContext.getObject() : null;
+      var sQuestion = String(oSuggestion && oSuggestion.question ? oSuggestion.question : "").trim();
+
+      if (!sQuestion) {
+        MessageToast.show("A javaslat nem tartalmaz futtathato kerdest.");
+        return;
+      }
+
+      this.getView().getModel("jokers").setProperty("/dummy4Question", sQuestion);
+      await this.onRunDummy4();
+    },
+
     onDummy9QuestionSubmit: async function() {
       await this.onRunDummy9();
     },
@@ -989,6 +1024,8 @@ sap.ui.define([
       oModel.setProperty("/dummy4Summary", "");
       oModel.setProperty("/dummy4Rows", []);
       oModel.setProperty("/dummy4ChartReady", false);
+      oModel.setProperty("/dummy4DiscoveryBusy", false);
+      oModel.setProperty("/dummy4DiscoverySuggestions", []);
       this._resetDummy9State();
       this._resetRpt1State();
       this._resetDummy10State();
@@ -1031,6 +1068,8 @@ sap.ui.define([
           oModel.setProperty("/dummy4Summary", "");
           oModel.setProperty("/dummy4Rows", []);
           oModel.setProperty("/dummy4ChartReady", false);
+          oModel.setProperty("/dummy4DiscoveryBusy", false);
+          oModel.setProperty("/dummy4DiscoverySuggestions", []);
           this._resetDummy4Chart();
           this._resetDummy4LocalChart();
           this._rebindDummy4PreviewTable();

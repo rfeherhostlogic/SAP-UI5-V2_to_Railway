@@ -369,6 +369,8 @@ sap.ui.define([
 				dummy4Summary: "",
 				dummy4Rows: [],
 				dummy4ChartReady: false,
+				dummy4DiscoveryBusy: false,
+				dummy4DiscoverySuggestions: [],
 				dummy4ScheduleEnabled: false,
 				dummy4ScheduleId: 0,
 				dummy4ScheduleFrequency: "immediate",

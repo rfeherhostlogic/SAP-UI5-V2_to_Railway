@@ -84,6 +84,8 @@ sap.ui.define([
         oJokersModel.setProperty("/dummy4GeneratedSql", "");
         oJokersModel.setProperty("/dummy4Summary", "");
         oJokersModel.setProperty("/dummy4Rows", []);
+        oJokersModel.setProperty("/dummy4DiscoveryBusy", false);
+        oJokersModel.setProperty("/dummy4DiscoverySuggestions", []);
       } else if (oJoker.id === "dummy-9") {
         oJokersModel.setProperty("/dummy9Files", []);
         oJokersModel.setProperty("/dummy9Question", "");

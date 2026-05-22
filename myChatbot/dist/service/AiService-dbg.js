@@ -377,6 +377,19 @@
     });
   }
 
+  function getDummy4DiscoverySuggestions() {
+    return fetch("/api/jokers/dummy4/discovery-suggestions", {
+      method: "GET"
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function getKpiDiscoverySuggestions() {
     return fetch("/api/jokers/kpi-discovery/suggestions", {
       method: "GET"
@@ -1270,6 +1283,7 @@
     runDummy14Analysis: runDummy14Analysis,
     getDummy14Status: getDummy14Status,
     getDummy4SchemaHint: getDummy4SchemaHint,
+    getDummy4DiscoverySuggestions: getDummy4DiscoverySuggestions,
     getKpiDiscoverySuggestions: getKpiDiscoverySuggestions,
     runKpiDiscovery: runKpiDiscovery,
     uploadDummy5Pdf: uploadDummy5Pdf,
