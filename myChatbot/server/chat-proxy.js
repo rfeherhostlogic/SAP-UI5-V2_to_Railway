@@ -20,6 +20,7 @@ const app = express();
 const PORT = Number(process.env.PORT || process.env.CHAT_PROXY_PORT || 4000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const STRANDS_OPENAI_MODEL = process.env.STRANDS_OPENAI_MODEL || OPENAI_MODEL;
 const DUMMY12_PRESS_MODEL = process.env.DUMMY12_PRESS_MODEL || "gpt-5";
 const DUMMY7_MODEL = process.env.DUMMY7_MODEL || "gpt-4.1";
 const DUMMY7_VECTOR_STORE_ID = "vs_698f417bc0e481919720698508275ad3";
@@ -4993,6 +4994,167 @@ function runKpiDiscoveryPython(mode, kpiId) {
   });
 }
 
+let strandsSdkPromise = null;
+
+async function loadStrandsSdk() {
+  if (!strandsSdkPromise) {
+    strandsSdkPromise = Promise.all([
+      import("@strands-agents/sdk"),
+      import("@strands-agents/sdk/models/openai"),
+      import("zod")
+    ]).then(function(modules) {
+      return {
+        Agent: modules[0].Agent,
+        tool: modules[0].tool,
+        OpenAIModel: modules[1].OpenAIModel,
+        z: modules[2].z || (modules[2].default && modules[2].default.z) || modules[2].default || modules[2]
+      };
+    });
+  }
+  return strandsSdkPromise;
+}
+
+function buildStrandsSystemPrompt() {
+  return [
+    "Te a myChatbot Strands agentje vagy.",
+    "Magyarul, tomoren es uzletileg hasznosan valaszolsz.",
+    "Riport, SQL es KPI kerdeseknel mindig a rendelkezesre allo toolokat hasznald.",
+    "Szamolast, KPI futtatast es SQL eredmenyt nem talalsz ki: a tool eredmenyet foglalod ossze.",
+    "Ha a felhasznalo felfedezest ker, eloszor javaslatokat adj.",
+    "Ha futtatast ker, hasznald a megfelelo riport vagy KPI futtato toolt.",
+    "A valaszban emeld ki, melyik toolt hasznaltad es milyen eredmeny szuletett."
+  ].join("\n");
+}
+
+function extractStrandsText(result) {
+  if (!result) {
+    return "";
+  }
+  if (typeof result.toString === "function") {
+    const text = String(result.toString() || "").trim();
+    if (text) {
+      return text;
+    }
+  }
+  const blocks = result.lastMessage && Array.isArray(result.lastMessage.content) ? result.lastMessage.content : [];
+  const parts = blocks.map(function(block) {
+    if (!block) {
+      return "";
+    }
+    if (typeof block.text === "string") {
+      return block.text;
+    }
+    if (block.text && typeof block.text.text === "string") {
+      return block.text.text;
+    }
+    if (block.reasoning && typeof block.reasoning.text === "string") {
+      return block.reasoning.text;
+    }
+    return "";
+  }).filter(Boolean);
+  if (parts.length > 0) {
+    return parts.join("\n");
+  }
+  try {
+    return JSON.stringify(result);
+  } catch (_err) {
+    return String(result);
+  }
+}
+
+function summarizeStrandsResult(result) {
+  if (!result) {
+    return {};
+  }
+  return {
+    stopReason: result.stopReason || "",
+    contextSize: result.contextSize,
+    projectedContextSize: result.projectedContextSize
+  };
+}
+
+async function createBusinessStrandsAgent() {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY nincs beallitva a Strands agent futtatasahoz.");
+  }
+
+  const sdk = await loadStrandsSdk();
+  const Agent = sdk.Agent;
+  const OpenAIModel = sdk.OpenAIModel;
+  const tool = sdk.tool;
+  const z = sdk.z;
+
+  const discoverReportQuestions = tool({
+    name: "discover_report_questions",
+    description: "Javasolt riport kerdeseket ad az elerheto SQLite tablakat es oszlopokat atnezve.",
+    inputSchema: z.object({}),
+    callback: async function() {
+      await ensureSeedData();
+      const tables = await loadSqlTableMetadata(DISCOVERY_DB_PATH);
+      return {
+        schemaHint: buildSchemaHintFromTables(tables),
+        suggestions: buildDummy4DiscoverySuggestions(tables)
+      };
+    }
+  });
+
+  const runSqlReport = tool({
+    name: "run_sql_report",
+    description: "Riport kerdes futtatasa a meglovo Dummy4 SQL riport motorral. Csak SELECT jellegu, validalt lekerdezest futtat.",
+    inputSchema: z.object({
+      question: z.string().min(1).describe("A magyar nyelvu riport kerdes."),
+      schemaHint: z.string().optional().describe("Opcionalis schema hint. Ha nincs megadva, a tool kesziti el.")
+    }),
+    callback: async function(input) {
+      await ensureSeedData();
+      const tables = await loadSqlTableMetadata(DISCOVERY_DB_PATH);
+      const schemaHint = String(input && input.schemaHint ? input.schemaHint : buildSchemaHintFromTables(tables));
+      return executeDummy4({
+        apiKey: OPENAI_API_KEY,
+        model: OPENAI_MODEL,
+        question: String(input && input.question ? input.question : ""),
+        schemaHint: schemaHint
+      });
+    }
+  });
+
+  const discoverKpis = tool({
+    name: "discover_kpis",
+    description: "KPI javaslatokat es KPI csempe adatokat ad az adatbazisbol Python alapu kalkulacioval.",
+    inputSchema: z.object({}),
+    callback: async function() {
+      await ensureSeedData();
+      return runKpiDiscoveryPython("discover");
+    }
+  });
+
+  const runKpi = tool({
+    name: "run_kpi",
+    description: "Egy kivalasztott KPI futtatasa Python alapu kalkulacioval, osszehasonlito referenciaertekekkel.",
+    inputSchema: z.object({
+      kpiId: z.string().min(1).describe("A futtatando KPI azonositoja.")
+    }),
+    callback: async function(input) {
+      await ensureSeedData();
+      return runKpiDiscoveryPython("run", String(input && input.kpiId ? input.kpiId : ""));
+    }
+  });
+
+  const model = new OpenAIModel({
+    api: "chat",
+    modelId: STRANDS_OPENAI_MODEL,
+    apiKey: OPENAI_API_KEY
+  });
+
+  return new Agent({
+    name: "myChatbot Business Agent",
+    model: model,
+    systemPrompt: buildStrandsSystemPrompt(),
+    tools: [discoverReportQuestions, runSqlReport, discoverKpis, runKpi],
+    printer: false
+  });
+}
+
 async function computeRfmTransitions(scheduleId, rows) {
   const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
   try {
@@ -6919,6 +7081,37 @@ app.post("/api/jokers/kpi-discovery/run", async function(req, res) {
   } catch (err) {
     res.status(500).json({
       error: "KPI futtatas hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/agent/strands", async function(req, res) {
+  try {
+    const message = String(req.body && req.body.message ? req.body.message : "").trim();
+    if (!message) {
+      res.status(400).json({ error: "message kotelezo." });
+      return;
+    }
+
+    const agent = await createBusinessStrandsAgent();
+    const result = await agent.invoke(message);
+    res.json({
+      ok: true,
+      provider: "aws-strands",
+      model: STRANDS_OPENAI_MODEL,
+      message: extractStrandsText(result),
+      meta: summarizeStrandsResult(result),
+      tools: [
+        "discover_report_questions",
+        "run_sql_report",
+        "discover_kpis",
+        "run_kpi"
+      ]
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Strands agent futtatasi hiba",
       details: err && err.message ? err.message : String(err)
     });
   }

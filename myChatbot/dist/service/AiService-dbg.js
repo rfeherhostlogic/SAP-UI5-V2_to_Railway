@@ -422,6 +422,25 @@
     });
   }
 
+  function runStrandsAgent(mPayload) {
+    return fetch("/api/agent/strands", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: mPayload && mPayload.message ? mPayload.message : ""
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function uploadDummy5Pdf(oFile) {
     var oFormData = new FormData();
     oFormData.append("file", oFile);
@@ -1286,6 +1305,7 @@
     getDummy4DiscoverySuggestions: getDummy4DiscoverySuggestions,
     getKpiDiscoverySuggestions: getKpiDiscoverySuggestions,
     runKpiDiscovery: runKpiDiscovery,
+    runStrandsAgent: runStrandsAgent,
     uploadDummy5Pdf: uploadDummy5Pdf,
     summarizeDummy5: summarizeDummy5,
     askDummy5: askDummy5,
