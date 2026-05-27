@@ -1608,18 +1608,10 @@ async function convertDocxToPdfBuffer(docxBuffer) {
 async function renderQuoteDocuments(session) {
   const quote = normalizeQuoteDraft(session.quote);
   const docxBuffer = await buildQuoteDocxBuffer(quote, session);
-  let pdfBuffer;
-  let conversionMode = "libreoffice";
-  try {
-    pdfBuffer = await convertDocxToPdfBuffer(docxBuffer);
-  } catch (err) {
-    conversionMode = "pdfkit-fallback";
-    console.warn("[quote] LibreOffice conversion fallback", err && err.message ? err.message : String(err));
-    pdfBuffer = await buildPdfFromText(quote.title, quotePlainText(quote));
-  }
+  const pdfBuffer = await convertDocxToPdfBuffer(docxBuffer);
   session.docxBuffer = docxBuffer;
   session.pdfBuffer = pdfBuffer;
-  session.conversionMode = conversionMode;
+  session.conversionMode = "libreoffice-docx-pdf";
   session.updatedAt = new Date().toISOString();
   return session;
 }

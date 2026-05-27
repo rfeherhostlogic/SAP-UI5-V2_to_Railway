@@ -1,0 +1,15 @@
+version: 1.0
+runtime: nodejs22
+build:
+  commands:
+    build:
+      - npm ci
+      - npm run build
+run:
+  runtime-version: 22
+  pre-run:
+    - dnf install -y libreoffice libreoffice-writer || yum install -y libreoffice libreoffice-writer
+  command: npm start
+  network:
+    port: 3000
+    env: PORT
