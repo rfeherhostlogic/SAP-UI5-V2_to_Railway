@@ -522,7 +522,8 @@
       },
       body: JSON.stringify({
         sessionId: mPayload.sessionId || "",
-        contextText: mPayload.contextText || ""
+        contextText: mPayload.contextText || "",
+        placeholderValues: mPayload.placeholderValues || {}
       })
     }).then(function(oResponse) {
       if (!oResponse.ok) {
@@ -542,7 +543,8 @@
       },
       body: JSON.stringify({
         sessionId: mPayload.sessionId || "",
-        message: mPayload.message || ""
+        message: mPayload.message || "",
+        placeholderValues: mPayload.placeholderValues || {}
       })
     }).then(function(oResponse) {
       if (!oResponse.ok) {

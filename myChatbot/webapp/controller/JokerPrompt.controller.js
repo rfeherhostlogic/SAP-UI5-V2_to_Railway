@@ -158,6 +158,9 @@ sap.ui.define([
         oModel.setProperty("/quoteSessionId", oUpload.sessionId || "");
         oModel.setProperty("/quoteTemplateFileName", oUpload.templateFileName || oFile.name || "");
         oModel.setProperty("/quoteTemplatePreview", oUpload.templateTextPreview || "");
+        oModel.setProperty("/quoteTemplatePlaceholders", Array.isArray(oUpload.templatePlaceholders) ? oUpload.templatePlaceholders : []);
+        oModel.setProperty("/quoteMissingPlaceholders", Array.isArray(oUpload.missingPlaceholders) ? oUpload.missingPlaceholders : []);
+        oModel.setProperty("/quotePlaceholderValues", {});
         MessageToast.show(oUpload.message || "Word sablon feltoltve.");
       } catch (oError) {
         oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "Word sablon feltoltesi hiba.");
@@ -186,10 +189,11 @@ sap.ui.define([
       try {
         var oResult = await AiService.generateQuote({
           sessionId: sSessionId,
-          contextText: sContext
+          contextText: sContext,
+          placeholderValues: this._collectQuotePlaceholderValues()
         });
         this._applyQuoteResult(oResult);
-        MessageToast.show("Arajanlat preview elkeszult.");
+        MessageToast.show(oResult && oResult.needsInput ? "Hianyzo placeholder ertekek szuksegesek." : "Arajanlat preview elkeszult.");
       } catch (oError) {
         oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "Arajanlat generalasi hiba.");
         MessageToast.show(oError && oError.message ? oError.message : "Arajanlat generalasi hiba.");
@@ -217,7 +221,8 @@ sap.ui.define([
       try {
         var oResult = await AiService.reviseQuote({
           sessionId: sSessionId,
-          message: sMessage
+          message: sMessage,
+          placeholderValues: this._collectQuotePlaceholderValues()
         });
         this._applyQuoteResult(oResult);
         oModel.setProperty("/quoteRevisionMessage", "");
@@ -252,9 +257,25 @@ sap.ui.define([
       oModel.setProperty("/quotePdfDownloadUrl", oResult && oResult.pdfDownloadUrl ? oResult.pdfDownloadUrl : "");
       oModel.setProperty("/quoteDocxDownloadUrl", oResult && oResult.docxDownloadUrl ? oResult.docxDownloadUrl : "");
       oModel.setProperty("/quoteConversionMode", oResult && oResult.conversionMode ? oResult.conversionMode : "");
+      oModel.setProperty("/quoteMissingPlaceholders", Array.isArray(oResult && oResult.missingPlaceholders) ? oResult.missingPlaceholders : []);
+      oModel.setProperty("/quoteTemplatePlaceholders", Array.isArray(oResult && oResult.templatePlaceholders) ? oResult.templatePlaceholders : (oModel.getProperty("/quoteTemplatePlaceholders") || []));
+      oModel.setProperty("/quotePlaceholderValues", oResult && oResult.placeholderValues ? oResult.placeholderValues : (oModel.getProperty("/quotePlaceholderValues") || {}));
       if (Array.isArray(oResult && oResult.chatMessages)) {
         oModel.setProperty("/quoteChatMessages", oResult.chatMessages);
       }
+    },
+
+    _collectQuotePlaceholderValues: function() {
+      var oModel = this.getView().getModel("jokers");
+      var mValues = Object.assign({}, oModel.getProperty("/quotePlaceholderValues") || {});
+      var aMissing = oModel.getProperty("/quoteMissingPlaceholders") || [];
+      aMissing.forEach(function(oItem) {
+        if (oItem && oItem.name) {
+          mValues[oItem.name] = oItem.value || "";
+        }
+      });
+      oModel.setProperty("/quotePlaceholderValues", mValues);
+      return mValues;
     },
 
     _openQuoteDownload: function(sProperty) {

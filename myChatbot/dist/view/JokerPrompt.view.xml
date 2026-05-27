@@ -181,6 +181,12 @@
               <Text text="{jokers>/quoteTemplatePreview}" wrapping="true" class="sapUiSmallMargin"/>
             </Panel>
 
+            <Panel headerText="Felismert placeholderek" expandable="true" expanded="false" class="sapUiSmallMarginTop" visible="{= ${jokers>/quoteTemplatePlaceholders}.length > 0 }">
+              <List items="{jokers>/quoteTemplatePlaceholders}">
+                <StandardListItem title="{jokers>}" icon="sap-icon://tag"/>
+              </List>
+            </Panel>
+
             <Label text="Kontextus" class="sapUiSmallMarginTop"/>
             <TextArea
               value="{jokers>/quoteContextText}"
@@ -198,6 +204,22 @@
             </HBox>
             <MessageStrip text="{jokers>/quoteError}" type="Error" showIcon="true" visible="{= ${jokers>/quoteError} ? true : false }" class="sapUiSmallMarginTop"/>
             <ObjectStatus text="{= ${jokers>/quoteConversionMode} ? 'PDF konverzio: ' + ${jokers>/quoteConversionMode} : '' }" state="{= ${jokers>/quoteConversionMode} === 'libreoffice' ? 'Success' : 'Warning' }" visible="{= ${jokers>/quoteConversionMode} ? true : false }" class="sapUiSmallMarginTop"/>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Hianyzo placeholder ertekek" class="sapUiSmallMarginTop" visible="{= ${jokers>/quoteMissingPlaceholders}.length > 0 }">
+          <VBox class="sapUiSmallMargin">
+            <MessageStrip text="Az AI nem tudott minden sablonmezot biztosan kitolteni. Add meg a hianyzo ertekeket, majd futtasd ujra a generalast." type="Warning" showIcon="true"/>
+            <List items="{jokers>/quoteMissingPlaceholders}" class="sapUiSmallMarginTop">
+              <CustomListItem>
+                <VBox class="sapUiTinyMargin">
+                  <Label text="{= ${jokers>label} + ' (' + ${jokers>name} + ')' }"/>
+                  <Text text="{jokers>reason}" wrapping="true" class="sapUiTinyMarginBottom"/>
+                  <TextArea value="{jokers>value}" rows="2" growing="true" growingMaxLines="6" width="100%" placeholder="Add meg a placeholder erteket"/>
+                </VBox>
+              </CustomListItem>
+            </List>
+            <Button text="Generalas a megadott ertekekkel" icon="sap-icon://accept" type="Emphasized" press=".onGenerateQuote" busy="{jokers>/quoteBusy}" enabled="{= ${jokers>/quoteBusy} ? false : true }" class="sapUiSmallMarginTop"/>
           </VBox>
         </Panel>
 

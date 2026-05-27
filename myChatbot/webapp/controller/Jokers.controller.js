@@ -114,6 +114,9 @@ sap.ui.define([
         oJokersModel.setProperty("/quoteSessionId", "");
         oJokersModel.setProperty("/quoteTemplateFileName", "");
         oJokersModel.setProperty("/quoteTemplatePreview", "");
+        oJokersModel.setProperty("/quoteTemplatePlaceholders", []);
+        oJokersModel.setProperty("/quoteMissingPlaceholders", []);
+        oJokersModel.setProperty("/quotePlaceholderValues", {});
         oJokersModel.setProperty("/quoteContextText", "");
         oJokersModel.setProperty("/quoteSummary", "");
         oJokersModel.setProperty("/quotePreviewUrl", "");

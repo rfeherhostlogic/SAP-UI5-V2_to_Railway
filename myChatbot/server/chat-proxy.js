@@ -12,6 +12,8 @@ const bcrypt = require("bcryptjs");
 const { PDFParse } = require("pdf-parse");
 const PDFDocument = require("pdfkit");
 const mammoth = require("mammoth");
+const PizZip = require("pizzip");
+const Docxtemplater = require("docxtemplater");
 const {
   AlignmentType,
   BorderStyle,
@@ -39,6 +41,7 @@ const DUMMY12_PRESS_MODEL = process.env.DUMMY12_PRESS_MODEL || "gpt-5";
 const DUMMY7_MODEL = process.env.DUMMY7_MODEL || "gpt-4.1";
 const DUMMY7_VECTOR_STORE_ID = "vs_698f417bc0e481919720698508275ad3";
 const QUOTE_VECTOR_STORE_ID = process.env.QUOTE_VECTOR_STORE_ID || "vs_6a16ba870e40819184099c03ca9cee06";
+const QUOTE_PRODUCT_VECTOR_STORE_ID = process.env.QUOTE_PRODUCT_VECTOR_STORE_ID || "vs_6a16ef61048081919e9861991510f45b";
 const SMART_SEGMENT_VECTOR_STORE_ID = "vs_699ec6f7dc188191881c8d782ade2131";
 const APP_SESSION_SECRET = process.env.APP_SESSION_SECRET || "replace-this-in-production";
 const APP_SESSION_TTL_MS = Number(process.env.APP_SESSION_TTL_MS || (1000 * 60 * 60 * 12));
@@ -1145,6 +1148,105 @@ async function extractWordTemplateText(file) {
   }
 }
 
+function extractTemplatePlaceholders(text) {
+  const seen = {};
+  const out = [];
+  String(text || "").replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, function(_match, name) {
+    const clean = String(name || "").trim();
+    if (clean && !seen[clean]) {
+      seen[clean] = true;
+      out.push(clean);
+    }
+    return _match;
+  });
+  return out;
+}
+
+function readDocxTemplatePlaceholders(buffer, fallbackText) {
+  const found = extractTemplatePlaceholders(fallbackText);
+  if (!buffer) {
+    return found;
+  }
+  try {
+    const zip = new PizZip(buffer);
+    const files = zip.files || {};
+    Object.keys(files).forEach(function(name) {
+      if (!/^word\/.*\.xml$/i.test(name)) {
+        return;
+      }
+      const file = zip.file(name);
+      const xml = file ? file.asText() : "";
+      extractTemplatePlaceholders(xml).forEach(function(ph) {
+        if (found.indexOf(ph) < 0) {
+          found.push(ph);
+        }
+      });
+    });
+  } catch (err) {
+    console.warn("[quote] DOCX placeholder extraction failed", err && err.message ? err.message : String(err));
+  }
+  return found;
+}
+
+function labelForPlaceholder(name) {
+  return String(name || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, function(ch) { return ch.toUpperCase(); });
+}
+
+function normalizePlaceholderValues(values) {
+  const out = {};
+  Object.keys(values || {}).forEach(function(key) {
+    const cleanKey = String(key || "").trim();
+    if (cleanKey) {
+      out[cleanKey] = String(values[key] == null ? "" : values[key]).trim();
+    }
+  });
+  return out;
+}
+
+function createMissingPlaceholderItems(placeholders, values, reasons) {
+  return (placeholders || []).filter(function(name) {
+    return !String(values && values[name] ? values[name] : "").trim();
+  }).map(function(name) {
+    return {
+      name: name,
+      label: labelForPlaceholder(name),
+      value: "",
+      reason: reasons && reasons[name] ? String(reasons[name]) : "Nem volt egyertelmuen megallapithato a kontextusbol."
+    };
+  });
+}
+
+function quoteTemplateSummary(quote) {
+  const q = normalizeQuoteDraft(quote);
+  const lines = [
+    "proposal_title: " + q.title,
+    "proposal_subtitle: " + q.customer + " ajanlat",
+    "customer_legal_name: " + q.customer,
+    "customer_short_name: " + q.customer,
+    "provider_legal_name: Techwave Hungary Kft.",
+    "provider_short_name: Techwave",
+    "provider_role: szolgaltato",
+    "validity_period: 30",
+    "service_scope_summary: " + q.intro,
+    "scope_block: " + q.terms,
+    "pricing_block: " + q.items.map(function(item) {
+      return item.description + " - " + item.qty + " " + item.unit + " - " + formatQuoteMoney(item.total, q.currency);
+    }).join("\n"),
+    "total_net: " + formatQuoteMoney(q.totalNet, q.currency),
+    "total_discount: 0 " + q.currency,
+    "total_gross: " + formatQuoteMoney(q.totalGross, q.currency)
+  ];
+  q.items.slice(0, 4).forEach(function(item, index) {
+    const n = index + 1;
+    lines.push("item_" + n + "_name: " + item.description);
+    lines.push("item_" + n + "_days: " + item.qty + " " + item.unit);
+    lines.push("item_" + n + "_net: " + formatQuoteMoney(item.total, q.currency));
+  });
+  return lines.join("\n");
+}
+
 async function retrieveQuotePrices(contextText) {
   if (!OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY hianyzik az arak lekeresehez.");
@@ -1177,6 +1279,39 @@ async function retrieveQuotePrices(contextText) {
   }
   const text = extractResponsesOutputText(json);
   return parseJsonObjectFromText(text) || { items: [], evidence: [text || "Nincs strukturalt arlekeresi valasz."] };
+}
+
+async function retrieveProductIntroduction(contextText) {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY hianyzik a termekbemutato lekeresehez.");
+  }
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + OPENAI_API_KEY
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      instructions: [
+        "A megadott ajanlati kontextus alapjan azonositsd a kiajanlott termeket vagy szolgaltatast.",
+        "A csatolt vector store-bol keress rola termekinformaciot.",
+        "Irj magyar nyelvu, ajanlatba illesztheto, 1-3 bekezdeses termekbemutatot.",
+        "Csak a visszakeresett informaciokra tamaszkodj. Ha nincs talalat, ird le roviden, hogy nincs eleg termekadat."
+      ].join("\n"),
+      input: String(contextText || "").slice(0, 12000),
+      tools: [{
+        type: "file_search",
+        vector_store_ids: [QUOTE_PRODUCT_VECTOR_STORE_ID]
+      }]
+    })
+  });
+  const raw = await response.text();
+  const json = parseOpenAiReply(raw);
+  if (!response.ok) {
+    throw new Error("Termekbemutato OpenAI hiba: " + (raw || response.status));
+  }
+  return extractResponsesOutputText(json) || "";
 }
 
 async function generateQuoteDraft(session, contextText, revisionText) {
@@ -1260,6 +1395,89 @@ async function generateQuoteDraft(session, contextText, revisionText) {
   });
 }
 
+async function generateQuotePlaceholderValues(session, contextText, revisionText, manualValues) {
+  const placeholders = Array.isArray(session && session.templatePlaceholders) ? session.templatePlaceholders : [];
+  const manual = normalizePlaceholderValues(manualValues);
+  if (placeholders.length === 0) {
+    return { values: manual, missingPlaceholders: [] };
+  }
+
+  const quote = session && session.quote ? normalizeQuoteDraft(session.quote) : normalizeQuoteDraft({});
+  const prices = await retrieveQuotePrices(contextText);
+  let productIntro = "";
+  if (placeholders.indexOf("product_introduction") >= 0 && !manual.product_introduction) {
+    productIntro = await retrieveProductIntroduction(contextText);
+  }
+
+  const prompt = [
+    "Toltsd ki egy Word arajanlat sablon placeholder ertekeit magyarul.",
+    "Csak JSON objektumot adj vissza ilyen formatumban:",
+    "{\"values\":{\"placeholder\":\"ertek\"},\"missing\":{\"placeholder\":\"rovid ok\"}}",
+    "Ha egy placeholder erteke nem allapithato meg a kontextusbol, ne talald ki: hagyd ki a values-bol vagy adj ures stringet, es tedd a missing objektumba.",
+    "A manualValues ertekeit kotelezo megtartani.",
+    "A product_introduction ertekehez a megadott termekbemutato forrast hasznald.",
+    "A pricing es item mezoknel a vector store areredmenyt hasznald, ne talalj ki arat.",
+    "",
+    "Placeholderek:",
+    placeholders.join(", "),
+    "",
+    "Manualis ertekek:",
+    JSON.stringify(manual),
+    "",
+    "Ajanlat osszefoglalo:",
+    quoteTemplateSummary(quote),
+    "",
+    "Vector store areredmeny:",
+    JSON.stringify(prices).slice(0, 8000),
+    "",
+    "Termekbemutato forras:",
+    productIntro || "(nincs termekbemutato talalat)",
+    "",
+    "Sablon szoveges minta:",
+    String(session && session.templateText ? session.templateText : "").slice(0, 6000),
+    "",
+    "Felhasznaloi kontextus:",
+    String(contextText || "").slice(0, 12000),
+    revisionText ? "\nModositasi keres:\n" + String(revisionText || "").slice(0, 4000) : ""
+  ].filter(Boolean).join("\n");
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + OPENAI_API_KEY
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      instructions: "Word sablon placeholder kitolto asszisztens vagy. Kizarolag valid JSON objektumot adj vissza.",
+      input: prompt
+    })
+  });
+  const raw = await response.text();
+  const json = parseOpenAiReply(raw);
+  if (!response.ok) {
+    throw new Error("Placeholder kitoltesi OpenAI hiba: " + (raw || response.status));
+  }
+  const parsed = parseJsonObjectFromText(extractResponsesOutputText(json)) || {};
+  const values = Object.assign({}, normalizePlaceholderValues(parsed.values || {}), manual);
+  if (productIntro && !values.product_introduction) {
+    values.product_introduction = productIntro;
+  }
+
+  placeholders.forEach(function(name) {
+    if (values[name] == null) {
+      values[name] = "";
+    }
+  });
+
+  const missingReasons = parsed.missing || {};
+  const missingPlaceholders = createMissingPlaceholderItems(placeholders, values, missingReasons);
+  return {
+    values: values,
+    missingPlaceholders: missingPlaceholders
+  };
+}
+
 function tableCell(text, bold) {
   return new TableCell({
     margins: { top: 120, bottom: 120, left: 120, right: 120 },
@@ -1269,7 +1487,33 @@ function tableCell(text, bold) {
   });
 }
 
-async function buildQuoteDocxBuffer(quote) {
+async function buildQuoteDocxBuffer(quote, session) {
+  if (session && session.templateBuffer && Array.isArray(session.templatePlaceholders) && session.templatePlaceholders.length > 0) {
+    const values = normalizePlaceholderValues(session.placeholderValues || {});
+    session.templatePlaceholders.forEach(function(name) {
+      if (values[name] == null) {
+        values[name] = "";
+      }
+    });
+    const zip = new PizZip(session.templateBuffer);
+    const doc = new Docxtemplater(zip, {
+      paragraphLoop: true,
+      linebreaks: true,
+      delimiters: {
+        start: "{{",
+        end: "}}"
+      },
+      nullGetter: function() {
+        return "";
+      }
+    });
+    doc.render(values);
+    return doc.getZip().generate({
+      type: "nodebuffer",
+      compression: "DEFLATE"
+    });
+  }
+
   const q = normalizeQuoteDraft(quote);
   const rows = [
     new TableRow({
@@ -1363,7 +1607,7 @@ async function convertDocxToPdfBuffer(docxBuffer) {
 
 async function renderQuoteDocuments(session) {
   const quote = normalizeQuoteDraft(session.quote);
-  const docxBuffer = await buildQuoteDocxBuffer(quote);
+  const docxBuffer = await buildQuoteDocxBuffer(quote, session);
   let pdfBuffer;
   let conversionMode = "libreoffice";
   try {
@@ -8255,12 +8499,16 @@ app.post("/api/jokers/quote-builder/upload-template", oQuoteTemplateUpload.singl
     }
     const sessionId = quoteToken();
     const templateText = await extractWordTemplateText(file);
+    const templatePlaceholders = readDocxTemplatePlaceholders(file.buffer, templateText);
     oQuoteSessions.set(sessionId, {
       sessionId: sessionId,
       templateFileName: name,
       templateMime: String(file.mimetype || ""),
       templateBuffer: file.buffer,
       templateText: templateText,
+      templatePlaceholders: templatePlaceholders,
+      placeholderValues: {},
+      missingPlaceholders: createMissingPlaceholderItems(templatePlaceholders, {}, {}),
       contextText: "",
       chatMessages: [],
       quote: null,
@@ -8273,6 +8521,8 @@ app.post("/api/jokers/quote-builder/upload-template", oQuoteTemplateUpload.singl
       sessionId: sessionId,
       templateFileName: name,
       templateTextPreview: templateText.slice(0, 1200),
+      templatePlaceholders: templatePlaceholders,
+      missingPlaceholders: createMissingPlaceholderItems(templatePlaceholders, {}, {}),
       message: templateText ? "Sablon feltoltve es szoveges minta kinyerve." : "Sablon feltoltve. A .doc fajlbol nem keszult szoveges minta, de a dokumentum referenciakent megmarad."
     });
   } catch (err) {
@@ -8287,6 +8537,7 @@ app.post("/api/jokers/quote-builder/generate", async function(req, res) {
   try {
     const sessionId = String(req.body && req.body.sessionId ? req.body.sessionId : "").trim();
     const contextText = String(req.body && req.body.contextText ? req.body.contextText : "").trim();
+    const manualValues = req.body && req.body.placeholderValues ? req.body.placeholderValues : {};
     const session = oQuoteSessions.get(sessionId);
     if (!session) {
       res.status(404).json({ error: "Az arajanlat session nem erheto el. Toltsd fel ujra a sablont." });
@@ -8298,11 +8549,31 @@ app.post("/api/jokers/quote-builder/generate", async function(req, res) {
     }
     session.contextText = contextText;
     session.quote = await generateQuoteDraft(session, contextText, "");
+    const placeholderResult = await generateQuotePlaceholderValues(session, contextText, "", manualValues);
+    session.placeholderValues = placeholderResult.values;
+    session.missingPlaceholders = placeholderResult.missingPlaceholders;
+    if (session.missingPlaceholders.length > 0) {
+      res.json({
+        sessionId: session.sessionId,
+        needsInput: true,
+        summary: quotePlainText(session.quote),
+        quote: session.quote,
+        templatePlaceholders: session.templatePlaceholders,
+        missingPlaceholders: session.missingPlaceholders,
+        placeholderValues: session.placeholderValues,
+        message: "Tobb placeholder nem volt egyertelmuen megallapithato. Add meg az ertekeket, majd generalj ujra."
+      });
+      return;
+    }
     await renderQuoteDocuments(session);
     res.json({
       sessionId: session.sessionId,
+      needsInput: false,
       summary: quotePlainText(session.quote),
       quote: session.quote,
+      templatePlaceholders: session.templatePlaceholders,
+      missingPlaceholders: [],
+      placeholderValues: session.placeholderValues,
       previewUrl: "/api/jokers/quote-builder/preview/" + encodeURIComponent(session.sessionId) + "?v=" + encodeURIComponent(session.updatedAt),
       pdfDownloadUrl: "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/pdf",
       docxDownloadUrl: "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/docx",
@@ -8320,6 +8591,7 @@ app.post("/api/jokers/quote-builder/revise", async function(req, res) {
   try {
     const sessionId = String(req.body && req.body.sessionId ? req.body.sessionId : "").trim();
     const message = String(req.body && req.body.message ? req.body.message : "").trim();
+    const manualValues = req.body && req.body.placeholderValues ? req.body.placeholderValues : {};
     const session = oQuoteSessions.get(sessionId);
     if (!session || !session.quote) {
       res.status(404).json({ error: "Nincs modosithato arajanlat preview. Generalj eloszor ajanlatot." });
@@ -8331,13 +8603,34 @@ app.post("/api/jokers/quote-builder/revise", async function(req, res) {
     }
     session.chatMessages.push({ role: "user", text: message, at: new Date().toISOString() });
     session.quote = await generateQuoteDraft(session, session.contextText, message);
+    const placeholderResult = await generateQuotePlaceholderValues(session, session.contextText, message, Object.assign({}, session.placeholderValues || {}, manualValues));
+    session.placeholderValues = placeholderResult.values;
+    session.missingPlaceholders = placeholderResult.missingPlaceholders;
+    if (session.missingPlaceholders.length > 0) {
+      res.json({
+        sessionId: session.sessionId,
+        needsInput: true,
+        summary: quotePlainText(session.quote),
+        quote: session.quote,
+        chatMessages: session.chatMessages,
+        templatePlaceholders: session.templatePlaceholders,
+        missingPlaceholders: session.missingPlaceholders,
+        placeholderValues: session.placeholderValues,
+        message: "A modositas utan is maradt hianyzo placeholder."
+      });
+      return;
+    }
     await renderQuoteDocuments(session);
     session.chatMessages.push({ role: "assistant", text: "Uj preview generalva.", at: new Date().toISOString() });
     res.json({
       sessionId: session.sessionId,
+      needsInput: false,
       summary: quotePlainText(session.quote),
       quote: session.quote,
       chatMessages: session.chatMessages,
+      templatePlaceholders: session.templatePlaceholders,
+      missingPlaceholders: [],
+      placeholderValues: session.placeholderValues,
       previewUrl: "/api/jokers/quote-builder/preview/" + encodeURIComponent(session.sessionId) + "?v=" + encodeURIComponent(session.updatedAt),
       pdfDownloadUrl: "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/pdf",
       docxDownloadUrl: "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/docx",
