@@ -136,6 +136,136 @@ sap.ui.define([
       }
     },
 
+    onQuoteTemplateFileChange: async function(oEvent) {
+      var oModel = this.getView().getModel("jokers");
+      var aFiles = oEvent && oEvent.getParameter ? oEvent.getParameter("files") : null;
+      var oFile = aFiles && aFiles[0] ? aFiles[0] : null;
+
+      if (!oFile) {
+        MessageToast.show("Valassz egy Word sablon fajlt.");
+        return;
+      }
+
+      oModel.setProperty("/quoteBusy", true);
+      oModel.setProperty("/quoteError", "");
+      oModel.setProperty("/quoteSummary", "");
+      oModel.setProperty("/quotePreviewUrl", "");
+      oModel.setProperty("/quotePdfDownloadUrl", "");
+      oModel.setProperty("/quoteDocxDownloadUrl", "");
+
+      try {
+        var oUpload = await AiService.uploadQuoteTemplate(oFile);
+        oModel.setProperty("/quoteSessionId", oUpload.sessionId || "");
+        oModel.setProperty("/quoteTemplateFileName", oUpload.templateFileName || oFile.name || "");
+        oModel.setProperty("/quoteTemplatePreview", oUpload.templateTextPreview || "");
+        MessageToast.show(oUpload.message || "Word sablon feltoltve.");
+      } catch (oError) {
+        oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "Word sablon feltoltesi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "Word sablon feltoltesi hiba.");
+      } finally {
+        oModel.setProperty("/quoteBusy", false);
+      }
+    },
+
+    onGenerateQuote: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
+      var sContext = (oModel.getProperty("/quoteContextText") || "").trim();
+
+      if (!sSessionId) {
+        MessageToast.show("Elobb tolts fel egy Word sablont.");
+        return;
+      }
+      if (!sContext) {
+        MessageToast.show("A kontextus mezot toltsd ki.");
+        return;
+      }
+
+      oModel.setProperty("/quoteBusy", true);
+      oModel.setProperty("/quoteError", "");
+      try {
+        var oResult = await AiService.generateQuote({
+          sessionId: sSessionId,
+          contextText: sContext
+        });
+        this._applyQuoteResult(oResult);
+        MessageToast.show("Arajanlat preview elkeszult.");
+      } catch (oError) {
+        oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "Arajanlat generalasi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "Arajanlat generalasi hiba.");
+      } finally {
+        oModel.setProperty("/quoteBusy", false);
+      }
+    },
+
+    onReviseQuote: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
+      var sMessage = (oModel.getProperty("/quoteRevisionMessage") || "").trim();
+
+      if (!sSessionId) {
+        MessageToast.show("Nincs aktiv arajanlat session.");
+        return;
+      }
+      if (!sMessage) {
+        MessageToast.show("Ird be a modositasi kerest.");
+        return;
+      }
+
+      oModel.setProperty("/quoteBusy", true);
+      oModel.setProperty("/quoteError", "");
+      try {
+        var oResult = await AiService.reviseQuote({
+          sessionId: sSessionId,
+          message: sMessage
+        });
+        this._applyQuoteResult(oResult);
+        oModel.setProperty("/quoteRevisionMessage", "");
+        MessageToast.show("Modositott preview elkeszult.");
+      } catch (oError) {
+        oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "Arajanlat modositasi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "Arajanlat modositasi hiba.");
+      } finally {
+        oModel.setProperty("/quoteBusy", false);
+      }
+    },
+
+    onOpenQuotePreview: function() {
+      var sUrl = this.getView().getModel("jokers").getProperty("/quotePreviewUrl");
+      if (sUrl) {
+        window.open(sUrl, "_blank", "noopener,noreferrer");
+      }
+    },
+
+    onDownloadQuoteDocx: function() {
+      this._openQuoteDownload("/quoteDocxDownloadUrl");
+    },
+
+    onDownloadQuotePdf: function() {
+      this._openQuoteDownload("/quotePdfDownloadUrl");
+    },
+
+    _applyQuoteResult: function(oResult) {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/quoteSummary", oResult && oResult.summary ? oResult.summary : "");
+      oModel.setProperty("/quotePreviewUrl", oResult && oResult.previewUrl ? oResult.previewUrl : "");
+      oModel.setProperty("/quotePdfDownloadUrl", oResult && oResult.pdfDownloadUrl ? oResult.pdfDownloadUrl : "");
+      oModel.setProperty("/quoteDocxDownloadUrl", oResult && oResult.docxDownloadUrl ? oResult.docxDownloadUrl : "");
+      oModel.setProperty("/quoteConversionMode", oResult && oResult.conversionMode ? oResult.conversionMode : "");
+      if (Array.isArray(oResult && oResult.chatMessages)) {
+        oModel.setProperty("/quoteChatMessages", oResult.chatMessages);
+      }
+    },
+
+    _openQuoteDownload: function(sProperty) {
+      var sUrl = this.getView().getModel("jokers").getProperty(sProperty);
+      if (!sUrl) {
+        MessageToast.show("Nincs letoltheto dokumentum.");
+        return;
+      }
+      window.open(sUrl, "_blank", "noopener,noreferrer");
+    },
+
     onRunDummy7Compare: async function() {
       var oModel = this.getView().getModel("jokers");
       var sCompanyA = (oModel.getProperty("/dummy7CompanyA") || "").trim();

@@ -159,6 +159,74 @@
         <TextArea value="{jokers>/dummy5Answer}" editable="false" rows="5" width="100%"/>
       </VBox>
 
+      <VBox visible="{= ${jokers>/selectedJoker/id} === 'quote-builder' }" width="100%">
+        <Panel headerText="Arajanlat bemenet">
+          <VBox class="sapUiSmallMargin">
+            <Text text="Tolts fel egy Word sablont, masold be az ugyfeligenyt vagy emailvaltast, majd generalj PDF preview-t es letoltheto Word/PDF ajanlatot." wrapping="true"/>
+            <Label text="Word sablon" class="sapUiSmallMarginTop"/>
+            <unif:FileUploader
+              id="quoteTemplateUploader"
+              width="100%"
+              fileType="docx,doc"
+              sameFilenameAllowed="true"
+              uploadOnChange="false"
+              buttonText="Word sablon valasztasa"
+              change=".onQuoteTemplateFileChange"/>
+            <ObjectStatus
+              text="{= ${jokers>/quoteTemplateFileName} ? 'Sablon: ' + ${jokers>/quoteTemplateFileName} : 'Nincs feltoltott Word sablon.' }"
+              state="{= ${jokers>/quoteSessionId} ? 'Success' : 'Information' }"
+              class="sapUiTinyMarginTop"/>
+
+            <Panel headerText="Sablon szoveges minta" expandable="true" expanded="false" class="sapUiSmallMarginTop" visible="{= ${jokers>/quoteTemplatePreview} ? true : false }">
+              <Text text="{jokers>/quoteTemplatePreview}" wrapping="true" class="sapUiSmallMargin"/>
+            </Panel>
+
+            <Label text="Kontextus" class="sapUiSmallMarginTop"/>
+            <TextArea
+              value="{jokers>/quoteContextText}"
+              rows="8"
+              growing="true"
+              growingMaxLines="16"
+              width="100%"
+              placeholder="Emailvaltas, ugyfeligeny, mennyisegek, hataridok, kedvezmeny vagy egyeb instrukcio..."/>
+
+            <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">
+              <Button text="Arajanlat generalasa" icon="sap-icon://pdf-attachment" type="Emphasized" press=".onGenerateQuote" busy="{jokers>/quoteBusy}" enabled="{= ${jokers>/quoteBusy} ? false : (${jokers>/quoteSessionId} ? true : false) }"/>
+              <Button text="PDF preview megnyitasa" icon="sap-icon://show" type="Transparent" press=".onOpenQuotePreview" enabled="{= ${jokers>/quotePreviewUrl} ? true : false }" class="sapUiTinyMarginBegin"/>
+              <Button text="Word letoltes" icon="sap-icon://download" type="Transparent" press=".onDownloadQuoteDocx" enabled="{= ${jokers>/quoteDocxDownloadUrl} ? true : false }" class="sapUiTinyMarginBegin"/>
+              <Button text="PDF letoltes" icon="sap-icon://download" type="Transparent" press=".onDownloadQuotePdf" enabled="{= ${jokers>/quotePdfDownloadUrl} ? true : false }" class="sapUiTinyMarginBegin"/>
+            </HBox>
+            <MessageStrip text="{jokers>/quoteError}" type="Error" showIcon="true" visible="{= ${jokers>/quoteError} ? true : false }" class="sapUiSmallMarginTop"/>
+            <ObjectStatus text="{= ${jokers>/quoteConversionMode} ? 'PDF konverzio: ' + ${jokers>/quoteConversionMode} : '' }" state="{= ${jokers>/quoteConversionMode} === 'libreoffice' ? 'Success' : 'Warning' }" visible="{= ${jokers>/quoteConversionMode} ? true : false }" class="sapUiSmallMarginTop"/>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="PDF preview" class="sapUiSmallMarginTop" visible="{= ${jokers>/quotePreviewUrl} ? true : false }">
+          <VBox class="sapUiSmallMargin">
+            <core:HTML content="{= '&lt;iframe src=&quot;' + ${jokers>/quotePreviewUrl} + '&quot; width=&quot;100%&quot; height=&quot;620&quot; style=&quot;border:1px solid #d9d9d9;border-radius:6px;&quot;&gt;&lt;/iframe&gt;' }"/>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Modositas chatben" class="sapUiSmallMarginTop" visible="{= ${jokers>/quotePreviewUrl} ? true : false }">
+          <VBox class="sapUiSmallMargin">
+            <TextArea value="{jokers>/quoteRevisionMessage}" rows="3" growing="true" growingMaxLines="8" width="100%" placeholder="Pl.: Adj hozza 10% kedvezmenyt, legyen 15 napos fizetesi hatarido, modositsd a bevezeto szoveget..."/>
+            <Button text="Modositas kuldese" icon="sap-icon://discussion" type="Emphasized" press=".onReviseQuote" busy="{jokers>/quoteBusy}" enabled="{= ${jokers>/quoteBusy} ? false : true }" class="sapUiTinyMarginTop"/>
+            <List items="{jokers>/quoteChatMessages}" visible="{= ${jokers>/quoteChatMessages}.length > 0 }" class="sapUiSmallMarginTop">
+              <CustomListItem>
+                <VBox class="sapUiTinyMargin">
+                  <ObjectStatus text="{jokers>role}" state="{= ${jokers>role} === 'user' ? 'Information' : 'Success' }"/>
+                  <Text text="{jokers>text}" wrapping="true"/>
+                </VBox>
+              </CustomListItem>
+            </List>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Arajanlat szoveges osszefoglalo" class="sapUiSmallMarginTop" visible="{= ${jokers>/quoteSummary} ? true : false }">
+          <TextArea value="{jokers>/quoteSummary}" editable="false" rows="10" growing="true" growingMaxLines="18" width="100%"/>
+        </Panel>
+      </VBox>
+
       <VBox visible="{= ${jokers>/selectedJoker/id} === 'dummy-7' }" width="100%">
         <Panel headerText="Bemenet (RAG osszehasonlitas)" class="sapUiSmallMarginBottom">
           <VBox class="sapUiSmallMargin">

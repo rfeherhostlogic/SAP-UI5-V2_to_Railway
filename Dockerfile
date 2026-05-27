@@ -3,8 +3,9 @@ FROM node:20-bookworm
 WORKDIR /app/myChatbot
 
 # Python is used by deterministic analytics runners in the backend.
+# LibreOffice is used for DOCX -> PDF preview conversion.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 \
+  && apt-get install -y --no-install-recommends python3 libreoffice-writer \
   && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies first for better layer caching

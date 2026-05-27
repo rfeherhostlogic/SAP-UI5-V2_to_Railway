@@ -11,6 +11,20 @@ const multer = require("multer");
 const bcrypt = require("bcryptjs");
 const { PDFParse } = require("pdf-parse");
 const PDFDocument = require("pdfkit");
+const mammoth = require("mammoth");
+const {
+  AlignmentType,
+  BorderStyle,
+  Document,
+  HeadingLevel,
+  Packer,
+  Paragraph,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+  WidthType
+} = require("docx");
 const { executeDummy4, SQL_PROMPTS, SUMMARY_PROMPTS } = require("./dummy4Service");
 const { parseSchemaHint, validateSelectSql } = require("./sqlValidator");
 const { buildChartRows, cloneDefaultCashflowRows, parseCsv, predictFromCsvBuffer } = require("./rpt1Service");
@@ -24,6 +38,7 @@ const STRANDS_OPENAI_MODEL = process.env.STRANDS_OPENAI_MODEL || OPENAI_MODEL;
 const DUMMY12_PRESS_MODEL = process.env.DUMMY12_PRESS_MODEL || "gpt-5";
 const DUMMY7_MODEL = process.env.DUMMY7_MODEL || "gpt-4.1";
 const DUMMY7_VECTOR_STORE_ID = "vs_698f417bc0e481919720698508275ad3";
+const QUOTE_VECTOR_STORE_ID = process.env.QUOTE_VECTOR_STORE_ID || "vs_6a16ba870e40819184099c03ca9cee06";
 const SMART_SEGMENT_VECTOR_STORE_ID = "vs_699ec6f7dc188191881c8d782ade2131";
 const APP_SESSION_SECRET = process.env.APP_SESSION_SECRET || "replace-this-in-production";
 const APP_SESSION_TTL_MS = Number(process.env.APP_SESSION_TTL_MS || (1000 * 60 * 60 * 12));
@@ -76,12 +91,20 @@ const oDummy13Jobs = new Map();
 const oDummy14Runs = new Map();
 const oDummy14Jobs = new Map();
 const oAuthSessions = new Map();
+const oQuoteSessions = new Map();
 let oShieldSchedulerTimer = null;
 const AUTH_USERS = loadAuthUsersFromEnv();
 const oDummy5Upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024
+  }
+});
+const oQuoteTemplateUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 15 * 1024 * 1024,
+    files: 1
   }
 });
 const oDummy9Upload = multer({
@@ -973,6 +996,388 @@ function buildPdfFromText(title, text) {
     renderRichPdfBody(doc, String(text || "Nincs eredmeny."));
     doc.end();
   });
+}
+
+function quoteToken() {
+  return crypto.randomBytes(18).toString("hex");
+}
+
+function parseJsonObjectFromText(text) {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    return null;
+  }
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(raw);
+  const candidate = fenced && fenced[1] ? fenced[1].trim() : raw;
+  try {
+    return JSON.parse(candidate);
+  } catch (_err) {
+    const start = candidate.indexOf("{");
+    const end = candidate.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(candidate.slice(start, end + 1));
+      } catch (_nestedErr) {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+function normalizeMoney(value) {
+  const n = Number(String(value == null ? 0 : value).replace(/\s/g, "").replace(",", "."));
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+}
+
+function formatQuoteMoney(value, currency) {
+  const n = normalizeMoney(value);
+  return new Intl.NumberFormat("hu-HU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(n) + " " + String(currency || "EUR");
+}
+
+function normalizeQuoteDraft(input) {
+  const now = new Date();
+  const quote = input && typeof input === "object" ? input : {};
+  const currency = String(quote.currency || "EUR").trim() || "EUR";
+  const items = Array.isArray(quote.items) ? quote.items : [];
+  let totalNet = 0;
+  const normalizedItems = items.map(function(item, index) {
+    const qty = normalizeMoney(item && item.qty != null ? item.qty : 1) || 1;
+    const unitPrice = normalizeMoney(item && item.unitPrice != null ? item.unitPrice : item && item.unit_price);
+    const total = Math.round(qty * unitPrice * 100) / 100;
+    totalNet += total;
+    return {
+      lineNo: index + 1,
+      description: String(item && item.description ? item.description : "Ajanlati tetel " + (index + 1)).trim(),
+      qty: qty,
+      unit: String(item && item.unit ? item.unit : "db").trim() || "db",
+      unitPrice: unitPrice,
+      total: total,
+      source: String(item && item.source ? item.source : "").trim()
+    };
+  });
+  if (normalizedItems.length === 0) {
+    normalizedItems.push({
+      lineNo: 1,
+      description: "Ajanlati tetel",
+      qty: 1,
+      unit: "db",
+      unitPrice: 0,
+      total: 0,
+      source: ""
+    });
+  }
+  if (totalNet === 0) {
+    totalNet = normalizedItems.reduce(function(sum, item) { return sum + normalizeMoney(item.total); }, 0);
+  }
+  const vatRate = normalizeMoney(quote.vatRate != null ? quote.vatRate : quote.vat_rate != null ? quote.vat_rate : 27);
+  const vatAmount = Math.round(totalNet * vatRate) / 100;
+  const totalGross = Math.round((totalNet + vatAmount) * 100) / 100;
+  return {
+    title: String(quote.title || "Arajanlat").trim(),
+    quoteNo: String(quote.quoteNo || quote.quote_no || ("Q-" + now.toISOString().slice(0, 10).replace(/-/g, ""))).trim(),
+    date: String(quote.date || now.toISOString().slice(0, 10)).trim(),
+    customer: String(quote.customer || quote.customerName || "Cimzett").trim(),
+    currency: currency,
+    intro: String(quote.intro || "Koszonjuk a megkeresest. Az alabbi arajanlatot keszitettuk el a megadott igenyek alapjan.").trim(),
+    items: normalizedItems,
+    notes: Array.isArray(quote.notes) ? quote.notes.map(String) : [],
+    terms: String(quote.terms || "Az ajanlat a muszaki es kereskedelmi egyeztetesek alapjan pontosithato.").trim(),
+    validity: String(quote.validity || "Az ajanlat 30 napig ervenyes.").trim(),
+    totalNet: Math.round(totalNet * 100) / 100,
+    vatRate: vatRate,
+    vatAmount: vatAmount,
+    totalGross: totalGross,
+    priceEvidence: Array.isArray(quote.priceEvidence) ? quote.priceEvidence.map(String).slice(0, 8) : []
+  };
+}
+
+function quotePlainText(quote) {
+  const q = normalizeQuoteDraft(quote);
+  const lines = [
+    q.title,
+    "Ajanlatszam: " + q.quoteNo,
+    "Datum: " + q.date,
+    "Cimzett: " + q.customer,
+    "",
+    q.intro,
+    "",
+    "Tetelek:"
+  ];
+  q.items.forEach(function(item) {
+    lines.push([
+      item.lineNo + ".",
+      item.description,
+      item.qty + " " + item.unit,
+      formatQuoteMoney(item.unitPrice, q.currency) + "/" + item.unit,
+      formatQuoteMoney(item.total, q.currency)
+    ].join(" | "));
+  });
+  lines.push("");
+  lines.push("Netto osszesen: " + formatQuoteMoney(q.totalNet, q.currency));
+  lines.push("AFA (" + q.vatRate + "%): " + formatQuoteMoney(q.vatAmount, q.currency));
+  lines.push("Brutto osszesen: " + formatQuoteMoney(q.totalGross, q.currency));
+  lines.push("");
+  lines.push("Feltetelek: " + q.terms);
+  lines.push("Ervenyesseg: " + q.validity);
+  if (q.notes.length) {
+    lines.push("");
+    lines.push("Megjegyzesek:");
+    q.notes.forEach(function(note) { lines.push("- " + note); });
+  }
+  return lines.join("\n");
+}
+
+async function extractWordTemplateText(file) {
+  const name = String(file && file.originalname ? file.originalname : "").toLowerCase();
+  if (!file || !file.buffer || !name.endsWith(".docx")) {
+    return "";
+  }
+  try {
+    const result = await mammoth.extractRawText({ buffer: file.buffer });
+    return String(result && result.value ? result.value : "").trim().slice(0, 6000);
+  } catch (err) {
+    console.warn("[quote] DOCX template extraction failed", err && err.message ? err.message : String(err));
+    return "";
+  }
+}
+
+async function retrieveQuotePrices(contextText) {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY hianyzik az arak lekeresehez.");
+  }
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + OPENAI_API_KEY
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      instructions: [
+        "A megadott kontextushoz keress relevans arakat a csatolt vector store-ban.",
+        "Csak visszakeresett aradatokra tamaszkodj.",
+        "A valasz JSON legyen: {\"items\":[{\"description\":\"\",\"unit\":\"db\",\"unitPrice\":0,\"currency\":\"EUR\",\"source\":\"\"}],\"evidence\":[\"\"]}.",
+        "Ha nincs ar, items legyen ures tomb es evidence tartalmazza, hogy nincs talalat."
+      ].join("\n"),
+      input: String(contextText || "").slice(0, 12000),
+      tools: [{
+        type: "file_search",
+        vector_store_ids: [QUOTE_VECTOR_STORE_ID]
+      }]
+    })
+  });
+  const raw = await response.text();
+  const json = parseOpenAiReply(raw);
+  if (!response.ok) {
+    throw new Error("Arlekeresi OpenAI hiba: " + (raw || response.status));
+  }
+  const text = extractResponsesOutputText(json);
+  return parseJsonObjectFromText(text) || { items: [], evidence: [text || "Nincs strukturalt arlekeresi valasz."] };
+}
+
+async function generateQuoteDraft(session, contextText, revisionText) {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY hianyzik az ajanlat generalashoz.");
+  }
+  const previous = session && session.quote ? quotePlainText(session.quote) : "";
+  const templateText = String(session && session.templateText ? session.templateText : "").slice(0, 5000);
+  const prompt = [
+    "Keszits magyar nyelvu uzleti arajanlatot JSON formatumban.",
+    "Arazashoz hivd meg/referald az arlekeresi toolt vagy a vector store eredmenyet.",
+    "Ne talalj ki arat, ha nincs aradat, akkor 0 arat es megjegyzest adj.",
+    "A JSON schema: title, quoteNo, date, customer, currency, intro, items[{description, qty, unit, unitPrice, source}], notes[], terms, validity, priceEvidence[].",
+    "",
+    "Sablon szoveges minta:",
+    templateText || "Nincs kinyerheto sablonszoveg; letisztult, formalis arajanlatot keszits.",
+    "",
+    "Felhasznaloi kontextus:",
+    String(contextText || "").slice(0, 12000),
+    previous ? "\nElozo ajanlat:\n" + previous : "",
+    revisionText ? "\nModositasi keres:\n" + String(revisionText || "").slice(0, 4000) : ""
+  ].filter(Boolean).join("\n");
+
+  try {
+    const sdk = await loadStrandsSdk();
+    const priceTool = sdk.tool({
+      name: "retrieve_quote_prices",
+      description: "Relevans arak lekerese az arajanlat vector store-bol.",
+      inputSchema: sdk.z.object({
+        context: sdk.z.string().min(1)
+      }),
+      callback: async function(input) {
+        return retrieveQuotePrices(input && input.context ? input.context : contextText);
+      }
+    });
+    const model = new sdk.OpenAIModel({
+      api: "chat",
+      modelId: STRANDS_OPENAI_MODEL,
+      apiKey: OPENAI_API_KEY
+    });
+    const agent = new sdk.Agent({
+      name: "Quote Builder Agent",
+      model: model,
+      tools: [priceTool],
+      systemPrompt: "Arajanlat-keszito agent vagy. Mindig strukturalt JSON-t adj vissza, es araknal hasznald a retrieve_quote_prices toolt.",
+      printer: false
+    });
+    const result = await agent.invoke(prompt);
+    const parsed = parseJsonObjectFromText(extractStrandsText(result));
+    if (parsed) {
+      return normalizeQuoteDraft(parsed);
+    }
+  } catch (err) {
+    console.warn("[quote] Strands generation fallback", err && err.message ? err.message : String(err));
+  }
+
+  const prices = await retrieveQuotePrices(contextText);
+  const fallbackResponse = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + OPENAI_API_KEY
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      instructions: "Arajanlat-keszito asszisztens vagy. Kotelezoen csak JSON objektumot adj vissza a kert mezokkel.",
+      input: prompt + "\n\nVector store areredmeny:\n" + JSON.stringify(prices).slice(0, 8000)
+    })
+  });
+  const raw = await fallbackResponse.text();
+  const json = parseOpenAiReply(raw);
+  if (!fallbackResponse.ok) {
+    throw new Error("Arajanlat generalasi OpenAI hiba: " + (raw || fallbackResponse.status));
+  }
+  const parsed = parseJsonObjectFromText(extractResponsesOutputText(json));
+  return normalizeQuoteDraft(parsed || {
+    title: "Arajanlat",
+    items: Array.isArray(prices.items) ? prices.items : [],
+    notes: ["Az ajanlat automatikusan keszult a megadott kontextus es az elerheto aradatok alapjan."],
+    priceEvidence: Array.isArray(prices.evidence) ? prices.evidence : []
+  });
+}
+
+function tableCell(text, bold) {
+  return new TableCell({
+    margins: { top: 120, bottom: 120, left: 120, right: 120 },
+    children: [new Paragraph({
+      children: [new TextRun({ text: String(text == null ? "" : text), bold: !!bold })]
+    })]
+  });
+}
+
+async function buildQuoteDocxBuffer(quote) {
+  const q = normalizeQuoteDraft(quote);
+  const rows = [
+    new TableRow({
+      children: [
+        tableCell("Tetel", true),
+        tableCell("Mennyiseg", true),
+        tableCell("Egysegar", true),
+        tableCell("Osszeg", true)
+      ]
+    })
+  ].concat(q.items.map(function(item) {
+    return new TableRow({
+      children: [
+        tableCell(item.description, false),
+        tableCell(item.qty + " " + item.unit, false),
+        tableCell(formatQuoteMoney(item.unitPrice, q.currency), false),
+        tableCell(formatQuoteMoney(item.total, q.currency), false)
+      ]
+    });
+  }));
+  const doc = new Document({
+    sections: [{
+      properties: {},
+      children: [
+        new Paragraph({ text: q.title, heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER }),
+        new Paragraph({ text: "Ajanlatszam: " + q.quoteNo }),
+        new Paragraph({ text: "Datum: " + q.date }),
+        new Paragraph({ text: "Cimzett: " + q.customer }),
+        new Paragraph({ text: "" }),
+        new Paragraph({ children: [new TextRun(q.intro)] }),
+        new Paragraph({ text: "" }),
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: rows
+        }),
+        new Paragraph({ text: "" }),
+        new Paragraph({ children: [new TextRun({ text: "Netto osszesen: " + formatQuoteMoney(q.totalNet, q.currency), bold: true })], alignment: AlignmentType.RIGHT }),
+        new Paragraph({ text: "AFA (" + q.vatRate + "%): " + formatQuoteMoney(q.vatAmount, q.currency), alignment: AlignmentType.RIGHT }),
+        new Paragraph({ children: [new TextRun({ text: "Brutto osszesen: " + formatQuoteMoney(q.totalGross, q.currency), bold: true })], alignment: AlignmentType.RIGHT }),
+        new Paragraph({ text: "" }),
+        new Paragraph({ text: "Feltetelek", heading: HeadingLevel.HEADING_2 }),
+        new Paragraph({ text: q.terms }),
+        new Paragraph({ text: q.validity }),
+        new Paragraph({ text: "" }),
+        new Paragraph({ text: "Megjegyzesek", heading: HeadingLevel.HEADING_2 }),
+        ...(q.notes.length ? q.notes : ["A vegleges dokumentum emberi ellenorzes utan kuldheto ki."]).map(function(note) {
+          return new Paragraph({ text: "- " + note });
+        })
+      ]
+    }]
+  });
+  return Packer.toBuffer(doc);
+}
+
+async function convertDocxToPdfBuffer(docxBuffer) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "quote-pdf-"));
+  const docxPath = path.join(tempDir, "quote.docx");
+  const pdfPath = path.join(tempDir, "quote.pdf");
+  fs.writeFileSync(docxPath, docxBuffer);
+  const commands = process.platform === "win32"
+    ? ["soffice.exe", "libreoffice.exe"]
+    : ["soffice", "libreoffice"];
+
+  try {
+    for (let i = 0; i < commands.length; i += 1) {
+      const cmd = commands[i];
+      try {
+        await new Promise(function(resolve, reject) {
+          const child = spawn(cmd, ["--headless", "--convert-to", "pdf", "--outdir", tempDir, docxPath]);
+          let stderr = "";
+          child.stderr.on("data", function(chunk) { stderr += String(chunk || ""); });
+          child.on("error", reject);
+          child.on("close", function(code) {
+            if (Number(code) === 0 && fs.existsSync(pdfPath)) {
+              resolve();
+            } else {
+              reject(new Error(stderr.trim() || ("LibreOffice konverzio hiba: " + code)));
+            }
+          });
+        });
+        return fs.readFileSync(pdfPath);
+      } catch (_err) {
+        // Try the next executable name.
+      }
+    }
+    throw new Error("LibreOffice nem erheto el.");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+async function renderQuoteDocuments(session) {
+  const quote = normalizeQuoteDraft(session.quote);
+  const docxBuffer = await buildQuoteDocxBuffer(quote);
+  let pdfBuffer;
+  let conversionMode = "libreoffice";
+  try {
+    pdfBuffer = await convertDocxToPdfBuffer(docxBuffer);
+  } catch (err) {
+    conversionMode = "pdfkit-fallback";
+    console.warn("[quote] LibreOffice conversion fallback", err && err.message ? err.message : String(err));
+    pdfBuffer = await buildPdfFromText(quote.title, quotePlainText(quote));
+  }
+  session.docxBuffer = docxBuffer;
+  session.pdfBuffer = pdfBuffer;
+  session.conversionMode = conversionMode;
+  session.updatedAt = new Date().toISOString();
+  return session;
 }
 
 function resolvePdfFontPath() {
@@ -7833,6 +8238,151 @@ app.post("/api/jokers/dummy9/run", oDummy9Upload.array("files", 12), async funct
       details: err && err.message ? err.message : String(err)
     });
   }
+});
+
+app.post("/api/jokers/quote-builder/upload-template", oQuoteTemplateUpload.single("file"), async function(req, res) {
+  try {
+    const file = req.file;
+    if (!file || !file.buffer) {
+      res.status(400).json({ error: "Word sablon fajl kotelezo." });
+      return;
+    }
+    const name = String(file.originalname || "template.docx");
+    const lower = name.toLowerCase();
+    if (!lower.endsWith(".docx") && !lower.endsWith(".doc")) {
+      res.status(400).json({ error: "Csak Word fajl tamogatott (.docx vagy .doc)." });
+      return;
+    }
+    const sessionId = quoteToken();
+    const templateText = await extractWordTemplateText(file);
+    oQuoteSessions.set(sessionId, {
+      sessionId: sessionId,
+      templateFileName: name,
+      templateMime: String(file.mimetype || ""),
+      templateBuffer: file.buffer,
+      templateText: templateText,
+      contextText: "",
+      chatMessages: [],
+      quote: null,
+      docxBuffer: null,
+      pdfBuffer: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    res.json({
+      sessionId: sessionId,
+      templateFileName: name,
+      templateTextPreview: templateText.slice(0, 1200),
+      message: templateText ? "Sablon feltoltve es szoveges minta kinyerve." : "Sablon feltoltve. A .doc fajlbol nem keszult szoveges minta, de a dokumentum referenciakent megmarad."
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Arajanlat sablon feltoltesi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/quote-builder/generate", async function(req, res) {
+  try {
+    const sessionId = String(req.body && req.body.sessionId ? req.body.sessionId : "").trim();
+    const contextText = String(req.body && req.body.contextText ? req.body.contextText : "").trim();
+    const session = oQuoteSessions.get(sessionId);
+    if (!session) {
+      res.status(404).json({ error: "Az arajanlat session nem erheto el. Toltsd fel ujra a sablont." });
+      return;
+    }
+    if (!contextText) {
+      res.status(400).json({ error: "A kontextus mezot toltsd ki." });
+      return;
+    }
+    session.contextText = contextText;
+    session.quote = await generateQuoteDraft(session, contextText, "");
+    await renderQuoteDocuments(session);
+    res.json({
+      sessionId: session.sessionId,
+      summary: quotePlainText(session.quote),
+      quote: session.quote,
+      previewUrl: "/api/jokers/quote-builder/preview/" + encodeURIComponent(session.sessionId) + "?v=" + encodeURIComponent(session.updatedAt),
+      pdfDownloadUrl: "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/pdf",
+      docxDownloadUrl: "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/docx",
+      conversionMode: session.conversionMode
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Arajanlat generalasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/quote-builder/revise", async function(req, res) {
+  try {
+    const sessionId = String(req.body && req.body.sessionId ? req.body.sessionId : "").trim();
+    const message = String(req.body && req.body.message ? req.body.message : "").trim();
+    const session = oQuoteSessions.get(sessionId);
+    if (!session || !session.quote) {
+      res.status(404).json({ error: "Nincs modosithato arajanlat preview. Generalj eloszor ajanlatot." });
+      return;
+    }
+    if (!message) {
+      res.status(400).json({ error: "A modositasi uzenet kotelezo." });
+      return;
+    }
+    session.chatMessages.push({ role: "user", text: message, at: new Date().toISOString() });
+    session.quote = await generateQuoteDraft(session, session.contextText, message);
+    await renderQuoteDocuments(session);
+    session.chatMessages.push({ role: "assistant", text: "Uj preview generalva.", at: new Date().toISOString() });
+    res.json({
+      sessionId: session.sessionId,
+      summary: quotePlainText(session.quote),
+      quote: session.quote,
+      chatMessages: session.chatMessages,
+      previewUrl: "/api/jokers/quote-builder/preview/" + encodeURIComponent(session.sessionId) + "?v=" + encodeURIComponent(session.updatedAt),
+      pdfDownloadUrl: "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/pdf",
+      docxDownloadUrl: "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/docx",
+      conversionMode: session.conversionMode
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Arajanlat modositasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.get("/api/jokers/quote-builder/preview/:sessionId", function(req, res) {
+  const session = oQuoteSessions.get(String(req.params.sessionId || ""));
+  if (!session || !session.pdfBuffer) {
+    res.status(404).json({ error: "PDF preview nem erheto el." });
+    return;
+  }
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Cache-Control", "no-store");
+  res.send(session.pdfBuffer);
+});
+
+app.get("/api/jokers/quote-builder/download/:sessionId/:format", function(req, res) {
+  const session = oQuoteSessions.get(String(req.params.sessionId || ""));
+  const format = String(req.params.format || "").toLowerCase();
+  if (!session) {
+    res.status(404).json({ error: "Arajanlat session nem erheto el." });
+    return;
+  }
+  const safeQuoteNo = String(session.quote && session.quote.quoteNo ? session.quote.quoteNo : "arajanlat").replace(/[^a-z0-9_-]+/gi, "_");
+  if (format === "pdf" && session.pdfBuffer) {
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=\"" + safeQuoteNo + ".pdf\"");
+    res.send(session.pdfBuffer);
+    return;
+  }
+  if (format === "docx" && session.docxBuffer) {
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", "attachment; filename=\"" + safeQuoteNo + ".docx\"");
+    res.send(session.docxBuffer);
+    return;
+  }
+  res.status(404).json({ error: "A kert formatum nem erheto el." });
 });
 
 app.post("/api/jokers/rpt1-payment-delay/run", oRpt1Upload.single("file"), async function(req, res) {

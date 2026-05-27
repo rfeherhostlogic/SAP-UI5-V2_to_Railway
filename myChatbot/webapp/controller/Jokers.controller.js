@@ -110,6 +110,20 @@ sap.ui.define([
         oJokersModel.setProperty("/dummy10Summary", "");
         oJokersModel.setProperty("/dummy10Rows", []);
         oJokersModel.setProperty("/dummy10SegmentItems", []);
+      } else if (oJoker.id === "quote-builder") {
+        oJokersModel.setProperty("/quoteSessionId", "");
+        oJokersModel.setProperty("/quoteTemplateFileName", "");
+        oJokersModel.setProperty("/quoteTemplatePreview", "");
+        oJokersModel.setProperty("/quoteContextText", "");
+        oJokersModel.setProperty("/quoteSummary", "");
+        oJokersModel.setProperty("/quotePreviewUrl", "");
+        oJokersModel.setProperty("/quotePdfDownloadUrl", "");
+        oJokersModel.setProperty("/quoteDocxDownloadUrl", "");
+        oJokersModel.setProperty("/quoteRevisionMessage", "");
+        oJokersModel.setProperty("/quoteChatMessages", []);
+        oJokersModel.setProperty("/quoteBusy", false);
+        oJokersModel.setProperty("/quoteError", "");
+        oJokersModel.setProperty("/quoteConversionMode", "");
       } else if (oJoker.id === "kpi-discovery") {
         oJokersModel.setProperty("/kpiDiscoveryError", "");
         oJokersModel.setProperty("/kpiDiscoverySchemaSummary", "");

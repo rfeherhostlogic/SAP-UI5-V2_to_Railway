@@ -497,6 +497,63 @@
     });
   }
 
+  function uploadQuoteTemplate(oFile) {
+    var oFormData = new FormData();
+    oFormData.append("file", oFile);
+
+    return fetch("/api/jokers/quote-builder/upload-template", {
+      method: "POST",
+      body: oFormData
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function generateQuote(mPayload) {
+    return fetch("/api/jokers/quote-builder/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        sessionId: mPayload.sessionId || "",
+        contextText: mPayload.contextText || ""
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function reviseQuote(mPayload) {
+    return fetch("/api/jokers/quote-builder/revise", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        sessionId: mPayload.sessionId || "",
+        message: mPayload.message || ""
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function runDummy7Compare(mPayload) {
     return fetch("/api/jokers/dummy7/compare", {
       method: "POST",
@@ -1309,6 +1366,9 @@
     uploadDummy5Pdf: uploadDummy5Pdf,
     summarizeDummy5: summarizeDummy5,
     askDummy5: askDummy5,
+    uploadQuoteTemplate: uploadQuoteTemplate,
+    generateQuote: generateQuote,
+    reviseQuote: reviseQuote,
     runDummy7Compare: runDummy7Compare,
     runSmartSegmentation: runSmartSegmentation,
     sendSmartSegmentationToCrm: sendSmartSegmentationToCrm,
