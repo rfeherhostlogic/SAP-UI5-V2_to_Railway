@@ -10,7 +10,7 @@ RUN apt-get update \
 
 # Install dependencies first for better layer caching
 COPY myChatbot/package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy application source and build UI5 production assets
 COPY myChatbot/ ./
