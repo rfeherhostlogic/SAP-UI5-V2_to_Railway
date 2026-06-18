@@ -96,6 +96,194 @@
   color: #17324d;
 }
 
+.quoteBuilderShell {
+  gap: 0.9rem;
+}
+
+.quoteTopBar {
+  border-radius: 1rem;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(210, 222, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  gap: 0.75rem;
+}
+
+.quoteTopBarTitle .sapMTitle {
+  color: #0f2942;
+}
+
+.quoteTemplateChip {
+  border-radius: 999px;
+  padding: 0.35rem 0.5rem 0.35rem 0.85rem;
+  background: linear-gradient(180deg, #eef4fd 0%, #e3edfb 100%);
+  border: 1px solid rgba(150, 180, 222, 0.6);
+  color: #1d4ed8;
+  gap: 0.4rem;
+}
+
+.quoteTemplateChip .sapMBtn .sapMBtnInner {
+  min-width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+}
+
+.quoteTextSampleSelect {
+  min-width: 13rem;
+}
+
+.quoteContextCard {
+  border-radius: 1.1rem;
+  padding: 1.1rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(210, 222, 240, 0.9);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.quoteGenerateButton {
+  border-radius: 0.9rem;
+  min-width: 14rem;
+}
+
+.quoteTemplateAccordion {
+  border-radius: 0.9rem;
+}
+
+.quoteSkeletonDoc {
+  border: 1px dashed #9db4cf;
+  border-radius: 0.75rem;
+  background: #f8fbff;
+  padding: 1rem;
+}
+
+.quoteSkeletonBlock {
+  border: 1px dashed #b9c8de;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+  color: #5e6f84;
+}
+
+.quoteResultLayout {
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.quoteTextPanel,
+.quotePreviewPanel {
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(210, 222, 240, 0.9);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.quoteCenterColumn {
+  flex: 0 0 6.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.quoteRefreshButton .sapMBtnInner {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 999px;
+  background: #0a6ed1;
+  border-color: #0a6ed1;
+  box-shadow: 0 12px 24px rgba(10, 110, 209, 0.35);
+}
+
+.quoteRefreshButton .sapMBtnIcon {
+  font-size: 1.5rem;
+  color: #ffffff;
+}
+
+.quoteRefreshCaption {
+  text-align: center;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.quoteEditableField input,
+.quoteEditableField .sapMInputBaseInner {
+  border: none;
+  border-bottom: 1px dashed #6f93c2;
+  border-radius: 0;
+  background: rgba(234, 242, 255, 0.5);
+}
+
+.quotePreviewToolbar {
+  border-bottom: 1px solid rgba(210, 222, 240, 0.9);
+}
+
+.quotePreviewFrame {
+  border: 0;
+}
+
+.quoteChatSection {
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(210, 222, 240, 0.9);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.quoteChatBubbleUser {
+  max-width: min(70%, 32rem);
+  border-radius: 1.1rem;
+  background: linear-gradient(180deg, #e8effd 0%, #deebff 100%);
+  border: 1px solid rgba(215, 226, 242, 0.8);
+  color: #1e3a5f;
+  padding: 0.7rem 0.9rem;
+}
+
+.quoteChatBubbleNoah {
+  max-width: min(70%, 32rem);
+  border-radius: 1.1rem;
+  background: #ffffff;
+  border: 1px solid rgba(214, 225, 241, 0.95);
+  color: #1d2e4a;
+  padding: 0.7rem 0.9rem;
+}
+
+.quoteChatAvatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: #0a6ed1;
+  color: #ffffff;
+  text-align: center;
+  font-weight: 700;
+  line-height: 2rem;
+}
+
+.quoteChatComposerBar {
+  gap: 0.4rem;
+  align-items: center;
+  border: 1px solid rgba(207, 219, 235, 0.95);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.97);
+  padding: 0.4rem 0.4rem 0.4rem 0.85rem;
+}
+
+.quoteChatSendButton .sapMBtnInner {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 999px;
+  background: #0a6ed1;
+  border-color: #0a6ed1;
+}
+
+.quoteChatSendButton .sapMBtnIcon {
+  color: #ffffff;
+}
+
+.quoteBottomBar {
+  padding-top: 0.25rem;
+}
+
 @media (max-width: 900px) {
   .jokerTile {
     width: 100%;
@@ -104,6 +292,15 @@
   .dummy9QuestionRow {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .quoteResultLayout {
+    flex-direction: column;
+  }
+
+  .quoteCenterColumn {
+    flex: 0 0 auto;
+    flex-direction: row;
   }
 }
 
