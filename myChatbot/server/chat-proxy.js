@@ -1570,22 +1570,37 @@ async function buildQuoteDocxBuffer(quote, session) {
 
 async function convertDocxToPdfBuffer(docxBuffer) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "quote-pdf-"));
+  const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "quote-pdf-profile-"));
   const docxPath = path.join(tempDir, "quote.docx");
   const pdfPath = path.join(tempDir, "quote.pdf");
   fs.writeFileSync(docxPath, docxBuffer);
   const commands = process.platform === "win32"
     ? ["soffice.exe", "libreoffice.exe"]
     : ["soffice", "libreoffice"];
+  const userInstallationUrl = "file://" + (process.platform === "win32" ? "/" + profileDir.replace(/\\/g, "/") : profileDir);
+  const childEnv = Object.assign({}, process.env, {
+    HOME: process.env.HOME || os.tmpdir()
+  });
 
+  const attemptErrors = [];
   try {
     for (let i = 0; i < commands.length; i += 1) {
       const cmd = commands[i];
       try {
         await new Promise(function(resolve, reject) {
-          const child = spawn(cmd, ["--headless", "--convert-to", "pdf", "--outdir", tempDir, docxPath]);
+          const child = spawn(cmd, [
+            "--headless",
+            "--norestore",
+            "-env:UserInstallation=" + userInstallationUrl,
+            "--convert-to", "pdf",
+            "--outdir", tempDir,
+            docxPath
+          ], { env: childEnv });
           let stderr = "";
           child.stderr.on("data", function(chunk) { stderr += String(chunk || ""); });
-          child.on("error", reject);
+          child.on("error", function(spawnErr) {
+            reject(new Error("A \"" + cmd + "\" parancs nem talalhato vagy nem futtathato (" + (spawnErr && spawnErr.code ? spawnErr.code : spawnErr.message) + ")."));
+          });
           child.on("close", function(code) {
             if (Number(code) === 0 && fs.existsSync(pdfPath)) {
               resolve();
@@ -1595,13 +1610,14 @@ async function convertDocxToPdfBuffer(docxBuffer) {
           });
         });
         return fs.readFileSync(pdfPath);
-      } catch (_err) {
-        // Try the next executable name.
+      } catch (attemptErr) {
+        attemptErrors.push(cmd + ": " + (attemptErr && attemptErr.message ? attemptErr.message : String(attemptErr)));
       }
     }
-    throw new Error("LibreOffice nem erheto el.");
+    throw new Error("LibreOffice nem erheto el. " + attemptErrors.join(" | "));
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.rmSync(profileDir, { recursive: true, force: true });
   }
 }
 
