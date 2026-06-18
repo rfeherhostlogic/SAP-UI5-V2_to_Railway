@@ -523,7 +523,8 @@
       body: JSON.stringify({
         sessionId: mPayload.sessionId || "",
         contextText: mPayload.contextText || "",
-        placeholderValues: mPayload.placeholderValues || {}
+        placeholderValues: mPayload.placeholderValues || {},
+        force: !!mPayload.force
       })
     }).then(function(oResponse) {
       if (!oResponse.ok) {
@@ -544,7 +545,29 @@
       body: JSON.stringify({
         sessionId: mPayload.sessionId || "",
         message: mPayload.message || "",
-        placeholderValues: mPayload.placeholderValues || {}
+        placeholderValues: mPayload.placeholderValues || {},
+        force: !!mPayload.force,
+        skipRender: !!mPayload.skipRender
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
+  function renderQuote(mPayload) {
+    return fetch("/api/jokers/quote-builder/render", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        sessionId: mPayload.sessionId || "",
+        quote: mPayload.quote || {}
       })
     }).then(function(oResponse) {
       if (!oResponse.ok) {
@@ -1371,6 +1394,7 @@
     uploadQuoteTemplate: uploadQuoteTemplate,
     generateQuote: generateQuote,
     reviseQuote: reviseQuote,
+    renderQuote: renderQuote,
     runDummy7Compare: runDummy7Compare,
     runSmartSegmentation: runSmartSegmentation,
     sendSmartSegmentationToCrm: sendSmartSegmentationToCrm,

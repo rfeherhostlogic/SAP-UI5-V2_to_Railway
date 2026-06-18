@@ -8530,6 +8530,7 @@ app.post("/api/jokers/quote-builder/generate", async function(req, res) {
     const sessionId = String(req.body && req.body.sessionId ? req.body.sessionId : "").trim();
     const contextText = String(req.body && req.body.contextText ? req.body.contextText : "").trim();
     const manualValues = req.body && req.body.placeholderValues ? req.body.placeholderValues : {};
+    const force = !!(req.body && req.body.force);
     const session = oQuoteSessions.get(sessionId);
     if (!session) {
       res.status(404).json({ error: "Az arajanlat session nem erheto el. Toltsd fel ujra a sablont." });
@@ -8544,7 +8545,7 @@ app.post("/api/jokers/quote-builder/generate", async function(req, res) {
     const placeholderResult = await generateQuotePlaceholderValues(session, contextText, "", manualValues);
     session.placeholderValues = placeholderResult.values;
     session.missingPlaceholders = placeholderResult.missingPlaceholders;
-    if (session.missingPlaceholders.length > 0) {
+    if (session.missingPlaceholders.length > 0 && !force) {
       res.json({
         sessionId: session.sessionId,
         needsInput: true,
@@ -8584,6 +8585,8 @@ app.post("/api/jokers/quote-builder/revise", async function(req, res) {
     const sessionId = String(req.body && req.body.sessionId ? req.body.sessionId : "").trim();
     const message = String(req.body && req.body.message ? req.body.message : "").trim();
     const manualValues = req.body && req.body.placeholderValues ? req.body.placeholderValues : {};
+    const force = !!(req.body && req.body.force);
+    const skipRender = !!(req.body && req.body.skipRender);
     const session = oQuoteSessions.get(sessionId);
     if (!session || !session.quote) {
       res.status(404).json({ error: "Nincs modosithato arajanlat preview. Generalj eloszor ajanlatot." });
@@ -8598,7 +8601,7 @@ app.post("/api/jokers/quote-builder/revise", async function(req, res) {
     const placeholderResult = await generateQuotePlaceholderValues(session, session.contextText, message, Object.assign({}, session.placeholderValues || {}, manualValues));
     session.placeholderValues = placeholderResult.values;
     session.missingPlaceholders = placeholderResult.missingPlaceholders;
-    if (session.missingPlaceholders.length > 0) {
+    if (session.missingPlaceholders.length > 0 && !force) {
       res.json({
         sessionId: session.sessionId,
         needsInput: true,
@@ -8612,8 +8615,10 @@ app.post("/api/jokers/quote-builder/revise", async function(req, res) {
       });
       return;
     }
-    await renderQuoteDocuments(session);
-    session.chatMessages.push({ role: "assistant", text: "Uj preview generalva.", at: new Date().toISOString() });
+    if (!skipRender) {
+      await renderQuoteDocuments(session);
+    }
+    session.chatMessages.push({ role: "assistant", text: skipRender ? "Az ajanlat szovege frissult. Kattints a \"Frissites PDF-ben\" gombra a PDF frissitesehez." : "Uj preview generalva.", at: new Date().toISOString() });
     res.json({
       sessionId: session.sessionId,
       needsInput: false,
@@ -8623,6 +8628,34 @@ app.post("/api/jokers/quote-builder/revise", async function(req, res) {
       templatePlaceholders: session.templatePlaceholders,
       missingPlaceholders: [],
       placeholderValues: session.placeholderValues,
+      previewUrl: session.pdfBuffer ? "/api/jokers/quote-builder/preview/" + encodeURIComponent(session.sessionId) + "?v=" + encodeURIComponent(session.updatedAt) : "",
+      pdfDownloadUrl: session.pdfBuffer ? "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/pdf" : "",
+      docxDownloadUrl: session.docxBuffer ? "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/docx" : "",
+      conversionMode: session.conversionMode
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Arajanlat modositasi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/quote-builder/render", async function(req, res) {
+  try {
+    const sessionId = String(req.body && req.body.sessionId ? req.body.sessionId : "").trim();
+    const editedQuote = req.body && req.body.quote && typeof req.body.quote === "object" ? req.body.quote : {};
+    const session = oQuoteSessions.get(sessionId);
+    if (!session || !session.quote) {
+      res.status(404).json({ error: "Nincs modosithato arajanlat preview. Generalj eloszor ajanlatot." });
+      return;
+    }
+    session.quote = normalizeQuoteDraft(Object.assign({}, session.quote, editedQuote));
+    await renderQuoteDocuments(session);
+    res.json({
+      sessionId: session.sessionId,
+      summary: quotePlainText(session.quote),
+      quote: session.quote,
       previewUrl: "/api/jokers/quote-builder/preview/" + encodeURIComponent(session.sessionId) + "?v=" + encodeURIComponent(session.updatedAt),
       pdfDownloadUrl: "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/pdf",
       docxDownloadUrl: "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/docx",
@@ -8630,7 +8663,7 @@ app.post("/api/jokers/quote-builder/revise", async function(req, res) {
     });
   } catch (err) {
     res.status(500).json({
-      error: "Arajanlat modositasi hiba",
+      error: "Arajanlat PDF frissitesi hiba",
       details: err && err.message ? err.message : String(err)
     });
   }
