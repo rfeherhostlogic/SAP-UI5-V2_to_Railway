@@ -8,7 +8,17 @@ build:
 run:
   runtime-version: 22
   pre-run:
-    - dnf install -y libreoffice libreoffice-writer || yum install -y libreoffice libreoffice-writer
+    # LibreOffice (soffice, headless) is required for DOCX -> PDF
+    # conversion in the Arajanlat keszito (Quote Builder) module.
+    # Try the package managers available on Amazon Linux managed
+    # runtime images, in order of likelihood, and fail loudly if none
+    # succeed so a missing dependency is visible at deploy time
+    # instead of surfacing later as a runtime PDF generation error.
+    - >
+      (dnf install -y libreoffice-writer libreoffice-core ||
+       microdnf install -y libreoffice-writer libreoffice-core ||
+       yum install -y libreoffice-writer libreoffice-core) &&
+      which soffice
   command: npm start
   network:
     port: 3000
