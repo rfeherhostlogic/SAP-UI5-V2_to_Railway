@@ -10737,4 +10737,8 @@ async function bootstrapServer() {
   });
 }
 
-bootstrapServer();
+if (require.main === module) {
+  bootstrapServer();
+}
+
+module.exports = { convertDocxToPdfBuffer };
