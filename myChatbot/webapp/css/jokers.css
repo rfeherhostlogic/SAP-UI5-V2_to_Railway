@@ -184,6 +184,7 @@
   flex: 0 0 6.5rem;
   align-items: center;
   justify-content: center;
+  align-self: center;
   gap: 0.5rem;
 }
 
@@ -230,33 +231,9 @@
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
 }
 
-.quoteChatBubbleUser {
+.quoteChatSection .chatBubbleAi,
+.quoteChatSection .chatBubbleUser {
   max-width: min(70%, 32rem);
-  border-radius: 1.1rem;
-  background: linear-gradient(180deg, #e8effd 0%, #deebff 100%);
-  border: 1px solid rgba(215, 226, 242, 0.8);
-  color: #1e3a5f;
-  padding: 0.7rem 0.9rem;
-}
-
-.quoteChatBubbleNoah {
-  max-width: min(70%, 32rem);
-  border-radius: 1.1rem;
-  background: #ffffff;
-  border: 1px solid rgba(214, 225, 241, 0.95);
-  color: #1d2e4a;
-  padding: 0.7rem 0.9rem;
-}
-
-.quoteChatAvatar {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 999px;
-  background: #0a6ed1;
-  color: #ffffff;
-  text-align: center;
-  font-weight: 700;
-  line-height: 2rem;
 }
 
 .quoteChatComposerBar {

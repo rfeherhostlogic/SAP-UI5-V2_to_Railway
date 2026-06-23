@@ -326,8 +326,8 @@
               <List items="{jokers>/quoteChatMessages}" showSeparators="None" mode="None">
                 <CustomListItem>
                   <HBox justifyContent="{= ${jokers>role} === 'user' ? 'End' : 'Start' }" alignItems="Start" width="100%" class="sapUiTinyMarginBottom">
-                    <Text text="N" class="quoteChatAvatar sapUiTinyMarginEnd" visible="{= ${jokers>role} !== 'user' }"/>
-                    <VBox class="{= ${jokers>role} === 'user' ? 'quoteChatBubbleUser' : 'quoteChatBubbleNoah' }">
+                    <Avatar initials="N" displaySize="XS" class="chatAvatar noahAvatar" visible="{= ${jokers>role} !== 'user' }"/>
+                    <VBox class="{= ${jokers>role} === 'user' ? 'chatBubble chatBubbleUser noahBubbleUser' : 'chatBubble chatBubbleAi noahBubbleAi' }">
                       <Text text="{jokers>text}" wrapping="true"/>
                     </VBox>
                   </HBox>
@@ -2000,7 +2000,7 @@
       </VBox>
       <!-- ═══════════════════════════════════════════════════ DUMMY 14 END ══ -->
 
-      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' &amp;&amp; ${jokers>/selectedJoker/id} !== 'kpi-discovery' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-11' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-12' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-13' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-14' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-21' }" width="100%">
+      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' &amp;&amp; ${jokers>/selectedJoker/id} !== 'kpi-discovery' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-11' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-12' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-13' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-14' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-21' &amp;&amp; ${jokers>/selectedJoker/id} !== 'quote-builder' }" width="100%">
         <TextArea value="{jokers>/promptInput}" rows="10" growing="true" growingMaxLines="16" width="100%" placeholder="Ide ird a feldolgozando szoveget..."/>
 
         <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">
