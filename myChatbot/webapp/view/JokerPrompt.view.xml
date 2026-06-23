@@ -683,7 +683,25 @@
       </VBox>
 
       <VBox visible="{= ${jokers>/selectedJoker/id} === 'kpi-discovery' }" width="100%">
-        <Panel headerText="KPI felfedezes">
+        <Panel class="kpiDiscoveryHeaderPanel">
+          <headerToolbar>
+            <Toolbar class="kpiDiscoveryHeaderToolbar">
+              <Title text="KPI felfedezes" level="H4"/>
+              <ToolbarSpacer/>
+              <Button
+                icon="sap-icon://database"
+                tooltip="Adatforrások"
+                type="Transparent"
+                press=".onToggleKpiSourcesTab"
+                class="{= ${jokers>/kpiDiscoveryActiveTab} === 'sources' ? 'kpiDiscoveryTabButton kpiDiscoveryTabButtonActive' : 'kpiDiscoveryTabButton' }"/>
+              <Button
+                icon="sap-icon://table-view"
+                tooltip="Adatbázis séma"
+                type="Transparent"
+                press=".onToggleKpiSchemaTab"
+                class="{= ${jokers>/kpiDiscoveryActiveTab} === 'schema' ? 'kpiDiscoveryTabButton kpiDiscoveryTabButtonActive sapUiTinyMarginBegin' : 'kpiDiscoveryTabButton sapUiTinyMarginBegin' }"/>
+            </Toolbar>
+          </headerToolbar>
           <VBox class="sapUiSmallMargin">
             <Text text="A rendszer a SQLite adatbazis tablait olvassa, majd olyan KPI jelolteket keszit, amelyek mindig valamilyen viszonyitasi alaphoz merik az aktualis adatot." wrapping="true"/>
             <HBox class="sapUiSmallMarginTop" wrap="Wrap" alignItems="Center">
@@ -692,6 +710,27 @@
               <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }" class="sapUiTinyMarginBegin"/>
             </HBox>
             <MessageStrip text="{jokers>/kpiDiscoveryError}" type="Error" showIcon="true" visible="{= ${jokers>/kpiDiscoveryError} ? true : false }" class="sapUiSmallMarginTop"/>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Adatforrások" class="kpiDiscoveryTabPanel sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryActiveTab} === 'sources' }">
+          <VBox class="sapUiSmallMargin">
+            <Text text="Az alább látható adatforrások érhetők el a KPI felfedezéshez." wrapping="true" class="sapUiTinyMarginBottom"/>
+            <BusyIndicator size="1.5rem" visible="{jokers>/kpiDiscoverySourcesBusy}"/>
+            <List items="{jokers>/kpiDiscoveryAvailableSources}" visible="{= !${jokers>/kpiDiscoverySourcesBusy} }" noDataText="Nem sikerült adatforrást beolvasni.">
+              <CustomListItem>
+                <HBox alignItems="Center" class="sapUiTinyMarginTopBottom">
+                  <core:Icon src="sap-icon://database" color="#0854a0" class="sapUiTinyMarginEnd"/>
+                  <Text text="{jokers>}"/>
+                </HBox>
+              </CustomListItem>
+            </List>
+          </VBox>
+        </Panel>
+
+        <Panel headerText="Adatbázis séma" class="kpiDiscoveryTabPanel sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryActiveTab} === 'schema' }">
+          <VBox class="sapUiSmallMargin">
+            <MessageStrip text="Hamarosan elérhető" type="Information" showIcon="true" showCloseButton="false"/>
           </VBox>
         </Panel>
 

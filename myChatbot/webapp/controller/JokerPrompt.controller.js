@@ -1418,8 +1418,41 @@ sap.ui.define([
       oModel.setProperty("/kpiDiscoveryMetrics", []);
       oModel.setProperty("/kpiDiscoveryChartRows", []);
       oModel.setProperty("/kpiDiscoveryRows", []);
+      oModel.setProperty("/kpiDiscoveryActiveTab", "");
+      oModel.setProperty("/kpiDiscoveryAvailableSources", []);
+      oModel.setProperty("/kpiDiscoverySourcesBusy", false);
       this._resetKpiDiscoveryChart();
       this._rebindKpiDiscoveryTable();
+    },
+
+    onToggleKpiSourcesTab: function() {
+      var oModel = this.getView().getModel("jokers");
+      var bWasOpen = oModel.getProperty("/kpiDiscoveryActiveTab") === "sources";
+      oModel.setProperty("/kpiDiscoveryActiveTab", bWasOpen ? "" : "sources");
+      if (!bWasOpen) {
+        this._loadKpiDiscoveryAvailableSources();
+      }
+    },
+
+    onToggleKpiSchemaTab: function() {
+      var oModel = this.getView().getModel("jokers");
+      var bWasOpen = oModel.getProperty("/kpiDiscoveryActiveTab") === "schema";
+      oModel.setProperty("/kpiDiscoveryActiveTab", bWasOpen ? "" : "schema");
+    },
+
+    _loadKpiDiscoveryAvailableSources: async function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/kpiDiscoverySourcesBusy", true);
+      try {
+        var oResp = await AiService.mlWizardGetDbTables();
+        var aTables = Array.isArray(oResp && oResp.tables) ? oResp.tables.filter(Boolean) : [];
+        oModel.setProperty("/kpiDiscoveryAvailableSources", aTables);
+      } catch (oError) {
+        oModel.setProperty("/kpiDiscoveryAvailableSources", []);
+        MessageToast.show(oError && oError.message ? oError.message : "Adatforrasok betoltesi hibaja.");
+      } finally {
+        oModel.setProperty("/kpiDiscoverySourcesBusy", false);
+      }
     },
 
     _loadJokerSchedule: async function(sJokerId, sPrefix) {
