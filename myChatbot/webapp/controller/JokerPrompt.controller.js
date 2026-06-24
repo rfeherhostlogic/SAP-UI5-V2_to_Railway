@@ -653,6 +653,7 @@ sap.ui.define([
     onDiscoverKpis: async function() {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/kpiDiscoveryBusy", true);
+      oModel.setProperty("/kpiDiscoverySuggestionsLoading", true);
       oModel.setProperty("/kpiDiscoveryError", "");
       oModel.setProperty("/kpiDiscoverySummary", "");
       oModel.setProperty("/kpiDiscoveryComparison", null);
@@ -674,6 +675,7 @@ sap.ui.define([
         MessageToast.show(oError && oError.message ? oError.message : "KPI felfedezesi hiba.");
       } finally {
         oModel.setProperty("/kpiDiscoveryBusy", false);
+        oModel.setProperty("/kpiDiscoverySuggestionsLoading", false);
       }
     },
 
@@ -1421,6 +1423,7 @@ sap.ui.define([
       oModel.setProperty("/kpiDiscoveryActiveTab", "");
       oModel.setProperty("/kpiDiscoveryAvailableSources", []);
       oModel.setProperty("/kpiDiscoverySourcesBusy", false);
+      oModel.setProperty("/kpiDiscoverySuggestionsLoading", false);
       this._resetKpiDiscoveryChart();
       this._rebindKpiDiscoveryTable();
     },

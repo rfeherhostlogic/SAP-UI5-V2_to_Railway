@@ -704,14 +704,47 @@
           </headerToolbar>
           <VBox class="sapUiSmallMargin">
             <Text text="A rendszer a SQLite adatbazis tablait olvassa, majd olyan KPI jelolteket keszit, amelyek mindig valamilyen viszonyitasi alaphoz merik az aktualis adatot." wrapping="true"/>
-            <HBox class="sapUiSmallMarginTop" wrap="Wrap" alignItems="Center">
-              <Button text="KPI otletek keresese" icon="sap-icon://lightbulb" type="Emphasized" press=".onDiscoverKpis" busy="{jokers>/kpiDiscoveryBusy}" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }"/>
+            <HBox class="sapUiSmallMarginTop" wrap="Wrap" alignItems="Center" visible="{= ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
+              <Button text="KPI otletek keresese ujra" icon="sap-icon://refresh" type="Transparent" press=".onDiscoverKpis" busy="{jokers>/kpiDiscoverySuggestionsLoading}" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }"/>
               <Button text="Kivalasztott KPI futtatasa" icon="sap-icon://play" type="Transparent" press=".onRunSelectedKpi" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : (${jokers>/kpiDiscoverySelectedId} ? true : false) }" class="sapUiTinyMarginBegin"/>
               <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }" class="sapUiTinyMarginBegin"/>
             </HBox>
             <MessageStrip text="{jokers>/kpiDiscoveryError}" type="Error" showIcon="true" visible="{= ${jokers>/kpiDiscoveryError} ? true : false }" class="sapUiSmallMarginTop"/>
           </VBox>
         </Panel>
+
+        <!-- Allapot 1: ures prompt zona, nincs meg AI hivas -->
+        <VBox
+          class="kpiDiscoveryEmptyState sapUiMediumMarginTop"
+          alignItems="Center"
+          visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length === 0 }">
+          <core:Icon src="sap-icon://lightbulb" size="2.25rem" class="kpiDiscoveryEmptyIcon"/>
+          <Title text="Fedezz fel KPI lehetőségeket" level="H4" class="sapUiTinyMarginTop"/>
+          <Text text="Az AI elemzi az adatbázis tábláit és releváns KPI javaslatokat készít." wrapping="true" class="kpiDiscoveryEmptyDesc sapUiTinyMarginTop"/>
+          <HBox class="kpiDiscoveryNoahPill sapUiMediumMarginTop" alignItems="Center">
+            <Avatar initials="N" displaySize="XS" press=".onDiscoverKpis" class="chatAvatar noahAvatar kpiDiscoveryNoahPillAvatar"/>
+            <Button
+              text="KPI ötletek keresése"
+              type="Transparent"
+              press=".onDiscoverKpis"
+              busy="{jokers>/kpiDiscoverySuggestionsLoading}"
+              enabled="{= !${jokers>/kpiDiscoverySuggestionsLoading} }"
+              class="kpiDiscoveryNoahPillButton"/>
+          </HBox>
+        </VBox>
+
+        <!-- Atmenet: skeleton loader amig az AI valasz meg nem erkezik meg -->
+        <VBox class="kpiDiscoverySkeletonWrap sapUiMediumMarginTop" visible="{jokers>/kpiDiscoverySuggestionsLoading}">
+          <VBox class="kpiDiscoverySkeletonTray"/>
+          <FlexBox wrap="Wrap" class="kpiDiscoverySkeletonGrid sapUiSmallMarginTop">
+            <VBox class="kpiDiscoverySkeletonTile"/>
+            <VBox class="kpiDiscoverySkeletonTile"/>
+            <VBox class="kpiDiscoverySkeletonTile"/>
+            <VBox class="kpiDiscoverySkeletonTile"/>
+            <VBox class="kpiDiscoverySkeletonTile"/>
+            <VBox class="kpiDiscoverySkeletonTile"/>
+          </FlexBox>
+        </VBox>
 
         <Panel headerText="Adatforrások" class="kpiDiscoveryTabPanel sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryActiveTab} === 'sources' }">
           <VBox class="sapUiSmallMargin">
@@ -740,7 +773,7 @@
           </VBox>
         </Panel>
 
-        <Panel headerText="Javasolt KPI csempek" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
+        <Panel headerText="Javasolt KPI csempek" class="sapUiSmallMarginTop" visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
           <FlexBox items="{jokers>/kpiDiscoverySuggestions}" wrap="Wrap">
             <items>
               <GenericTile

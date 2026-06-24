@@ -421,6 +421,7 @@ sap.ui.define([
 				dummy10ScheduleWeeklyDay: 1,
 				dummy10ScheduleTime: "09:00",
 				kpiDiscoveryBusy: false,
+				kpiDiscoverySuggestionsLoading: false,
 				kpiDiscoveryError: "",
 				kpiDiscoverySchemaSummary: "",
 				kpiDiscoverySuggestions: [],
