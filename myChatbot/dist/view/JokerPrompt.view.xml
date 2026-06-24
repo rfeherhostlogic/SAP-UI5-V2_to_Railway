@@ -845,7 +845,7 @@
                   items="{jokers>bars}">
                   <items>
                     <VBox class="kpiMiniBarCol" alignItems="Center" justifyContent="End">
-                      <VBox class="{= 'kpiMiniBar ' + ${jokers>colorClass} }" height="{= ${jokers>heightPx} + 'px' }"/>
+                      <VBox class="{= 'kpiMiniBar ' + ${jokers>colorClass} }" height="{= (${jokers>heightPx} || 4) + 'px' }"/>
                       <Text text="{jokers>label}" class="kpiMiniBarLabel"/>
                     </VBox>
                   </items>
@@ -856,7 +856,7 @@
                     <HBox alignItems="Center" class="kpiMiniRankItem">
                       <Text text="{jokers>label}" class="kpiMiniRankLabel"/>
                       <HBox class="kpiMiniRankTrack">
-                        <VBox class="{= 'kpiMiniBar kpiMiniBarRank ' + ${jokers>colorClass} }" width="{= ${jokers>widthPct} + '%' }"/>
+                        <VBox class="{= 'kpiMiniBar kpiMiniBarRank ' + ${jokers>colorClass} }" width="{= (${jokers>widthPct} || 4) + '%' }"/>
                       </HBox>
                     </HBox>
                   </items>
