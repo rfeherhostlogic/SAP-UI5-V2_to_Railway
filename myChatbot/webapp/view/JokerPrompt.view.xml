@@ -772,14 +772,16 @@
           </VBox>
         </Panel>
 
+        <!-- Allapot 2: Munkaterulet tálca a kivalasztott KPI-kkal -->
         <VBox
           class="kpiTrayWrap sapUiMediumMarginTop"
-          visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
+          visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length > 0 &amp;&amp; !${jokers>/kpiDiscoveryResultsView} }">
           <Title text="Munkaterület" level="H5" class="kpiTrayTitle"/>
 
           <HBox items="{jokers>/kpiDiscoveryTrayItems}" class="kpiTrayCardsRow sapUiTinyMarginTop" wrap="Wrap" visible="{= ${jokers>/kpiDiscoveryTrayItems}.length > 0 }">
             <items>
               <VBox class="kpiTrayCard">
+                <VBox class="kpiTrayCardSkeletonOverlay" visible="{jokers>/kpiDiscoveryBusy}"/>
                 <HBox alignItems="Center" justifyContent="SpaceBetween">
                   <Text text="{jokers>categoryTag}" class="kpiTrayCardTag"/>
                   <Button
@@ -820,23 +822,100 @@
           </HBox>
         </VBox>
 
+        <!-- Allapot 3: Eredmenyek zona, ugyanazon a helyen mint a Munkaterulet -->
+        <VBox
+          class="kpiTrayWrap kpiResultsWrap sapUiMediumMarginTop"
+          visible="{= ${jokers>/kpiDiscoveryResultsView} }">
+          <HBox alignItems="Center" justifyContent="SpaceBetween">
+            <Title text="Eredmények" level="H5" class="kpiTrayTitle"/>
+            <Button
+              text="Vissza a kiválasztáshoz"
+              type="Transparent"
+              press=".onBackToKpiSelection"
+              class="kpiTrayClearBtn"/>
+          </HBox>
+
+          <HBox items="{jokers>/kpiDiscoveryMultiResults}" class="kpiTrayCardsRow sapUiTinyMarginTop" wrap="Wrap">
+            <items>
+              <VBox class="kpiResultCard">
+                <Title text="{jokers>title}" level="H6" class="kpiResultCardName"/>
+
+                <HBox class="kpiMiniChartRow" alignItems="End" wrap="Wrap"
+                  visible="{= ${jokers>chartType} === 'timeseries' || ${jokers>chartType} === 'comparison' }"
+                  items="{jokers>bars}">
+                  <items>
+                    <VBox class="kpiMiniBarCol" alignItems="Center" justifyContent="End">
+                      <VBox class="{= 'kpiMiniBar ' + ${jokers>colorClass} }" height="{= ${jokers>heightPx} + 'px' }"/>
+                      <Text text="{jokers>label}" class="kpiMiniBarLabel"/>
+                    </VBox>
+                  </items>
+                </HBox>
+
+                <VBox class="kpiMiniRankWrap sapUiTinyMarginTop" visible="{= ${jokers>chartType} === 'ranking' }" items="{jokers>bars}">
+                  <items>
+                    <HBox alignItems="Center" class="kpiMiniRankItem">
+                      <Text text="{jokers>label}" class="kpiMiniRankLabel"/>
+                      <HBox class="kpiMiniRankTrack">
+                        <VBox class="{= 'kpiMiniBar kpiMiniBarRank ' + ${jokers>colorClass} }" width="{= ${jokers>widthPct} + '%' }"/>
+                      </HBox>
+                    </HBox>
+                  </items>
+                </VBox>
+
+                <!-- Komplex KPI tipusok (szegmentacio, ML-alapu elemzes): a teljes
+                     vizualizacio kesobbi feladat, addig csak a kulcsszamot mutatjuk. -->
+                <Text text="{jokers>complexValueText}" visible="{= ${jokers>chartType} === 'none' }" class="kpiResultComplexValue sapUiTinyMarginTop"/>
+
+                <Text text="{jokers>summary}" wrapping="true" class="kpiResultCardSummary sapUiTinyMarginTop"/>
+              </VBox>
+            </items>
+          </HBox>
+
+          <Panel headerText="Számítási részletek" expandable="true" expanded="false" class="sapUiSmallMarginTop kpiResultDetailsPanel">
+            <List items="{jokers>/kpiDiscoveryMultiResults}" mode="None">
+              <CustomListItem>
+                <VBox class="sapUiSmallMarginBottom">
+                  <Text text="{jokers>title}" class="kpiDetailTableTitle"/>
+                  <List items="{jokers>detailRows}" mode="None" class="kpiDetailTable">
+                    <CustomListItem>
+                      <HBox items="{jokers>cells}" class="{= ${jokers>header} ? 'kpiDetailRow kpiDetailRowHeader' : 'kpiDetailRow' }">
+                        <items>
+                          <Text text="{jokers>}" class="kpiDetailCell"/>
+                        </items>
+                      </HBox>
+                    </CustomListItem>
+                  </List>
+                </VBox>
+              </CustomListItem>
+            </List>
+          </Panel>
+
+          <HBox class="kpiTrayActionsRow sapUiSmallMarginTop" alignItems="Center">
+            <Button
+              text="Vissza a kiválasztáshoz"
+              type="Transparent"
+              press=".onBackToKpiSelection"
+              class="kpiTrayClearBtn"/>
+          </HBox>
+        </VBox>
+
         <Panel id="kpiDiscoveryTilesPanel" headerText="Javasolt KPI csempek" class="sapUiSmallMarginTop" visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
           <FlexBox items="{jokers>/kpiDiscoverySuggestions}" wrap="Wrap">
             <items>
               <VBox
-                class="{= ${jokers>selected} ? 'kpiDiscoveryTileWrap kpiDiscoveryTileSelected sapUiTinyMarginEnd sapUiTinyMarginBottom' : (${jokers>/kpiDiscoveryMaxReached} ? 'kpiDiscoveryTileWrap kpiDiscoveryTileDisabled sapUiTinyMarginEnd sapUiTinyMarginBottom' : 'kpiDiscoveryTileWrap sapUiTinyMarginEnd sapUiTinyMarginBottom') }"
-                tooltip="{= !${jokers>selected} &amp;&amp; ${jokers>/kpiDiscoveryMaxReached} ? 'Maximum 3 KPI választható egyszerre.' : '' }">
+                class="{= ${jokers>/kpiDiscoveryResultsView} ? 'kpiDiscoveryTileWrap kpiDiscoveryTileDisabled sapUiTinyMarginEnd sapUiTinyMarginBottom' : (${jokers>selected} ? 'kpiDiscoveryTileWrap kpiDiscoveryTileSelected sapUiTinyMarginEnd sapUiTinyMarginBottom' : (${jokers>/kpiDiscoveryMaxReached} ? 'kpiDiscoveryTileWrap kpiDiscoveryTileDisabled sapUiTinyMarginEnd sapUiTinyMarginBottom' : 'kpiDiscoveryTileWrap sapUiTinyMarginEnd sapUiTinyMarginBottom')) }"
+                tooltip="{= !${jokers>selected} &amp;&amp; ${jokers>/kpiDiscoveryMaxReached} &amp;&amp; !${jokers>/kpiDiscoveryResultsView} ? 'Maximum 3 KPI választható egyszerre.' : '' }">
                 <customData>
                   <core:CustomData key="kpiid" value="{jokers>id}" writeToDom="true"/>
                 </customData>
-                <Text text="{jokers>selectionOrder}" visible="{jokers>selected}" class="kpiDiscoveryTileBadge"/>
+                <Text text="{jokers>selectionOrder}" visible="{= ${jokers>selected} &amp;&amp; !${jokers>/kpiDiscoveryResultsView} }" class="kpiDiscoveryTileBadge"/>
                 <GenericTile
                   header="{jokers>title}"
                   subheader="{= 'Viszonyitas: ' + ${jokers>comparison} }"
                   frameType="OneByOne"
                   press=".onSelectKpiSuggestion">
                   <tileContent>
-                    <TileContent footer="{= ${jokers>selected} ? 'Kivalasztva' : 'Kattints a valasztashoz' }">
+                    <TileContent footer="{= ${jokers>selected} &amp;&amp; !${jokers>/kpiDiscoveryResultsView} ? 'Kivalasztva' : 'Kattints a valasztashoz' }">
                       <content>
                         <ImageContent src="sap-icon://business-objects-experience"/>
                       </content>
@@ -846,49 +925,6 @@
               </VBox>
             </items>
           </FlexBox>
-        </Panel>
-
-        <Panel headerText="KPI eredmenyek" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryMultiResults}.length > 1 }">
-          <List items="{jokers>/kpiDiscoveryMultiResults}" mode="None">
-            <CustomListItem>
-              <VBox class="sapUiSmallMargin">
-                <Title text="{jokers>title}" level="H5"/>
-                <Text text="{jokers>summary}" wrapping="true" class="sapUiTinyMarginTop"/>
-                <ObjectStatus
-                  text="{= ${jokers>comparison} ? ('Eltérés: ' + ${jokers>comparison/delta} + ' / ' + (${jokers>comparison/deltaPct} === null ? 'n/a' : ${jokers>comparison/deltaPct} + '%')) : '' }"
-                  state="{= ${jokers>comparison} &amp;&amp; ${jokers>comparison/status} === 'Good' ? 'Success' : (${jokers>comparison} &amp;&amp; ${jokers>comparison/status} === 'Warning' ? 'Warning' : 'None') }"
-                  visible="{= ${jokers>comparison} ? true : false }"/>
-              </VBox>
-            </CustomListItem>
-          </List>
-        </Panel>
-
-        <Panel headerText="KPI eredmeny" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoverySummary} ? true : false }">
-          <VBox class="sapUiSmallMargin">
-            <Text text="{jokers>/kpiDiscoverySummary}" wrapping="true"/>
-            <HBox wrap="Wrap" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryComparison} ? true : false }">
-              <ObjectStatus
-                text="{= 'Aktualis: ' + ${jokers>/kpiDiscoveryComparison/current} + ' ' + (${jokers>/kpiDiscoveryComparison/unit} || '') }"
-                state="Information"
-                class="sapUiTinyMarginEnd"/>
-              <ObjectStatus
-                text="{= ${jokers>/kpiDiscoveryComparison/referenceLabel} + ': ' + ${jokers>/kpiDiscoveryComparison/reference} + ' ' + (${jokers>/kpiDiscoveryComparison/unit} || '') }"
-                state="Information"
-                class="sapUiTinyMarginEnd"/>
-              <ObjectStatus
-                text="{= 'Eltérés: ' + ${jokers>/kpiDiscoveryComparison/delta} + ' / ' + (${jokers>/kpiDiscoveryComparison/deltaPct} === null ? 'n/a' : ${jokers>/kpiDiscoveryComparison/deltaPct} + '%') }"
-                state="{= ${jokers>/kpiDiscoveryComparison/status} === 'Good' ? 'Success' : (${jokers>/kpiDiscoveryComparison/status} === 'Warning' ? 'Warning' : 'None') }"/>
-            </HBox>
-            <HBox wrap="Wrap" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryMetrics}.length > 0 }">
-              <ObjectStatus text="{= ${jokers>/kpiDiscoveryMetrics/0/label} ? ${jokers>/kpiDiscoveryMetrics/0/label} + ': ' + ${jokers>/kpiDiscoveryMetrics/0/value} + ' ' + (${jokers>/kpiDiscoveryMetrics/0/unit} || '') : '' }" state="Success" class="sapUiTinyMarginEnd"/>
-              <ObjectStatus text="{= ${jokers>/kpiDiscoveryMetrics/1/label} ? ${jokers>/kpiDiscoveryMetrics/1/label} + ': ' + ${jokers>/kpiDiscoveryMetrics/1/value} + ' ' + (${jokers>/kpiDiscoveryMetrics/1/unit} || '') : '' }" state="Information"/>
-            </HBox>
-            <VBox id="kpiDiscoveryChartHost" class="sapUiSmallMarginTop"/>
-          </VBox>
-        </Panel>
-
-        <Panel headerText="Szamitasi reszletek" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryRows}.length > 0 }">
-          <Table id="kpiDiscoveryResultTable" growing="true" growingThreshold="50" inset="false"/>
         </Panel>
       </VBox>
 

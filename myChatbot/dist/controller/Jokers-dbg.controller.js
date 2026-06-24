@@ -136,6 +136,7 @@ sap.ui.define([
         oJokersModel.setProperty("/kpiDiscoveryMaxReached", false);
         oJokersModel.setProperty("/kpiDiscoveryTrayItems", []);
         oJokersModel.setProperty("/kpiDiscoveryMultiResults", []);
+        oJokersModel.setProperty("/kpiDiscoveryResultsView", false);
         oJokersModel.setProperty("/kpiDiscoverySummary", "");
         oJokersModel.setProperty("/kpiDiscoveryComparison", null);
         oJokersModel.setProperty("/kpiDiscoveryMetrics", []);

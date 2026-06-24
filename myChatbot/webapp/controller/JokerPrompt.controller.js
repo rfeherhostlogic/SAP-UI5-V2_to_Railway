@@ -737,7 +737,7 @@ sap.ui.define([
     onSelectKpiSuggestion: function(oEvent) {
       var oContext = oEvent.getSource().getBindingContext("jokers");
       var oModel = this.getView().getModel("jokers");
-      if (!oContext) {
+      if (!oContext || oModel.getProperty("/kpiDiscoveryResultsView")) {
         return;
       }
       var sId = String(oContext.getObject().id || "");
@@ -783,14 +783,7 @@ sap.ui.define([
 
       oModel.setProperty("/kpiDiscoveryBusy", true);
       oModel.setProperty("/kpiDiscoveryError", "");
-      oModel.setProperty("/kpiDiscoverySummary", "");
-      oModel.setProperty("/kpiDiscoveryComparison", null);
-      oModel.setProperty("/kpiDiscoveryMetrics", []);
-      oModel.setProperty("/kpiDiscoveryChartRows", []);
-      oModel.setProperty("/kpiDiscoveryRows", []);
       oModel.setProperty("/kpiDiscoveryMultiResults", []);
-      this._resetKpiDiscoveryChart();
-      this._rebindKpiDiscoveryTable();
 
       var aSuggestions = oModel.getProperty("/kpiDiscoverySuggestions") || [];
 
@@ -801,35 +794,126 @@ sap.ui.define([
           var oResp = await AiService.runKpiDiscovery({ kpiId: sKpiId });
           var oRun = oResp && oResp.run ? oResp.run : {};
           var oSuggestion = aSuggestions.filter(function(oItem) { return oItem.id === sKpiId; })[0] || {};
-          aResults.push({
-            kpiId: sKpiId,
-            title: oSuggestion.title || sKpiId,
-            summary: String(oRun.summary || ""),
-            comparison: oRun.comparison || null,
-            metrics: Array.isArray(oRun.metrics) ? oRun.metrics : [],
-            chart: Array.isArray(oRun.chart) ? oRun.chart : [],
-            rows: Array.isArray(oRun.rows) ? oRun.rows : []
-          });
+          aResults.push(this._buildKpiDiscoveryResultCard(sKpiId, oSuggestion, oRun));
         }
 
-        if (aResults.length === 1) {
-          var oFirst = aResults[0];
-          oModel.setProperty("/kpiDiscoverySummary", oFirst.summary);
-          oModel.setProperty("/kpiDiscoveryComparison", oFirst.comparison);
-          oModel.setProperty("/kpiDiscoveryMetrics", oFirst.metrics);
-          oModel.setProperty("/kpiDiscoveryChartRows", oFirst.chart);
-          oModel.setProperty("/kpiDiscoveryRows", oFirst.rows);
-          this._renderKpiDiscoveryChart(oFirst.chart);
-          this._rebindKpiDiscoveryTable();
-        } else {
-          oModel.setProperty("/kpiDiscoveryMultiResults", aResults);
-        }
+        oModel.setProperty("/kpiDiscoveryMultiResults", aResults);
+        oModel.setProperty("/kpiDiscoveryResultsView", true);
       } catch (oError) {
         oModel.setProperty("/kpiDiscoveryError", oError && oError.message ? oError.message : "KPI futtatasi hiba.");
         MessageToast.show(oError && oError.message ? oError.message : "KPI futtatasi hiba.");
       } finally {
         oModel.setProperty("/kpiDiscoveryBusy", false);
       }
+    },
+
+    onBackToKpiSelection: function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/kpiDiscoveryResultsView", false);
+    },
+
+    _buildKpiDiscoveryResultCard: function(sKpiId, oSuggestion, oRun) {
+      var aChart = Array.isArray(oRun.chart) ? oRun.chart : [];
+      var oComparison = oRun.comparison || null;
+      var aRows = Array.isArray(oRun.rows) ? oRun.rows : [];
+      var oChartInfo = this._buildKpiDiscoveryMiniChart(aChart, oComparison);
+
+      return {
+        kpiId: sKpiId,
+        title: oSuggestion.title || sKpiId,
+        summary: String(oRun.summary || ""),
+        comparison: oComparison,
+        chartType: oChartInfo.chartType,
+        bars: oChartInfo.bars,
+        complexValueText: oChartInfo.complexValueText,
+        detailRows: this._buildKpiDiscoveryDetailRows(aRows)
+      };
+    },
+
+    _buildKpiDiscoveryMiniChart: function(aChart, oComparison) {
+      var HIGHLIGHT = "kpiMiniBarHighlight";
+      var MUTED = "kpiMiniBarMuted";
+      var NEGATIVE = "kpiMiniBarNegative";
+
+      if (!aChart.length) {
+        // Komplex KPI tipusok (szegmentacio, ML-alapu elemzes): a teljes
+        // vizualizacio kesobbi feladat, addig csak a kulcsszamot mutatjuk.
+        var sComplexText = oComparison
+          ? (oComparison.label + ": " + oComparison.current + (oComparison.unit ? " " + oComparison.unit : ""))
+          : "";
+        return { chartType: "none", bars: [], complexValueText: sComplexText };
+      }
+
+      var aValues = aChart.map(function(oPoint) { return Number(oPoint && oPoint.value) || 0; });
+      var nMax = Math.max.apply(null, aValues.concat([0])) || 1;
+
+      if (aChart.length === 2) {
+        var bWarning = !!(oComparison && oComparison.status === "Warning");
+        var aBars = aChart.map(function(oPoint, iIndex) {
+          var nValue = Number(oPoint.value) || 0;
+          var sColorClass = iIndex === 0 ? (bWarning ? NEGATIVE : HIGHLIGHT) : MUTED;
+          return {
+            label: String(oPoint.label || ""),
+            heightPx: Math.max(4, Math.round((nValue / nMax) * 60)),
+            colorClass: sColorClass
+          };
+        });
+        return { chartType: "comparison", bars: aBars, complexValueText: "" };
+      }
+
+      var bLooksLikeDate = /^\d{4}-\d{2}/.test(String(aChart[0] && aChart[0].label || ""));
+
+      if (bLooksLikeDate) {
+        var aTimeBars = aChart.map(function(oPoint) {
+          var nValue = Number(oPoint.value) || 0;
+          return {
+            label: String(oPoint.label || ""),
+            heightPx: Math.max(4, Math.round((nValue / nMax) * 60)),
+            colorClass: nValue === nMax ? HIGHLIGHT : MUTED
+          };
+        });
+        return { chartType: "timeseries", bars: aTimeBars, complexValueText: "" };
+      }
+
+      var aRankBars = aChart.map(function(oPoint) {
+        var nValue = Number(oPoint.value) || 0;
+        return {
+          label: String(oPoint.label || ""),
+          widthPct: Math.max(4, Math.round((nValue / nMax) * 100)),
+          colorClass: nValue === nMax ? HIGHLIGHT : MUTED
+        };
+      });
+      return { chartType: "ranking", bars: aRankBars, complexValueText: "" };
+    },
+
+    _buildKpiDiscoveryDetailRows: function(aRows) {
+      var aColumns = this._extractDummy4Columns(aRows);
+      if (!aColumns.length) {
+        return [];
+      }
+
+      var aLimitedRows = aRows.slice(0, 50);
+      var aDetailRows = [{ header: true, cells: aColumns.slice() }];
+
+      aLimitedRows.forEach(function(oRow) {
+        aDetailRows.push({
+          header: false,
+          cells: aColumns.map(function(sCol) {
+            var vValue = oRow ? oRow[sCol] : "";
+            return vValue == null ? "" : String(vValue);
+          })
+        });
+      });
+
+      if (aRows.length > aLimitedRows.length) {
+        aDetailRows.push({
+          header: false,
+          note: true,
+          cells: ["... (" + aRows.length + " sorbol az elso " + aLimitedRows.length + " latszik)"]
+        });
+      }
+
+      return aDetailRows;
     },
 
     onSaveDummy10Schedule: async function() {
@@ -1525,6 +1609,7 @@ sap.ui.define([
       oModel.setProperty("/kpiDiscoveryMaxReached", false);
       oModel.setProperty("/kpiDiscoveryTrayItems", []);
       oModel.setProperty("/kpiDiscoveryMultiResults", []);
+      oModel.setProperty("/kpiDiscoveryResultsView", false);
       oModel.setProperty("/kpiDiscoverySummary", "");
       oModel.setProperty("/kpiDiscoveryComparison", null);
       oModel.setProperty("/kpiDiscoveryMetrics", []);

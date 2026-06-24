@@ -266,6 +266,7 @@
   border-radius: 0.9rem;
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(184, 197, 217, 0.6);
+  border-left: 4px solid #185fa5;
 }
 
 .kpiTrayTitle {
@@ -377,6 +378,142 @@
 .kpiDiscoveryTileDisabled {
   opacity: 0.4;
   pointer-events: none;
+}
+
+.kpiTrayCard {
+  position: relative;
+  overflow: hidden;
+}
+
+.kpiTrayCardSkeletonOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(227, 232, 239, 0.85);
+  animation: kpiSkeletonPulse 1.4s ease-in-out infinite;
+  z-index: 3;
+}
+
+.kpiResultCard {
+  flex: 1 1 0;
+  min-width: 14rem;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #d2dcec;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+  padding: 0.7rem 0.8rem;
+}
+
+.kpiResultCardName {
+  color: #1f2a3c;
+}
+
+.kpiResultCardSummary {
+  color: #4a5a70;
+  font-size: 0.82rem;
+}
+
+.kpiResultComplexValue {
+  color: #185fa5;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.kpiMiniChartRow {
+  height: 60px;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.kpiMiniBarCol {
+  min-width: 1.6rem;
+}
+
+.kpiMiniBar {
+  width: 14px;
+  border-radius: 2px 2px 0 0;
+}
+
+.kpiMiniBarHighlight {
+  background: #185fa5;
+}
+
+.kpiMiniBarMuted {
+  background: #b5d4f4;
+}
+
+.kpiMiniBarNegative {
+  background: #f09595;
+}
+
+.kpiMiniBarLabel {
+  font-size: 0.55rem;
+  color: #8392a6;
+  margin-top: 0.2rem;
+  text-align: center;
+}
+
+.kpiMiniRankWrap {
+  gap: 0.3rem;
+}
+
+.kpiMiniRankItem {
+  gap: 0.4rem;
+}
+
+.kpiMiniRankLabel {
+  font-size: 0.65rem;
+  color: #8392a6;
+  min-width: 4.5rem;
+  max-width: 4.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpiMiniRankTrack {
+  flex: 1 1 0;
+  background: #eef2f8;
+  border-radius: 2px;
+  height: 10px;
+}
+
+.kpiMiniBarRank {
+  height: 10px;
+  border-radius: 2px;
+}
+
+.kpiResultDetailsPanel {
+  border-radius: 0.75rem;
+}
+
+.kpiDetailTableTitle {
+  font-weight: 700;
+  color: #1f2a3c;
+}
+
+.kpiDetailTable {
+  border: 1px solid #e3e8ef;
+  border-radius: 0.4rem;
+  overflow: hidden;
+}
+
+.kpiDetailRow {
+  gap: 0.75rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.kpiDetailRowHeader {
+  background: #eaf2fd;
+  font-weight: 700;
+}
+
+.kpiDetailCell {
+  font-size: 0.78rem;
+  color: #4a5a70;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kpiDiscoveryTileTooltipPopover .sapMPopoverCont {

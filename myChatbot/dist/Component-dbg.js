@@ -430,6 +430,7 @@ sap.ui.define([
 				kpiDiscoveryMaxReached: false,
 				kpiDiscoveryTrayItems: [],
 				kpiDiscoveryMultiResults: [],
+				kpiDiscoveryResultsView: false,
 				kpiDiscoverySummary: "",
 				kpiDiscoveryComparison: null,
 				kpiDiscoveryMetrics: [],
