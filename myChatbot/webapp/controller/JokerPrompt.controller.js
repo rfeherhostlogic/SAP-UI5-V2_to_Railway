@@ -666,9 +666,10 @@ sap.ui.define([
       try {
         var oResp = await AiService.getKpiDiscoverySuggestions();
         var aSuggestions = Array.isArray(oResp && oResp.suggestions) ? oResp.suggestions : [];
+        aSuggestions = this._decorateKpiDiscoverySuggestions(aSuggestions);
         oModel.setProperty("/kpiDiscoverySchemaSummary", String(oResp && oResp.schemaSummary ? oResp.schemaSummary : ""));
         oModel.setProperty("/kpiDiscoverySuggestions", aSuggestions);
-        oModel.setProperty("/kpiDiscoverySelectedId", aSuggestions.length ? String(aSuggestions[0].id || "") : "");
+        this._setKpiDiscoverySelection(aSuggestions.length ? [String(aSuggestions[0].id || "")] : []);
         MessageToast.show(aSuggestions.length ? "KPI javaslatok elkeszultek." : "Nem talaltam KPI javaslatot.");
       } catch (oError) {
         oModel.setProperty("/kpiDiscoveryError", oError && oError.message ? oError.message : "KPI felfedezesi hiba.");
@@ -679,21 +680,97 @@ sap.ui.define([
       }
     },
 
+    _getKpiDiscoverySourceMeta: function(sId) {
+      if (sId.indexOf("sales_") === 0) {
+        return { categoryTag: "Árbevétel", dataSourceName: "SalesOrder", dataSourceIcon: "sap-icon://sales-order" };
+      }
+      if (sId.indexOf("customer_") === 0) {
+        return { categoryTag: "Ügyfél", dataSourceName: "Customer", dataSourceIcon: "sap-icon://customer" };
+      }
+      var aParts = sId.split("__");
+      var sTable = aParts.length > 1 ? aParts[1] : "Adatbázis";
+      return { categoryTag: "Általános", dataSourceName: sTable, dataSourceIcon: "sap-icon://database" };
+    },
+
+    _decorateKpiDiscoverySuggestions: function(aSuggestions) {
+      var that = this;
+      return aSuggestions.map(function(oItem) {
+        var sId = String(oItem.id || "");
+        var oMeta = that._getKpiDiscoverySourceMeta(sId);
+        return Object.assign({}, oItem, {
+          selected: false,
+          selectionOrder: "",
+          categoryTag: oMeta.categoryTag,
+          dataSourceName: oMeta.dataSourceName,
+          dataSourceIcon: oMeta.dataSourceIcon
+        });
+      });
+    },
+
+    _setKpiDiscoverySelection: function(aIds) {
+      var oModel = this.getView().getModel("jokers");
+      var aSuggestions = (oModel.getProperty("/kpiDiscoverySuggestions") || []).map(function(oItem) {
+        var iOrder = aIds.indexOf(oItem.id);
+        return Object.assign({}, oItem, {
+          selected: iOrder >= 0,
+          selectionOrder: iOrder >= 0 ? String(iOrder + 1) : ""
+        });
+      });
+      var aTrayItems = aIds.map(function(sId) {
+        return aSuggestions.filter(function(oItem) { return oItem.id === sId; })[0];
+      }).filter(Boolean);
+
+      oModel.setProperty("/kpiDiscoverySuggestions", aSuggestions);
+      oModel.setProperty("/kpiDiscoverySelectedIds", aIds.slice());
+      oModel.setProperty("/kpiDiscoveryMaxReached", aIds.length >= 3);
+      oModel.setProperty("/kpiDiscoveryTrayItems", aTrayItems);
+      oModel.setProperty("/kpiDiscoverySelectedId", aIds.length ? aIds[aIds.length - 1] : "");
+    },
+
     onSelectKpiSuggestion: function(oEvent) {
       var oContext = oEvent.getSource().getBindingContext("jokers");
       var oModel = this.getView().getModel("jokers");
       if (!oContext) {
         return;
       }
-      oModel.setProperty("/kpiDiscoverySelectedId", String(oContext.getObject().id || ""));
+      var sId = String(oContext.getObject().id || "");
+      var aIds = (oModel.getProperty("/kpiDiscoverySelectedIds") || []).slice();
+      var iIdx = aIds.indexOf(sId);
+      if (iIdx >= 0) {
+        aIds.splice(iIdx, 1);
+      } else {
+        if (aIds.length >= 3) {
+          MessageToast.show("Maximum 3 KPI választható egyszerre.");
+          return;
+        }
+        aIds.push(sId);
+      }
+      this._setKpiDiscoverySelection(aIds);
+    },
+
+    onRemoveKpiFromTray: function(oEvent) {
+      var oContext = oEvent.getSource().getBindingContext("jokers");
+      var oModel = this.getView().getModel("jokers");
+      if (!oContext) {
+        return;
+      }
+      var sId = String(oContext.getObject().id || "");
+      var aIds = (oModel.getProperty("/kpiDiscoverySelectedIds") || []).filter(function(sSelectedId) {
+        return sSelectedId !== sId;
+      });
+      this._setKpiDiscoverySelection(aIds);
+    },
+
+    onClearKpiTraySelection: function() {
+      this._setKpiDiscoverySelection([]);
     },
 
     onRunSelectedKpi: async function() {
       var oModel = this.getView().getModel("jokers");
-      var sKpiId = String(oModel.getProperty("/kpiDiscoverySelectedId") || "").trim();
+      var aIds = (oModel.getProperty("/kpiDiscoverySelectedIds") || []).slice();
 
-      if (!sKpiId) {
-        MessageToast.show("Valassz KPI-t a listabol.");
+      if (!aIds.length) {
+        MessageToast.show("Válassz legalább egy KPI-t a futtatáshoz.");
         return;
       }
 
@@ -704,20 +781,42 @@ sap.ui.define([
       oModel.setProperty("/kpiDiscoveryMetrics", []);
       oModel.setProperty("/kpiDiscoveryChartRows", []);
       oModel.setProperty("/kpiDiscoveryRows", []);
+      oModel.setProperty("/kpiDiscoveryMultiResults", []);
       this._resetKpiDiscoveryChart();
       this._rebindKpiDiscoveryTable();
 
+      var aSuggestions = oModel.getProperty("/kpiDiscoverySuggestions") || [];
+
       try {
-        var oResp = await AiService.runKpiDiscovery({ kpiId: sKpiId });
-        var oRun = oResp && oResp.run ? oResp.run : {};
-        var aChartRows = Array.isArray(oRun.chart) ? oRun.chart : [];
-        oModel.setProperty("/kpiDiscoverySummary", String(oRun.summary || ""));
-        oModel.setProperty("/kpiDiscoveryComparison", oRun.comparison || null);
-        oModel.setProperty("/kpiDiscoveryMetrics", Array.isArray(oRun.metrics) ? oRun.metrics : []);
-        oModel.setProperty("/kpiDiscoveryChartRows", aChartRows);
-        oModel.setProperty("/kpiDiscoveryRows", Array.isArray(oRun.rows) ? oRun.rows : []);
-        this._renderKpiDiscoveryChart(aChartRows);
-        this._rebindKpiDiscoveryTable();
+        var aResults = [];
+        for (var i = 0; i < aIds.length; i++) {
+          var sKpiId = aIds[i];
+          var oResp = await AiService.runKpiDiscovery({ kpiId: sKpiId });
+          var oRun = oResp && oResp.run ? oResp.run : {};
+          var oSuggestion = aSuggestions.filter(function(oItem) { return oItem.id === sKpiId; })[0] || {};
+          aResults.push({
+            kpiId: sKpiId,
+            title: oSuggestion.title || sKpiId,
+            summary: String(oRun.summary || ""),
+            comparison: oRun.comparison || null,
+            metrics: Array.isArray(oRun.metrics) ? oRun.metrics : [],
+            chart: Array.isArray(oRun.chart) ? oRun.chart : [],
+            rows: Array.isArray(oRun.rows) ? oRun.rows : []
+          });
+        }
+
+        if (aResults.length === 1) {
+          var oFirst = aResults[0];
+          oModel.setProperty("/kpiDiscoverySummary", oFirst.summary);
+          oModel.setProperty("/kpiDiscoveryComparison", oFirst.comparison);
+          oModel.setProperty("/kpiDiscoveryMetrics", oFirst.metrics);
+          oModel.setProperty("/kpiDiscoveryChartRows", oFirst.chart);
+          oModel.setProperty("/kpiDiscoveryRows", oFirst.rows);
+          this._renderKpiDiscoveryChart(oFirst.chart);
+          this._rebindKpiDiscoveryTable();
+        } else {
+          oModel.setProperty("/kpiDiscoveryMultiResults", aResults);
+        }
       } catch (oError) {
         oModel.setProperty("/kpiDiscoveryError", oError && oError.message ? oError.message : "KPI futtatasi hiba.");
         MessageToast.show(oError && oError.message ? oError.message : "KPI futtatasi hiba.");
@@ -1415,6 +1514,10 @@ sap.ui.define([
       oModel.setProperty("/kpiDiscoverySchemaSummary", "");
       oModel.setProperty("/kpiDiscoverySuggestions", []);
       oModel.setProperty("/kpiDiscoverySelectedId", "");
+      oModel.setProperty("/kpiDiscoverySelectedIds", []);
+      oModel.setProperty("/kpiDiscoveryMaxReached", false);
+      oModel.setProperty("/kpiDiscoveryTrayItems", []);
+      oModel.setProperty("/kpiDiscoveryMultiResults", []);
       oModel.setProperty("/kpiDiscoverySummary", "");
       oModel.setProperty("/kpiDiscoveryComparison", null);
       oModel.setProperty("/kpiDiscoveryMetrics", []);

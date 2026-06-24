@@ -261,6 +261,124 @@
   }
 }
 
+.kpiTrayWrap {
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(184, 197, 217, 0.6);
+}
+
+.kpiTrayTitle {
+  color: #344a63;
+}
+
+.kpiTrayCardsRow {
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.kpiTrayCard {
+  flex: 1 1 0;
+  min-width: 12rem;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #d2dcec;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+  padding: 0.6rem 0.7rem;
+}
+
+.kpiTrayCardTag {
+  display: inline-block;
+  background: #eaf2fd;
+  color: #185fa5;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.55rem;
+}
+
+.kpiTrayCardRemoveBtn .sapMBtnInner {
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+}
+
+.kpiTrayCardRemoveBtn .sapMBtnIcon {
+  font-size: 0.7rem;
+  color: #8392a6;
+}
+
+.kpiTrayCardName {
+  font-weight: 700;
+  color: #1f2a3c;
+}
+
+.kpiTrayCardDesc {
+  color: #6b7a8e;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpiTrayCardSourceRow {
+  color: #6b7a8e;
+}
+
+.kpiTrayCardSourceIcon {
+  color: #185fa5;
+}
+
+.kpiTrayCardSourceName {
+  font-size: 0.75rem;
+}
+
+.kpiTrayEmptyCard {
+  border: 1px dashed #b9c8de;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 1.25rem;
+}
+
+.kpiTrayEmptyText {
+  color: #6b7a8e;
+}
+
+.kpiTrayActionsRow {
+  gap: 0.5rem;
+}
+
+.kpiDiscoveryTileWrap {
+  position: relative;
+  display: inline-block;
+}
+
+.kpiDiscoveryTileBadge {
+  position: absolute;
+  top: -0.4rem;
+  left: -0.4rem;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: #185fa5;
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.3rem;
+  text-align: center;
+  z-index: 2;
+}
+
+.kpiDiscoveryTileSelected .sapMGT {
+  border: 2px solid #185fa5;
+  border-radius: 0.5rem;
+}
+
+.kpiDiscoveryTileDisabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 .quoteResultLayout {
   gap: 0.75rem;
   align-items: stretch;

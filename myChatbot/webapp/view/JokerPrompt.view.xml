@@ -706,7 +706,6 @@
             <Text text="A rendszer a SQLite adatbazis tablait olvassa, majd olyan KPI jelolteket keszit, amelyek mindig valamilyen viszonyitasi alaphoz merik az aktualis adatot." wrapping="true"/>
             <HBox class="sapUiSmallMarginTop" wrap="Wrap" alignItems="Center" visible="{= ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
               <Button text="KPI otletek keresese ujra" icon="sap-icon://refresh" type="Transparent" press=".onDiscoverKpis" busy="{jokers>/kpiDiscoverySuggestionsLoading}" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }"/>
-              <Button text="Kivalasztott KPI futtatasa" icon="sap-icon://play" type="Transparent" press=".onRunSelectedKpi" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : (${jokers>/kpiDiscoverySelectedId} ? true : false) }" class="sapUiTinyMarginBegin"/>
               <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }" class="sapUiTinyMarginBegin"/>
             </HBox>
             <MessageStrip text="{jokers>/kpiDiscoveryError}" type="Error" showIcon="true" visible="{= ${jokers>/kpiDiscoveryError} ? true : false }" class="sapUiSmallMarginTop"/>
@@ -773,31 +772,98 @@
           </VBox>
         </Panel>
 
+        <VBox
+          class="kpiTrayWrap sapUiMediumMarginTop"
+          visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
+          <Title text="Munkaterület" level="H5" class="kpiTrayTitle"/>
+
+          <HBox items="{jokers>/kpiDiscoveryTrayItems}" class="kpiTrayCardsRow sapUiTinyMarginTop" wrap="Wrap" visible="{= ${jokers>/kpiDiscoveryTrayItems}.length > 0 }">
+            <items>
+              <VBox class="kpiTrayCard">
+                <HBox alignItems="Center" justifyContent="SpaceBetween">
+                  <Text text="{jokers>categoryTag}" class="kpiTrayCardTag"/>
+                  <Button
+                    icon="sap-icon://decline"
+                    type="Transparent"
+                    tooltip="KPI eltávolítása"
+                    press=".onRemoveKpiFromTray"
+                    class="kpiTrayCardRemoveBtn"/>
+                </HBox>
+                <Title text="{jokers>title}" level="H6" class="kpiTrayCardName sapUiTinyMarginTop"/>
+                <Text text="{jokers>description}" class="kpiTrayCardDesc" wrapping="false"/>
+                <HBox alignItems="Center" class="kpiTrayCardSourceRow sapUiTinyMarginTop">
+                  <core:Icon src="{jokers>dataSourceIcon}" size="0.75rem" class="kpiTrayCardSourceIcon"/>
+                  <Text text="{jokers>dataSourceName}" class="kpiTrayCardSourceName sapUiTinyMarginBeginEnd"/>
+                </HBox>
+              </VBox>
+            </items>
+          </HBox>
+
+          <VBox class="kpiTrayEmptyCard sapUiTinyMarginTop" alignItems="Center" justifyContent="Center" visible="{= ${jokers>/kpiDiscoveryTrayItems}.length === 0 }">
+            <Text text="Válassz legalább egy KPI-t a futtatáshoz" class="kpiTrayEmptyText"/>
+          </VBox>
+
+          <HBox class="kpiTrayActionsRow sapUiSmallMarginTop" alignItems="Center" visible="{= ${jokers>/kpiDiscoveryTrayItems}.length > 0 }">
+            <Button
+              text="{= ${jokers>/kpiDiscoveryTrayItems}.length === 1 ? 'KPI futtatása' : ${jokers>/kpiDiscoveryTrayItems}.length + ' KPI futtatása' }"
+              type="Emphasized"
+              press=".onRunSelectedKpi"
+              busy="{jokers>/kpiDiscoveryBusy}"
+              enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }"
+              class="kpiTrayRunBtn"/>
+            <Button
+              text="Kijelölés törlése"
+              type="Transparent"
+              press=".onClearKpiTraySelection"
+              enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }"
+              class="kpiTrayClearBtn sapUiTinyMarginBegin"/>
+          </HBox>
+        </VBox>
+
         <Panel headerText="Javasolt KPI csempek" class="sapUiSmallMarginTop" visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
           <FlexBox items="{jokers>/kpiDiscoverySuggestions}" wrap="Wrap">
             <items>
-              <GenericTile
-                class="sapUiTinyMarginEnd sapUiTinyMarginBottom"
-                header="{jokers>title}"
-                subheader="{= 'Viszonyitas: ' + ${jokers>comparison} }"
-                frameType="OneByOne"
-                press=".onSelectKpiSuggestion">
-                <tileContent>
-                  <TileContent footer="{= ${jokers>id} === ${jokers>/kpiDiscoverySelectedId} ? 'Kivalasztva' : 'Kattints a valasztashoz' }">
-                    <content>
-                      <ImageContent src="sap-icon://business-objects-experience"/>
-                    </content>
-                  </TileContent>
-                </tileContent>
-              </GenericTile>
+              <VBox
+                class="{= ${jokers>selected} ? 'kpiDiscoveryTileWrap kpiDiscoveryTileSelected sapUiTinyMarginEnd sapUiTinyMarginBottom' : (${jokers>/kpiDiscoveryMaxReached} ? 'kpiDiscoveryTileWrap kpiDiscoveryTileDisabled sapUiTinyMarginEnd sapUiTinyMarginBottom' : 'kpiDiscoveryTileWrap sapUiTinyMarginEnd sapUiTinyMarginBottom') }"
+                tooltip="{= !${jokers>selected} &amp;&amp; ${jokers>/kpiDiscoveryMaxReached} ? 'Maximum 3 KPI választható egyszerre.' : '' }">
+                <Text text="{jokers>selectionOrder}" visible="{jokers>selected}" class="kpiDiscoveryTileBadge"/>
+                <GenericTile
+                  header="{jokers>title}"
+                  subheader="{= 'Viszonyitas: ' + ${jokers>comparison} }"
+                  frameType="OneByOne"
+                  press=".onSelectKpiSuggestion">
+                  <tileContent>
+                    <TileContent footer="{= ${jokers>selected} ? 'Kivalasztva' : 'Kattints a valasztashoz' }">
+                      <content>
+                        <ImageContent src="sap-icon://business-objects-experience"/>
+                      </content>
+                    </TileContent>
+                  </tileContent>
+                </GenericTile>
+              </VBox>
             </items>
           </FlexBox>
           <List items="{jokers>/kpiDiscoverySuggestions}" mode="None" class="sapUiSmallMarginTop">
             <CustomListItem>
               <VBox class="sapUiSmallMargin">
-                <ObjectStatus text="{= ${jokers>title} + ' | ' + ${jokers>comparison} }" state="{= ${jokers>id} === ${jokers>/kpiDiscoverySelectedId} ? 'Success' : 'Information' }"/>
+                <ObjectStatus text="{= ${jokers>title} + ' | ' + ${jokers>comparison} }" state="{= ${jokers>selected} ? 'Success' : 'Information' }"/>
                 <Text text="{jokers>description}" wrapping="true" class="sapUiTinyMarginTop"/>
                 <Text text="{= 'Miert erdemes figyelni: ' + ${jokers>why} }" wrapping="true" class="sapUiTinyMarginTop"/>
+              </VBox>
+            </CustomListItem>
+          </List>
+        </Panel>
+
+        <Panel headerText="KPI eredmenyek" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryMultiResults}.length > 1 }">
+          <List items="{jokers>/kpiDiscoveryMultiResults}" mode="None">
+            <CustomListItem>
+              <VBox class="sapUiSmallMargin">
+                <Title text="{jokers>title}" level="H5"/>
+                <Text text="{jokers>summary}" wrapping="true" class="sapUiTinyMarginTop"/>
+                <ObjectStatus
+                  text="{= ${jokers>comparison} ? ('Eltérés: ' + ${jokers>comparison/delta} + ' / ' + (${jokers>comparison/deltaPct} === null ? 'n/a' : ${jokers>comparison/deltaPct} + '%')) : '' }"
+                  state="{= ${jokers>comparison} &amp;&amp; ${jokers>comparison/status} === 'Good' ? 'Success' : (${jokers>comparison} &amp;&amp; ${jokers>comparison/status} === 'Warning' ? 'Warning' : 'None') }"
+                  visible="{= ${jokers>comparison} ? true : false }"/>
               </VBox>
             </CustomListItem>
           </List>

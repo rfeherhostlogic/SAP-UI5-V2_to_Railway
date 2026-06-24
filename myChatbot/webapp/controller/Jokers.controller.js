@@ -132,6 +132,10 @@ sap.ui.define([
         oJokersModel.setProperty("/kpiDiscoverySchemaSummary", "");
         oJokersModel.setProperty("/kpiDiscoverySuggestions", []);
         oJokersModel.setProperty("/kpiDiscoverySelectedId", "");
+        oJokersModel.setProperty("/kpiDiscoverySelectedIds", []);
+        oJokersModel.setProperty("/kpiDiscoveryMaxReached", false);
+        oJokersModel.setProperty("/kpiDiscoveryTrayItems", []);
+        oJokersModel.setProperty("/kpiDiscoveryMultiResults", []);
         oJokersModel.setProperty("/kpiDiscoverySummary", "");
         oJokersModel.setProperty("/kpiDiscoveryComparison", null);
         oJokersModel.setProperty("/kpiDiscoveryMetrics", []);

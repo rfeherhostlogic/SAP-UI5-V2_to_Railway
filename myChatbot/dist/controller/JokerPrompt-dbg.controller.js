@@ -142,16 +142,19 @@ sap.ui.define([
       var oFile = aFiles && aFiles[0] ? aFiles[0] : null;
 
       if (!oFile) {
-        MessageToast.show("Valassz egy Word sablon fajlt.");
+        MessageToast.show("Valassz egy sablon fajlt.");
         return;
       }
 
       oModel.setProperty("/quoteBusy", true);
       oModel.setProperty("/quoteError", "");
+      oModel.setProperty("/quoteState", "input");
+      oModel.setProperty("/quote", null);
       oModel.setProperty("/quoteSummary", "");
       oModel.setProperty("/quotePreviewUrl", "");
       oModel.setProperty("/quotePdfDownloadUrl", "");
       oModel.setProperty("/quoteDocxDownloadUrl", "");
+      oModel.setProperty("/quoteChatMessages", []);
 
       try {
         var oUpload = await AiService.uploadQuoteTemplate(oFile);
@@ -161,12 +164,47 @@ sap.ui.define([
         oModel.setProperty("/quoteTemplatePlaceholders", Array.isArray(oUpload.templatePlaceholders) ? oUpload.templatePlaceholders : []);
         oModel.setProperty("/quoteMissingPlaceholders", Array.isArray(oUpload.missingPlaceholders) ? oUpload.missingPlaceholders : []);
         oModel.setProperty("/quotePlaceholderValues", {});
-        MessageToast.show(oUpload.message || "Word sablon feltoltve.");
+        MessageToast.show(oUpload.message || "Sablon feltoltve.");
       } catch (oError) {
-        oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "Word sablon feltoltesi hiba.");
-        MessageToast.show(oError && oError.message ? oError.message : "Word sablon feltoltesi hiba.");
+        oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "Sablon feltoltesi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "Sablon feltoltesi hiba.");
       } finally {
         oModel.setProperty("/quoteBusy", false);
+      }
+    },
+
+    onQuoteRemoveTemplate: function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/quoteSessionId", "");
+      oModel.setProperty("/quoteTemplateFileName", "");
+      oModel.setProperty("/quoteTemplatePreview", "");
+      oModel.setProperty("/quoteTemplatePlaceholders", []);
+      oModel.setProperty("/quoteMissingPlaceholders", []);
+      oModel.setProperty("/quotePlaceholderValues", {});
+      oModel.setProperty("/quoteState", "input");
+      oModel.setProperty("/quote", null);
+      oModel.setProperty("/quoteSummary", "");
+      oModel.setProperty("/quotePreviewUrl", "");
+      oModel.setProperty("/quotePdfDownloadUrl", "");
+      oModel.setProperty("/quoteDocxDownloadUrl", "");
+      oModel.setProperty("/quoteChatMessages", []);
+
+      var oFileUploader = this.byId("quoteTemplateUploader");
+      if (oFileUploader && oFileUploader.clear) {
+        oFileUploader.clear();
+      }
+    },
+
+    onQuoteTextSampleChange: function(oEvent) {
+      var oModel = this.getView().getModel("jokers");
+      var oSelectedItem = oEvent && oEvent.getParameter ? oEvent.getParameter("selectedItem") : null;
+      var sKey = oSelectedItem ? oSelectedItem.getKey() : "";
+      var aSamples = oModel.getProperty("/quoteTextSamples") || [];
+      var oSample = aSamples.find(function(oItem) {
+        return oItem.key === sKey;
+      });
+      if (oSample) {
+        oModel.setProperty("/quoteContextText", oSample.text);
       }
     },
 
@@ -176,11 +214,11 @@ sap.ui.define([
       var sContext = (oModel.getProperty("/quoteContextText") || "").trim();
 
       if (!sSessionId) {
-        MessageToast.show("Elobb tolts fel egy Word sablont.");
+        MessageToast.show("Elobb tolts fel egy sablont.");
         return;
       }
       if (!sContext) {
-        MessageToast.show("A kontextus mezot toltsd ki.");
+        MessageToast.show("Az ajanlat kontextusat add meg.");
         return;
       }
 
@@ -190,10 +228,12 @@ sap.ui.define([
         var oResult = await AiService.generateQuote({
           sessionId: sSessionId,
           contextText: sContext,
-          placeholderValues: this._collectQuotePlaceholderValues()
+          placeholderValues: {},
+          force: true
         });
-        this._applyQuoteResult(oResult);
-        MessageToast.show(oResult && oResult.needsInput ? "Hianyzo placeholder ertekek szuksegesek." : "Arajanlat preview elkeszult.");
+        this._applyQuoteResult(oResult, true);
+        oModel.setProperty("/quoteState", "result");
+        MessageToast.show("Az ajanlat elkeszult.");
       } catch (oError) {
         oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "Arajanlat generalasi hiba.");
         MessageToast.show(oError && oError.message ? oError.message : "Arajanlat generalasi hiba.");
@@ -202,7 +242,7 @@ sap.ui.define([
       }
     },
 
-    onReviseQuote: async function() {
+    onQuoteChatSend: async function() {
       var oModel = this.getView().getModel("jokers");
       var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
       var sMessage = (oModel.getProperty("/quoteRevisionMessage") || "").trim();
@@ -212,7 +252,6 @@ sap.ui.define([
         return;
       }
       if (!sMessage) {
-        MessageToast.show("Ird be a modositasi kerest.");
         return;
       }
 
@@ -222,11 +261,12 @@ sap.ui.define([
         var oResult = await AiService.reviseQuote({
           sessionId: sSessionId,
           message: sMessage,
-          placeholderValues: this._collectQuotePlaceholderValues()
+          placeholderValues: {},
+          force: true,
+          skipRender: true
         });
-        this._applyQuoteResult(oResult);
+        this._applyQuoteResult(oResult, false);
         oModel.setProperty("/quoteRevisionMessage", "");
-        MessageToast.show("Modositott preview elkeszult.");
       } catch (oError) {
         oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "Arajanlat modositasi hiba.");
         MessageToast.show(oError && oError.message ? oError.message : "Arajanlat modositasi hiba.");
@@ -235,10 +275,72 @@ sap.ui.define([
       }
     },
 
-    onOpenQuotePreview: function() {
-      var sUrl = this.getView().getModel("jokers").getProperty("/quotePreviewUrl");
-      if (sUrl) {
-        window.open(sUrl, "_blank", "noopener,noreferrer");
+    onRefreshQuotePdf: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
+      var oQuote = oModel.getProperty("/quote");
+
+      if (!sSessionId || !oQuote) {
+        MessageToast.show("Nincs modosithato arajanlat.");
+        return;
+      }
+
+      oModel.setProperty("/quotePdfBusy", true);
+      oModel.setProperty("/quoteError", "");
+      try {
+        var oResult = await AiService.renderQuote({
+          sessionId: sSessionId,
+          quote: oQuote
+        });
+        this._applyQuoteResult(oResult, true);
+        MessageToast.show("A PDF elonezet frissult.");
+      } catch (oError) {
+        oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "PDF frissitesi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "PDF frissitesi hiba.");
+      } finally {
+        oModel.setProperty("/quotePdfBusy", false);
+      }
+    },
+
+    onNewQuote: function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/quoteState", "input");
+      oModel.setProperty("/quoteContextText", "");
+      oModel.setProperty("/quote", null);
+      oModel.setProperty("/quoteSummary", "");
+      oModel.setProperty("/quotePreviewUrl", "");
+      oModel.setProperty("/quotePdfDownloadUrl", "");
+      oModel.setProperty("/quoteDocxDownloadUrl", "");
+      oModel.setProperty("/quoteChatMessages", []);
+      oModel.setProperty("/quoteRevisionMessage", "");
+      oModel.setProperty("/quoteError", "");
+    },
+
+    onSaveQuote: async function() {
+      var oModel = this.getView().getModel("jokers");
+      var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
+      var oQuote = oModel.getProperty("/quote");
+
+      if (!sSessionId || !oQuote) {
+        MessageToast.show("Nincs menthato arajanlat.");
+        return;
+      }
+
+      oModel.setProperty("/quoteBusy", true);
+      oModel.setProperty("/quoteError", "");
+      try {
+        var oResult = await AiService.renderQuote({
+          sessionId: sSessionId,
+          quote: oQuote
+        });
+        this._applyQuoteResult(oResult, true);
+        MessageToast.show("Az ajanlat mentve.");
+        this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: "noah" });
+      } catch (oError) {
+        oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "Arajanlat mentesi hiba.");
+        MessageToast.show(oError && oError.message ? oError.message : "Arajanlat mentesi hiba.");
+      } finally {
+        oModel.setProperty("/quoteBusy", false);
       }
     },
 
@@ -250,32 +352,31 @@ sap.ui.define([
       this._openQuoteDownload("/quotePdfDownloadUrl");
     },
 
-    _applyQuoteResult: function(oResult) {
+    _applyQuoteResult: function(oResult, bUpdatePdf) {
       var oModel = this.getView().getModel("jokers");
+      if (oResult && oResult.quote) {
+        oModel.setProperty("/quote", oResult.quote);
+      }
       oModel.setProperty("/quoteSummary", oResult && oResult.summary ? oResult.summary : "");
-      oModel.setProperty("/quotePreviewUrl", oResult && oResult.previewUrl ? oResult.previewUrl : "");
-      oModel.setProperty("/quotePdfDownloadUrl", oResult && oResult.pdfDownloadUrl ? oResult.pdfDownloadUrl : "");
-      oModel.setProperty("/quoteDocxDownloadUrl", oResult && oResult.docxDownloadUrl ? oResult.docxDownloadUrl : "");
-      oModel.setProperty("/quoteConversionMode", oResult && oResult.conversionMode ? oResult.conversionMode : "");
       oModel.setProperty("/quoteMissingPlaceholders", Array.isArray(oResult && oResult.missingPlaceholders) ? oResult.missingPlaceholders : []);
-      oModel.setProperty("/quoteTemplatePlaceholders", Array.isArray(oResult && oResult.templatePlaceholders) ? oResult.templatePlaceholders : (oModel.getProperty("/quoteTemplatePlaceholders") || []));
-      oModel.setProperty("/quotePlaceholderValues", oResult && oResult.placeholderValues ? oResult.placeholderValues : (oModel.getProperty("/quotePlaceholderValues") || {}));
+      if (Array.isArray(oResult && oResult.templatePlaceholders)) {
+        oModel.setProperty("/quoteTemplatePlaceholders", oResult.templatePlaceholders);
+      }
+      if (oResult && oResult.placeholderValues) {
+        oModel.setProperty("/quotePlaceholderValues", oResult.placeholderValues);
+      }
       if (Array.isArray(oResult && oResult.chatMessages)) {
         oModel.setProperty("/quoteChatMessages", oResult.chatMessages);
       }
-    },
-
-    _collectQuotePlaceholderValues: function() {
-      var oModel = this.getView().getModel("jokers");
-      var mValues = Object.assign({}, oModel.getProperty("/quotePlaceholderValues") || {});
-      var aMissing = oModel.getProperty("/quoteMissingPlaceholders") || [];
-      aMissing.forEach(function(oItem) {
-        if (oItem && oItem.name) {
-          mValues[oItem.name] = oItem.value || "";
-        }
-      });
-      oModel.setProperty("/quotePlaceholderValues", mValues);
-      return mValues;
+      if (bUpdatePdf) {
+        oModel.setProperty("/quotePreviewUrl", oResult && oResult.previewUrl ? oResult.previewUrl : "");
+        oModel.setProperty("/quotePdfDownloadUrl", oResult && oResult.pdfDownloadUrl ? oResult.pdfDownloadUrl : "");
+        oModel.setProperty("/quoteDocxDownloadUrl", oResult && oResult.docxDownloadUrl ? oResult.docxDownloadUrl : "");
+        oModel.setProperty("/quoteConversionMode", oResult && oResult.conversionMode ? oResult.conversionMode : "");
+        var oQuote = oModel.getProperty("/quote");
+        var sQuoteNo = oQuote && oQuote.quoteNo ? String(oQuote.quoteNo) : "arajanlat";
+        oModel.setProperty("/quoteFileName", sQuoteNo.replace(/[^a-z0-9_-]+/gi, "_") + ".pdf");
+      }
     },
 
     _openQuoteDownload: function(sProperty) {
@@ -552,6 +653,7 @@ sap.ui.define([
     onDiscoverKpis: async function() {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/kpiDiscoveryBusy", true);
+      oModel.setProperty("/kpiDiscoverySuggestionsLoading", true);
       oModel.setProperty("/kpiDiscoveryError", "");
       oModel.setProperty("/kpiDiscoverySummary", "");
       oModel.setProperty("/kpiDiscoveryComparison", null);
@@ -564,16 +666,65 @@ sap.ui.define([
       try {
         var oResp = await AiService.getKpiDiscoverySuggestions();
         var aSuggestions = Array.isArray(oResp && oResp.suggestions) ? oResp.suggestions : [];
+        aSuggestions = this._decorateKpiDiscoverySuggestions(aSuggestions);
         oModel.setProperty("/kpiDiscoverySchemaSummary", String(oResp && oResp.schemaSummary ? oResp.schemaSummary : ""));
         oModel.setProperty("/kpiDiscoverySuggestions", aSuggestions);
-        oModel.setProperty("/kpiDiscoverySelectedId", aSuggestions.length ? String(aSuggestions[0].id || "") : "");
+        this._setKpiDiscoverySelection(aSuggestions.length ? [String(aSuggestions[0].id || "")] : []);
         MessageToast.show(aSuggestions.length ? "KPI javaslatok elkeszultek." : "Nem talaltam KPI javaslatot.");
       } catch (oError) {
         oModel.setProperty("/kpiDiscoveryError", oError && oError.message ? oError.message : "KPI felfedezesi hiba.");
         MessageToast.show(oError && oError.message ? oError.message : "KPI felfedezesi hiba.");
       } finally {
         oModel.setProperty("/kpiDiscoveryBusy", false);
+        oModel.setProperty("/kpiDiscoverySuggestionsLoading", false);
       }
+    },
+
+    _getKpiDiscoverySourceMeta: function(sId) {
+      if (sId.indexOf("sales_") === 0) {
+        return { categoryTag: "Árbevétel", dataSourceName: "SalesOrder", dataSourceIcon: "sap-icon://sales-order" };
+      }
+      if (sId.indexOf("customer_") === 0) {
+        return { categoryTag: "Ügyfél", dataSourceName: "Customer", dataSourceIcon: "sap-icon://customer" };
+      }
+      var aParts = sId.split("__");
+      var sTable = aParts.length > 1 ? aParts[1] : "Adatbázis";
+      return { categoryTag: "Általános", dataSourceName: sTable, dataSourceIcon: "sap-icon://database" };
+    },
+
+    _decorateKpiDiscoverySuggestions: function(aSuggestions) {
+      var that = this;
+      return aSuggestions.map(function(oItem) {
+        var sId = String(oItem.id || "");
+        var oMeta = that._getKpiDiscoverySourceMeta(sId);
+        return Object.assign({}, oItem, {
+          selected: false,
+          selectionOrder: "",
+          categoryTag: oMeta.categoryTag,
+          dataSourceName: oMeta.dataSourceName,
+          dataSourceIcon: oMeta.dataSourceIcon
+        });
+      });
+    },
+
+    _setKpiDiscoverySelection: function(aIds) {
+      var oModel = this.getView().getModel("jokers");
+      var aSuggestions = (oModel.getProperty("/kpiDiscoverySuggestions") || []).map(function(oItem) {
+        var iOrder = aIds.indexOf(oItem.id);
+        return Object.assign({}, oItem, {
+          selected: iOrder >= 0,
+          selectionOrder: iOrder >= 0 ? String(iOrder + 1) : ""
+        });
+      });
+      var aTrayItems = aIds.map(function(sId) {
+        return aSuggestions.filter(function(oItem) { return oItem.id === sId; })[0];
+      }).filter(Boolean);
+
+      oModel.setProperty("/kpiDiscoverySuggestions", aSuggestions);
+      oModel.setProperty("/kpiDiscoverySelectedIds", aIds.slice());
+      oModel.setProperty("/kpiDiscoveryMaxReached", aIds.length >= 3);
+      oModel.setProperty("/kpiDiscoveryTrayItems", aTrayItems);
+      oModel.setProperty("/kpiDiscoverySelectedId", aIds.length ? aIds[aIds.length - 1] : "");
     },
 
     onSelectKpiSuggestion: function(oEvent) {
@@ -582,15 +733,44 @@ sap.ui.define([
       if (!oContext) {
         return;
       }
-      oModel.setProperty("/kpiDiscoverySelectedId", String(oContext.getObject().id || ""));
+      var sId = String(oContext.getObject().id || "");
+      var aIds = (oModel.getProperty("/kpiDiscoverySelectedIds") || []).slice();
+      var iIdx = aIds.indexOf(sId);
+      if (iIdx >= 0) {
+        aIds.splice(iIdx, 1);
+      } else {
+        if (aIds.length >= 3) {
+          MessageToast.show("Maximum 3 KPI választható egyszerre.");
+          return;
+        }
+        aIds.push(sId);
+      }
+      this._setKpiDiscoverySelection(aIds);
+    },
+
+    onRemoveKpiFromTray: function(oEvent) {
+      var oContext = oEvent.getSource().getBindingContext("jokers");
+      var oModel = this.getView().getModel("jokers");
+      if (!oContext) {
+        return;
+      }
+      var sId = String(oContext.getObject().id || "");
+      var aIds = (oModel.getProperty("/kpiDiscoverySelectedIds") || []).filter(function(sSelectedId) {
+        return sSelectedId !== sId;
+      });
+      this._setKpiDiscoverySelection(aIds);
+    },
+
+    onClearKpiTraySelection: function() {
+      this._setKpiDiscoverySelection([]);
     },
 
     onRunSelectedKpi: async function() {
       var oModel = this.getView().getModel("jokers");
-      var sKpiId = String(oModel.getProperty("/kpiDiscoverySelectedId") || "").trim();
+      var aIds = (oModel.getProperty("/kpiDiscoverySelectedIds") || []).slice();
 
-      if (!sKpiId) {
-        MessageToast.show("Valassz KPI-t a listabol.");
+      if (!aIds.length) {
+        MessageToast.show("Válassz legalább egy KPI-t a futtatáshoz.");
         return;
       }
 
@@ -601,20 +781,42 @@ sap.ui.define([
       oModel.setProperty("/kpiDiscoveryMetrics", []);
       oModel.setProperty("/kpiDiscoveryChartRows", []);
       oModel.setProperty("/kpiDiscoveryRows", []);
+      oModel.setProperty("/kpiDiscoveryMultiResults", []);
       this._resetKpiDiscoveryChart();
       this._rebindKpiDiscoveryTable();
 
+      var aSuggestions = oModel.getProperty("/kpiDiscoverySuggestions") || [];
+
       try {
-        var oResp = await AiService.runKpiDiscovery({ kpiId: sKpiId });
-        var oRun = oResp && oResp.run ? oResp.run : {};
-        var aChartRows = Array.isArray(oRun.chart) ? oRun.chart : [];
-        oModel.setProperty("/kpiDiscoverySummary", String(oRun.summary || ""));
-        oModel.setProperty("/kpiDiscoveryComparison", oRun.comparison || null);
-        oModel.setProperty("/kpiDiscoveryMetrics", Array.isArray(oRun.metrics) ? oRun.metrics : []);
-        oModel.setProperty("/kpiDiscoveryChartRows", aChartRows);
-        oModel.setProperty("/kpiDiscoveryRows", Array.isArray(oRun.rows) ? oRun.rows : []);
-        this._renderKpiDiscoveryChart(aChartRows);
-        this._rebindKpiDiscoveryTable();
+        var aResults = [];
+        for (var i = 0; i < aIds.length; i++) {
+          var sKpiId = aIds[i];
+          var oResp = await AiService.runKpiDiscovery({ kpiId: sKpiId });
+          var oRun = oResp && oResp.run ? oResp.run : {};
+          var oSuggestion = aSuggestions.filter(function(oItem) { return oItem.id === sKpiId; })[0] || {};
+          aResults.push({
+            kpiId: sKpiId,
+            title: oSuggestion.title || sKpiId,
+            summary: String(oRun.summary || ""),
+            comparison: oRun.comparison || null,
+            metrics: Array.isArray(oRun.metrics) ? oRun.metrics : [],
+            chart: Array.isArray(oRun.chart) ? oRun.chart : [],
+            rows: Array.isArray(oRun.rows) ? oRun.rows : []
+          });
+        }
+
+        if (aResults.length === 1) {
+          var oFirst = aResults[0];
+          oModel.setProperty("/kpiDiscoverySummary", oFirst.summary);
+          oModel.setProperty("/kpiDiscoveryComparison", oFirst.comparison);
+          oModel.setProperty("/kpiDiscoveryMetrics", oFirst.metrics);
+          oModel.setProperty("/kpiDiscoveryChartRows", oFirst.chart);
+          oModel.setProperty("/kpiDiscoveryRows", oFirst.rows);
+          this._renderKpiDiscoveryChart(oFirst.chart);
+          this._rebindKpiDiscoveryTable();
+        } else {
+          oModel.setProperty("/kpiDiscoveryMultiResults", aResults);
+        }
       } catch (oError) {
         oModel.setProperty("/kpiDiscoveryError", oError && oError.message ? oError.message : "KPI futtatasi hiba.");
         MessageToast.show(oError && oError.message ? oError.message : "KPI futtatasi hiba.");
@@ -1312,13 +1514,51 @@ sap.ui.define([
       oModel.setProperty("/kpiDiscoverySchemaSummary", "");
       oModel.setProperty("/kpiDiscoverySuggestions", []);
       oModel.setProperty("/kpiDiscoverySelectedId", "");
+      oModel.setProperty("/kpiDiscoverySelectedIds", []);
+      oModel.setProperty("/kpiDiscoveryMaxReached", false);
+      oModel.setProperty("/kpiDiscoveryTrayItems", []);
+      oModel.setProperty("/kpiDiscoveryMultiResults", []);
       oModel.setProperty("/kpiDiscoverySummary", "");
       oModel.setProperty("/kpiDiscoveryComparison", null);
       oModel.setProperty("/kpiDiscoveryMetrics", []);
       oModel.setProperty("/kpiDiscoveryChartRows", []);
       oModel.setProperty("/kpiDiscoveryRows", []);
+      oModel.setProperty("/kpiDiscoveryActiveTab", "");
+      oModel.setProperty("/kpiDiscoveryAvailableSources", []);
+      oModel.setProperty("/kpiDiscoverySourcesBusy", false);
+      oModel.setProperty("/kpiDiscoverySuggestionsLoading", false);
       this._resetKpiDiscoveryChart();
       this._rebindKpiDiscoveryTable();
+    },
+
+    onToggleKpiSourcesTab: function() {
+      var oModel = this.getView().getModel("jokers");
+      var bWasOpen = oModel.getProperty("/kpiDiscoveryActiveTab") === "sources";
+      oModel.setProperty("/kpiDiscoveryActiveTab", bWasOpen ? "" : "sources");
+      if (!bWasOpen) {
+        this._loadKpiDiscoveryAvailableSources();
+      }
+    },
+
+    onToggleKpiSchemaTab: function() {
+      var oModel = this.getView().getModel("jokers");
+      var bWasOpen = oModel.getProperty("/kpiDiscoveryActiveTab") === "schema";
+      oModel.setProperty("/kpiDiscoveryActiveTab", bWasOpen ? "" : "schema");
+    },
+
+    _loadKpiDiscoveryAvailableSources: async function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/kpiDiscoverySourcesBusy", true);
+      try {
+        var oResp = await AiService.mlWizardGetDbTables();
+        var aTables = Array.isArray(oResp && oResp.tables) ? oResp.tables.filter(Boolean) : [];
+        oModel.setProperty("/kpiDiscoveryAvailableSources", aTables);
+      } catch (oError) {
+        oModel.setProperty("/kpiDiscoveryAvailableSources", []);
+        MessageToast.show(oError && oError.message ? oError.message : "Adatforrasok betoltesi hibaja.");
+      } finally {
+        oModel.setProperty("/kpiDiscoverySourcesBusy", false);
+      }
     },
 
     _loadJokerSchedule: async function(sJokerId, sPrefix) {

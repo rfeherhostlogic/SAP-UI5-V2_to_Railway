@@ -421,10 +421,15 @@ sap.ui.define([
 				dummy10ScheduleWeeklyDay: 1,
 				dummy10ScheduleTime: "09:00",
 				kpiDiscoveryBusy: false,
+				kpiDiscoverySuggestionsLoading: false,
 				kpiDiscoveryError: "",
 				kpiDiscoverySchemaSummary: "",
 				kpiDiscoverySuggestions: [],
 				kpiDiscoverySelectedId: "",
+				kpiDiscoverySelectedIds: [],
+				kpiDiscoveryMaxReached: false,
+				kpiDiscoveryTrayItems: [],
+				kpiDiscoveryMultiResults: [],
 				kpiDiscoverySummary: "",
 				kpiDiscoveryComparison: null,
 				kpiDiscoveryMetrics: [],
@@ -588,6 +593,7 @@ sap.ui.define([
 				dummy5Summary: "",
 				dummy5Question: "",
 				dummy5Answer: "",
+				quoteState: "input",
 				quoteSessionId: "",
 				quoteTemplateFileName: "",
 				quoteTemplatePreview: "",
@@ -595,13 +601,34 @@ sap.ui.define([
 				quoteMissingPlaceholders: [],
 				quotePlaceholderValues: {},
 				quoteContextText: "",
+				quoteTextSampleKey: "",
+				quoteTextSamples: [
+					{
+						key: "altalanos",
+						title: "Altalanos szolgaltatas ajanlat",
+						text: "Uj ugyfel erdeklodik altalanos szolgaltatasunk irant. Kerlek keszits arajanlatot havi tamogatasi csomagra, kb. 20 munkaorat tartalmazva, 30 napos fizetesi hataridovel."
+					},
+					{
+						key: "termek",
+						title: "Termekertekesitesi ajanlat",
+						text: "Az ugyfel 50 darab termeket szeretne rendelni, mennyisegi kedvezmenyt kerve. Kerlek keszits arajanlatot a rendeles mennyisegere, szallitasi hataridovel es 15 napos fizetesi feltetellel."
+					},
+					{
+						key: "projekt",
+						title: "Projekt alapu ajanlat",
+						text: "Egyedi fejlesztesi projektrol van szo, kb. 3 honapos futamidovel. Kerlek keszits arajanlatot mernoki napokra bontva, mertfoldkovenkenti szamlazassal."
+					}
+				],
+				quote: null,
 				quoteSummary: "",
 				quotePreviewUrl: "",
 				quotePdfDownloadUrl: "",
 				quoteDocxDownloadUrl: "",
+				quoteFileName: "",
 				quoteRevisionMessage: "",
 				quoteChatMessages: [],
 				quoteBusy: false,
+				quotePdfBusy: false,
 				quoteError: "",
 				quoteConversionMode: "",
 				dummy7CompanyA: "",
