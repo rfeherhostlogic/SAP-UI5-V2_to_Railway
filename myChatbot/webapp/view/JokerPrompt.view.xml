@@ -730,12 +730,14 @@
 
         <Panel headerText="Adatbázis séma" class="kpiDiscoveryTabPanel sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryActiveTab} === 'schema' }">
           <VBox class="sapUiSmallMargin">
-            <MessageStrip text="Hamarosan elérhető" type="Information" showIcon="true" showCloseButton="false"/>
+            <Text text="{jokers>/kpiDiscoverySchemaSummary}" wrapping="true" visible="{= ${jokers>/kpiDiscoverySchemaSummary} ? true : false }"/>
+            <MessageStrip
+              text="A séma összegzés a 'KPI ötletek keresése' gomb lefuttatása után jelenik meg itt."
+              type="Information"
+              showIcon="true"
+              showCloseButton="false"
+              visible="{= ${jokers>/kpiDiscoverySchemaSummary} ? false : true }"/>
           </VBox>
-        </Panel>
-
-        <Panel headerText="Adatbazis sema" expandable="true" expanded="false" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoverySchemaSummary} ? true : false }">
-          <Text text="{jokers>/kpiDiscoverySchemaSummary}" wrapping="true" class="sapUiSmallMargin"/>
         </Panel>
 
         <Panel headerText="Javasolt KPI csempek" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
