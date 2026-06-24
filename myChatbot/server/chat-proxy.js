@@ -625,8 +625,15 @@ function parseCookies(req) {
   }, {});
 }
 
-function setAuthCookie(res, token) {
-  const isProduction = process.env.NODE_ENV === "production";
+function isRequestSecure(req) {
+  if (req && req.secure) {
+    return true;
+  }
+  const proto = String((req && req.headers && req.headers["x-forwarded-proto"]) || "").split(",")[0].trim().toLowerCase();
+  return proto === "https";
+}
+
+function setAuthCookie(res, token, req) {
   const parts = [
     AUTH_COOKIE_NAME + "=" + encodeURIComponent(String(token || "")),
     "Path=/",
@@ -634,20 +641,24 @@ function setAuthCookie(res, token) {
     "SameSite=Lax",
     "Max-Age=" + Math.max(0, Math.floor(APP_SESSION_TTL_MS / 1000))
   ];
-  if (isProduction) {
+  if (isRequestSecure(req)) {
     parts.push("Secure");
   }
   res.setHeader("Set-Cookie", parts.join("; "));
 }
 
-function clearAuthCookie(res) {
-  res.setHeader("Set-Cookie", [
+function clearAuthCookie(res, req) {
+  const parts = [
     AUTH_COOKIE_NAME + "=",
     "Path=/",
     "HttpOnly",
     "SameSite=Lax",
     "Max-Age=0"
-  ].join("; "));
+  ];
+  if (isRequestSecure(req)) {
+    parts.push("Secure");
+  }
+  res.setHeader("Set-Cookie", parts.join("; "));
 }
 
 function cleanupAuthSessions() {
@@ -7317,7 +7328,7 @@ app.post("/api/auth/login", async function(req, res) {
   }
 
   const token = createAuthSession(user);
-  setAuthCookie(res, token);
+  setAuthCookie(res, token, req);
   res.json({
     authenticated: true,
     user: publicAuthUser(user)
@@ -7335,7 +7346,7 @@ app.post("/api/auth/logout", function(req, res) {
       oAuthSessions.delete(token);
     }
   }
-  clearAuthCookie(res);
+  clearAuthCookie(res, req);
   res.json({ ok: true });
 });
 
