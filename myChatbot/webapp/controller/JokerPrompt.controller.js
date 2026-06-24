@@ -823,65 +823,133 @@ sap.ui.define([
         summary: String(oRun.summary || ""),
         comparison: oComparison,
         chartType: oChartInfo.chartType,
-        bars: oChartInfo.bars,
-        complexValueText: oChartInfo.complexValueText
+        chartHtml: oChartInfo.chartHtml
       };
     },
 
+    // Adatpontok forrasa: a backend run() valasz "chart" tombje, elemei
+    // { label, value } alakuak (lasd server/kpi_discovery_runner.py
+    // comparison_chart()/run_kpi()). Ket pontos tomb mindig "Aktualis" +
+    // viszonyitasi alap part (osszehasonlitas), "YYYY-MM" formatumu label
+    // tobb ponton idosor, minden mas tobb pontos tomb rangsor/kategoria.
     _buildKpiDiscoveryMiniChart: function(aChart, oComparison) {
-      var HIGHLIGHT = "kpiMiniBarHighlight";
-      var MUTED = "kpiMiniBarMuted";
-      var NEGATIVE = "kpiMiniBarNegative";
+      var HIGHLIGHT = "#185FA5";
+      var MUTED = "#B5D4F4";
+      var NEGATIVE = "#F09595";
 
       if (!aChart.length) {
+        // TODO: complex KPI visualization not yet implemented
         // Komplex KPI tipusok (szegmentacio, ML-alapu elemzes): a teljes
         // vizualizacio kesobbi feladat, addig csak a kulcsszamot mutatjuk.
         var sComplexText = oComparison
           ? (oComparison.label + ": " + oComparison.current + (oComparison.unit ? " " + oComparison.unit : ""))
           : "";
-        return { chartType: "none", bars: [], complexValueText: sComplexText };
+        return { chartType: "none", chartHtml: this._renderKpiComplexValueHtml(sComplexText) };
       }
 
-      var aValues = aChart.map(function(oPoint) { return Number(oPoint && oPoint.value) || 0; });
-      var nMax = Math.max.apply(null, aValues.concat([0])) || 1;
-
       if (aChart.length === 2) {
-        var bWarning = !!(oComparison && oComparison.status === "Warning");
-        var aBars = aChart.map(function(oPoint, iIndex) {
-          var nValue = Number(oPoint.value) || 0;
-          var sColorClass = iIndex === 0 ? (bWarning ? NEGATIVE : HIGHLIGHT) : MUTED;
-          return {
-            label: String(oPoint.label || ""),
-            heightPx: Math.max(4, Math.round((nValue / nMax) * 60)),
-            colorClass: sColorClass
-          };
-        });
-        return { chartType: "comparison", bars: aBars, complexValueText: "" };
+        var nCurrent = Number(aChart[0] && aChart[0].value) || 0;
+        var nReference = Number(aChart[1] && aChart[1].value) || 0;
+        var sCurrentColor = nCurrent < nReference ? NEGATIVE : HIGHLIGHT;
+        var aComparisonBars = [
+          { label: String(aChart[0] && aChart[0].label || ""), value: nCurrent, color: sCurrentColor },
+          { label: String(aChart[1] && aChart[1].label || ""), value: nReference, color: MUTED }
+        ];
+        return { chartType: "comparison", chartHtml: this._renderKpiVerticalBarSvg(aComparisonBars) };
       }
 
       var bLooksLikeDate = /^\d{4}-\d{2}/.test(String(aChart[0] && aChart[0].label || ""));
 
       if (bLooksLikeDate) {
-        var aTimeBars = aChart.map(function(oPoint) {
-          var nValue = Number(oPoint.value) || 0;
-          return {
-            label: String(oPoint.label || ""),
-            heightPx: Math.max(4, Math.round((nValue / nMax) * 60)),
-            colorClass: nValue === nMax ? HIGHLIGHT : MUTED
-          };
-        });
-        return { chartType: "timeseries", bars: aTimeBars, complexValueText: "" };
+        var aTimeBars = this._markKpiHighlightBar(aChart, HIGHLIGHT, MUTED);
+        return { chartType: "timeseries", chartHtml: this._renderKpiVerticalBarSvg(aTimeBars) };
       }
 
-      var aRankBars = aChart.map(function(oPoint) {
-        var nValue = Number(oPoint.value) || 0;
+      var aRankBars = this._markKpiHighlightBar(aChart, HIGHLIGHT, MUTED);
+      return { chartType: "ranking", chartHtml: this._renderKpiHorizontalBarSvg(aRankBars) };
+    },
+
+    // Az elso legnagyobb erteku pontot jeloli kiemeltnek - soha nem kerul
+    // tobb mint egy bar #185FA5 szinre, holtverseny eseten az elso nyer.
+    _markKpiHighlightBar: function(aChart, sHighlightColor, sMutedColor) {
+      var nMax = -Infinity;
+      var iMaxIndex = -1;
+      aChart.forEach(function(oPoint, iIndex) {
+        var nValue = Number(oPoint && oPoint.value) || 0;
+        if (nValue > nMax) {
+          nMax = nValue;
+          iMaxIndex = iIndex;
+        }
+      });
+
+      return aChart.map(function(oPoint, iIndex) {
         return {
-          label: String(oPoint.label || ""),
-          widthPct: Math.max(4, Math.round((nValue / nMax) * 100)),
-          colorClass: nValue === nMax ? HIGHLIGHT : MUTED
+          label: String(oPoint && oPoint.label || ""),
+          value: Number(oPoint && oPoint.value) || 0,
+          color: iIndex === iMaxIndex ? sHighlightColor : sMutedColor
         };
       });
-      return { chartType: "ranking", bars: aRankBars, complexValueText: "" };
+    },
+
+    _escapeKpiChartText: function(sValue) {
+      return String(sValue == null ? "" : sValue)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    },
+
+    _renderKpiVerticalBarSvg: function(aBars) {
+      var VIEW_W = 300;
+      var VIEW_H = 60;
+      var PLOT_H = 44;
+      var nMax = Math.max.apply(null, aBars.map(function(oBar) { return oBar.value; }).concat([0])) || 1;
+      var nSlotW = VIEW_W / aBars.length;
+      var nBarW = Math.max(4, nSlotW * 0.5);
+      var that = this;
+
+      var sBars = aBars.map(function(oBar, iIndex) {
+        var nHeight = Math.max(2, Math.round((oBar.value / nMax) * PLOT_H));
+        var nX = iIndex * nSlotW + (nSlotW - nBarW) / 2;
+        var nY = PLOT_H - nHeight;
+        var nLabelX = iIndex * nSlotW + nSlotW / 2;
+        return (
+          '<rect x="' + nX.toFixed(1) + '" y="' + nY.toFixed(1) + '" width="' + nBarW.toFixed(1) + '" height="' + nHeight.toFixed(1) + '" fill="' + oBar.color + '" rx="2"></rect>' +
+          '<text x="' + nLabelX.toFixed(1) + '" y="58" font-size="8" fill="#8C8C8C" text-anchor="middle">' + that._escapeKpiChartText(oBar.label) + '</text>'
+        );
+      }).join("");
+
+      return '<svg width="100%" height="60" viewBox="0 0 ' + VIEW_W + ' ' + VIEW_H + '" preserveAspectRatio="none">' + sBars + '</svg>';
+    },
+
+    _renderKpiHorizontalBarSvg: function(aBars) {
+      var VIEW_W = 300;
+      var VIEW_H = 60;
+      var nMax = Math.max.apply(null, aBars.map(function(oBar) { return oBar.value; }).concat([0])) || 1;
+      var nRowH = VIEW_H / aBars.length;
+      var nBarH = Math.max(4, nRowH * 0.55);
+      var that = this;
+
+      var sBars = aBars.map(function(oBar, iIndex) {
+        var nWidth = Math.max(8, Math.round((oBar.value / nMax) * (VIEW_W - 6)));
+        var nY = iIndex * nRowH + (nRowH - nBarH) / 2;
+        var nLabelY = iIndex * nRowH + nRowH / 2 + 2.5;
+        return (
+          '<rect x="0" y="' + nY.toFixed(1) + '" width="' + nWidth.toFixed(1) + '" height="' + nBarH.toFixed(1) + '" fill="' + oBar.color + '" rx="2"></rect>' +
+          '<text x="4" y="' + nLabelY.toFixed(1) + '" font-size="8" fill="#8C8C8C">' + that._escapeKpiChartText(oBar.label) + '</text>'
+        );
+      }).join("");
+
+      return '<svg width="100%" height="60" viewBox="0 0 ' + VIEW_W + ' ' + VIEW_H + '" preserveAspectRatio="none">' + sBars + '</svg>';
+    },
+
+    _renderKpiComplexValueHtml: function(sText) {
+      return (
+        '<div style="height:60px;display:flex;align-items:center;justify-content:center;' +
+        'font-size:1.05rem;font-weight:700;color:#185FA5;text-align:center;">' +
+        this._escapeKpiChartText(sText) +
+        '</div>'
+      );
     },
 
     onSaveDummy10Schedule: async function() {

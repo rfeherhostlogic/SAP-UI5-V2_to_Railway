@@ -418,68 +418,19 @@
   font-size: 0.95rem;
 }
 
-.kpiMiniChartRow {
+.kpiMiniChartHost {
+  display: block;
+  width: 100%;
   height: 60px;
-  gap: 0.5rem;
   margin-top: 0.6rem;
-}
-
-.kpiMiniBarCol {
-  min-width: 1.6rem;
-}
-
-.kpiMiniBar {
-  width: 14px;
-  border-radius: 2px 2px 0 0;
-}
-
-.kpiMiniBarHighlight {
-  background: #185fa5;
-}
-
-.kpiMiniBarMuted {
-  background: #b5d4f4;
-}
-
-.kpiMiniBarNegative {
-  background: #f09595;
-}
-
-.kpiMiniBarLabel {
-  font-size: 8.5px;
-  color: #8c8c8c;
-  margin-top: 0.2rem;
-  text-align: center;
-}
-
-.kpiMiniRankWrap {
-  gap: 0.3rem;
-}
-
-.kpiMiniRankItem {
-  gap: 0.4rem;
-}
-
-.kpiMiniRankLabel {
-  font-size: 8.5px;
-  color: #8c8c8c;
-  min-width: 4.5rem;
-  max-width: 4.5rem;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.kpiMiniRankTrack {
-  flex: 1 1 0;
-  background: #eef2f8;
-  border-radius: 2px;
-  height: 10px;
-}
-
-.kpiMiniBarRank {
-  height: 10px;
-  border-radius: 2px;
+.kpiMiniChartHost > div,
+.kpiMiniChartHost > svg {
+  width: 100%;
+  height: 60px;
+  display: block;
 }
 
 .kpiDiscoveryTileTooltipPopover .sapMPopoverCont {
