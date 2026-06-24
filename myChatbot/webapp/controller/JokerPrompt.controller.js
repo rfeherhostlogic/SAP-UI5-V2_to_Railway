@@ -815,7 +815,6 @@ sap.ui.define([
     _buildKpiDiscoveryResultCard: function(sKpiId, oSuggestion, oRun) {
       var aChart = Array.isArray(oRun.chart) ? oRun.chart : [];
       var oComparison = oRun.comparison || null;
-      var aRows = Array.isArray(oRun.rows) ? oRun.rows : [];
       var oChartInfo = this._buildKpiDiscoveryMiniChart(aChart, oComparison);
 
       return {
@@ -825,8 +824,7 @@ sap.ui.define([
         comparison: oComparison,
         chartType: oChartInfo.chartType,
         bars: oChartInfo.bars,
-        complexValueText: oChartInfo.complexValueText,
-        detailRows: this._buildKpiDiscoveryDetailRows(aRows)
+        complexValueText: oChartInfo.complexValueText
       };
     },
 
@@ -884,36 +882,6 @@ sap.ui.define([
         };
       });
       return { chartType: "ranking", bars: aRankBars, complexValueText: "" };
-    },
-
-    _buildKpiDiscoveryDetailRows: function(aRows) {
-      var aColumns = this._extractDummy4Columns(aRows);
-      if (!aColumns.length) {
-        return [];
-      }
-
-      var aLimitedRows = aRows.slice(0, 50);
-      var aDetailRows = [{ header: true, cells: aColumns.slice() }];
-
-      aLimitedRows.forEach(function(oRow) {
-        aDetailRows.push({
-          header: false,
-          cells: aColumns.map(function(sCol) {
-            var vValue = oRow ? oRow[sCol] : "";
-            return vValue == null ? "" : String(vValue);
-          })
-        });
-      });
-
-      if (aRows.length > aLimitedRows.length) {
-        aDetailRows.push({
-          header: false,
-          note: true,
-          cells: ["... (" + aRows.length + " sorbol az elso " + aLimitedRows.length + " latszik)"]
-        });
-      }
-
-      return aDetailRows;
     },
 
     onSaveDummy10Schedule: async function() {

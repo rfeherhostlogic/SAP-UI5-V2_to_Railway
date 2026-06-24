@@ -871,25 +871,6 @@
             </items>
           </HBox>
 
-          <Panel headerText="Számítási részletek" expandable="true" expanded="false" class="sapUiSmallMarginTop kpiResultDetailsPanel">
-            <List items="{jokers>/kpiDiscoveryMultiResults}" mode="None">
-              <CustomListItem>
-                <VBox class="sapUiSmallMarginBottom">
-                  <Text text="{jokers>title}" class="kpiDetailTableTitle"/>
-                  <List items="{jokers>detailRows}" mode="None" class="kpiDetailTable">
-                    <CustomListItem>
-                      <HBox items="{jokers>cells}" class="{= ${jokers>header} ? 'kpiDetailRow kpiDetailRowHeader' : 'kpiDetailRow' }">
-                        <items>
-                          <Text text="{jokers>}" class="kpiDetailCell"/>
-                        </items>
-                      </HBox>
-                    </CustomListItem>
-                  </List>
-                </VBox>
-              </CustomListItem>
-            </List>
-          </Panel>
-
           <HBox class="kpiTrayActionsRow sapUiSmallMarginTop" alignItems="Center">
             <Button
               text="Vissza a kiválasztáshoz"

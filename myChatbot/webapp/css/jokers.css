@@ -446,8 +446,8 @@
 }
 
 .kpiMiniBarLabel {
-  font-size: 0.55rem;
-  color: #8392a6;
+  font-size: 8.5px;
+  color: #8c8c8c;
   margin-top: 0.2rem;
   text-align: center;
 }
@@ -461,8 +461,8 @@
 }
 
 .kpiMiniRankLabel {
-  font-size: 0.65rem;
-  color: #8392a6;
+  font-size: 8.5px;
+  color: #8c8c8c;
   min-width: 4.5rem;
   max-width: 4.5rem;
   overflow: hidden;
@@ -480,40 +480,6 @@
 .kpiMiniBarRank {
   height: 10px;
   border-radius: 2px;
-}
-
-.kpiResultDetailsPanel {
-  border-radius: 0.75rem;
-}
-
-.kpiDetailTableTitle {
-  font-weight: 700;
-  color: #1f2a3c;
-}
-
-.kpiDetailTable {
-  border: 1px solid #e3e8ef;
-  border-radius: 0.4rem;
-  overflow: hidden;
-}
-
-.kpiDetailRow {
-  gap: 0.75rem;
-  padding: 0.3rem 0.5rem;
-}
-
-.kpiDetailRowHeader {
-  background: #eaf2fd;
-  font-weight: 700;
-}
-
-.kpiDetailCell {
-  font-size: 0.78rem;
-  color: #4a5a70;
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .kpiDiscoveryTileTooltipPopover .sapMPopoverCont {
