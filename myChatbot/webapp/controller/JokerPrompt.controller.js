@@ -16,7 +16,10 @@ sap.ui.define([
   "sap/viz/ui5/controls/common/feeds/FeedItem",
   "sap/m/Panel",
   "sap/m/VBox",
-  "sap/m/ObjectStatus"
+  "sap/m/ObjectStatus",
+  "sap/m/Popover",
+  "sap/m/Title",
+  "sap/ui/core/Element"
 ], function(
   Controller,
   MessageToast,
@@ -35,7 +38,10 @@ sap.ui.define([
   FeedItem,
   Panel,
   VBox,
-  ObjectStatus
+  ObjectStatus,
+  Popover,
+  Title,
+  Element
 ) {
   "use strict";
 
@@ -48,6 +54,7 @@ sap.ui.define([
 
     onAfterRendering: function() {
       this._bindDummy9DropZoneEvents();
+      this._bindKpiDiscoveryTileHoverEvents();
     },
 
     onGenerate: async function() {
@@ -2986,6 +2993,93 @@ sap.ui.define([
       });
 
       this._dummy9DropZoneBound = true;
+    },
+
+    _bindKpiDiscoveryTileHoverEvents: function() {
+      if (this._kpiDiscoveryTileHoverBound) {
+        return;
+      }
+
+      var oPanel = this.byId("kpiDiscoveryTilesPanel");
+      if (!oPanel || !oPanel.getDomRef()) {
+        return;
+      }
+
+      var dom = oPanel.getDomRef();
+      var that = this;
+
+      dom.addEventListener("mouseover", function(ev) {
+        var oTileEl = ev.target.closest(".kpiDiscoveryTileWrap");
+        if (!oTileEl || oTileEl.contains(ev.relatedTarget)) {
+          return;
+        }
+        that._showKpiDiscoveryTileTooltip(oTileEl);
+      });
+
+      dom.addEventListener("mouseout", function(ev) {
+        var oTileEl = ev.target.closest(".kpiDiscoveryTileWrap");
+        if (!oTileEl || oTileEl.contains(ev.relatedTarget)) {
+          return;
+        }
+        that._hideKpiDiscoveryTileTooltip();
+      });
+
+      this._kpiDiscoveryTileHoverBound = true;
+    },
+
+    _getKpiDiscoveryTileTooltipPopover: function() {
+      if (!this._oKpiDiscoveryTileTooltipPopover) {
+        this._oKpiDiscoveryTileTooltipPopover = new Popover({
+          showHeader: false,
+          placement: "Auto",
+          showArrow: true,
+          class: "kpiDiscoveryTileTooltipPopover",
+          content: [
+            new VBox({
+              class: "kpiDiscoveryTileTooltipContent",
+              items: [
+                new Title({ text: "{tileTooltip>/title}", level: "H6" }),
+                new Text({ text: "{tileTooltip>/comparisonText}", class: "sapUiTinyMarginTop" }),
+                new Text({ text: "{tileTooltip>/description}", wrapping: true, class: "sapUiTinyMarginTop" }),
+                new Text({ text: "{tileTooltip>/why}", wrapping: true, class: "sapUiTinyMarginTop" })
+              ]
+            })
+          ]
+        });
+        this._oKpiDiscoveryTileTooltipPopover.setModel(new JSONModel({}), "tileTooltip");
+        this.getView().addDependent(this._oKpiDiscoveryTileTooltipPopover);
+      }
+      return this._oKpiDiscoveryTileTooltipPopover;
+    },
+
+    _showKpiDiscoveryTileTooltip: function(oTileEl) {
+      var oTileControl = Element.closestTo(oTileEl);
+      if (!oTileControl) {
+        return;
+      }
+
+      var sId = oTileEl.getAttribute("data-kpiid") || "";
+      var oModel = this.getView().getModel("jokers");
+      var aSuggestions = oModel.getProperty("/kpiDiscoverySuggestions") || [];
+      var oItem = aSuggestions.filter(function(oSuggestion) { return oSuggestion.id === sId; })[0];
+      if (!oItem) {
+        return;
+      }
+
+      var oPopover = this._getKpiDiscoveryTileTooltipPopover();
+      oPopover.getModel("tileTooltip").setData({
+        title: oItem.title || "",
+        comparisonText: "Viszonyítás: " + (oItem.comparison || ""),
+        description: oItem.description || "",
+        why: "Miért érdemes figyelni: " + (oItem.why || "")
+      });
+      oPopover.openBy(oTileControl);
+    },
+
+    _hideKpiDiscoveryTileTooltip: function() {
+      if (this._oKpiDiscoveryTileTooltipPopover && this._oKpiDiscoveryTileTooltipPopover.isOpen()) {
+        this._oKpiDiscoveryTileTooltipPopover.close();
+      }
     },
 
     _appendDummy9Files: function(aFilesLike) {

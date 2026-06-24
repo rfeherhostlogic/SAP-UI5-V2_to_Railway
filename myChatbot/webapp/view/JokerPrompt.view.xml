@@ -820,12 +820,15 @@
           </HBox>
         </VBox>
 
-        <Panel headerText="Javasolt KPI csempek" class="sapUiSmallMarginTop" visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
+        <Panel id="kpiDiscoveryTilesPanel" headerText="Javasolt KPI csempek" class="sapUiSmallMarginTop" visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
           <FlexBox items="{jokers>/kpiDiscoverySuggestions}" wrap="Wrap">
             <items>
               <VBox
                 class="{= ${jokers>selected} ? 'kpiDiscoveryTileWrap kpiDiscoveryTileSelected sapUiTinyMarginEnd sapUiTinyMarginBottom' : (${jokers>/kpiDiscoveryMaxReached} ? 'kpiDiscoveryTileWrap kpiDiscoveryTileDisabled sapUiTinyMarginEnd sapUiTinyMarginBottom' : 'kpiDiscoveryTileWrap sapUiTinyMarginEnd sapUiTinyMarginBottom') }"
                 tooltip="{= !${jokers>selected} &amp;&amp; ${jokers>/kpiDiscoveryMaxReached} ? 'Maximum 3 KPI választható egyszerre.' : '' }">
+                <customData>
+                  <core:CustomData key="kpiid" value="{jokers>id}" writeToDom="true"/>
+                </customData>
                 <Text text="{jokers>selectionOrder}" visible="{jokers>selected}" class="kpiDiscoveryTileBadge"/>
                 <GenericTile
                   header="{jokers>title}"
@@ -843,15 +846,6 @@
               </VBox>
             </items>
           </FlexBox>
-          <List items="{jokers>/kpiDiscoverySuggestions}" mode="None" class="sapUiSmallMarginTop">
-            <CustomListItem>
-              <VBox class="sapUiSmallMargin">
-                <ObjectStatus text="{= ${jokers>title} + ' | ' + ${jokers>comparison} }" state="{= ${jokers>selected} ? 'Success' : 'Information' }"/>
-                <Text text="{jokers>description}" wrapping="true" class="sapUiTinyMarginTop"/>
-                <Text text="{= 'Miert erdemes figyelni: ' + ${jokers>why} }" wrapping="true" class="sapUiTinyMarginTop"/>
-              </VBox>
-            </CustomListItem>
-          </List>
         </Panel>
 
         <Panel headerText="KPI eredmenyek" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryMultiResults}.length > 1 }">
