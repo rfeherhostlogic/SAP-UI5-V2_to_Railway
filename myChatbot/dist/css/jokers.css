@@ -96,6 +96,553 @@
   color: #17324d;
 }
 
+.quoteBuilderShell {
+  gap: 0.9rem;
+}
+
+.quoteTopBar {
+  border-radius: 1rem;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(210, 222, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  gap: 0.75rem;
+}
+
+.quoteTopBarTitle .sapMTitle {
+  color: #0f2942;
+}
+
+.quoteTemplateChip {
+  border-radius: 999px;
+  padding: 0.35rem 0.5rem 0.35rem 0.85rem;
+  background: linear-gradient(180deg, #eef4fd 0%, #e3edfb 100%);
+  border: 1px solid rgba(150, 180, 222, 0.6);
+  color: #1d4ed8;
+  gap: 0.4rem;
+}
+
+.quoteTemplateChip .sapMBtn .sapMBtnInner {
+  min-width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+}
+
+.quoteTextSampleSelect {
+  min-width: 13rem;
+}
+
+.quoteContextCard {
+  border-radius: 1.1rem;
+  padding: 1.1rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(210, 222, 240, 0.9);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.quoteGenerateButton {
+  border-radius: 0.9rem;
+  min-width: 14rem;
+}
+
+.quoteTemplateAccordion {
+  border-radius: 0.9rem;
+}
+
+.quoteFieldGroup {
+  gap: 0.75rem;
+}
+
+.quoteFieldRow {
+  border: 1px solid rgba(210, 222, 240, 0.9);
+  border-radius: 0.6rem;
+  background: #ffffff;
+  padding: 0.6rem 0.75rem;
+}
+
+.quoteNoahFieldAvatar {
+  cursor: pointer;
+}
+
+.quoteResultBackLink {
+  display: inline-block;
+}
+
+.quoteStepBar {
+  border-bottom: 1px solid rgba(210, 222, 240, 0.9);
+  padding-bottom: 0.4rem;
+  gap: 0.25rem;
+}
+
+.quoteStepBtn .sapMBtnInner {
+  background: transparent;
+  border: none;
+  color: #8c96a6;
+  font-weight: 600;
+  border-radius: 0;
+  padding: 0 0.2rem;
+}
+
+.quoteStepActive .sapMBtnInner {
+  color: #185fa5;
+  border-bottom: 2px solid #185fa5;
+}
+
+.quoteStepDone .sapMBtnInner {
+  color: #185fa5;
+}
+
+.quoteResultScrollArea {
+  border: 1px solid rgba(210, 222, 240, 0.6);
+  border-radius: 0.6rem;
+  background: rgba(248, 250, 253, 0.6);
+  padding: 0.75rem;
+}
+
+.quoteResultPage {
+  gap: 0;
+}
+
+.quoteResultBottomNav {
+  border-top: 1px solid rgba(210, 222, 240, 0.9);
+  padding-top: 0.6rem;
+}
+
+.quoteNoahPillButton {
+  border-radius: 999px;
+}
+
+.quoteNoahPillButton .sapMBtnInner {
+  background: #eaf2fd;
+  border: 1px solid rgba(150, 180, 222, 0.6);
+  border-radius: 999px;
+  color: #185fa5;
+  font-weight: 600;
+  height: 1.8rem;
+  padding: 0 0.7rem;
+}
+
+.quotePriceGrid {
+  border: 1px solid rgba(210, 222, 240, 0.9);
+  border-radius: 0.6rem;
+  overflow: hidden;
+}
+
+.quotePriceGridRow {
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid rgba(210, 222, 240, 0.6);
+}
+
+.quotePriceGridRow:last-child {
+  border-bottom: none;
+}
+
+.quotePriceGridHeaderRow {
+  background: #eaf2fd;
+}
+
+.quotePriceGridCell {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.quotePriceGridHeaderCell {
+  font-weight: 600;
+  color: #344a63;
+  font-size: 0.8rem;
+}
+
+.quotePriceGridCellNarrow {
+  flex: 0 0 5.5rem;
+}
+
+.quoteTotalField {
+  flex: 1 1 0;
+  min-width: 7rem;
+}
+
+.kpiDiscoveryHeaderToolbar {
+  background: transparent;
+  padding: 0 0.25rem;
+}
+
+.kpiDiscoveryTabButton .sapMBtnInner {
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  border-radius: 0.6rem;
+}
+
+.kpiDiscoveryTabButton .sapMBtnIcon {
+  font-size: 0.95rem;
+  color: #5e6f84;
+}
+
+.kpiDiscoveryTabButtonActive .sapMBtnInner {
+  background: #eaf2fd;
+  border-color: #0a6ed1;
+}
+
+.kpiDiscoveryTabButtonActive .sapMBtnIcon {
+  color: #0a6ed1;
+}
+
+.kpiDiscoveryTabPanel {
+  border-radius: 0.75rem;
+}
+
+.kpiDiscoveryEmptyState {
+  border: 1px dashed #b9c8de;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+}
+
+.kpiDiscoveryEmptyIcon {
+  color: #0a6ed1;
+}
+
+.kpiDiscoveryEmptyDesc {
+  color: #5e6f84;
+  max-width: 28rem;
+}
+
+.kpiDiscoveryNoahPill {
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid rgba(10, 110, 209, 0.3);
+  box-shadow: 0 10px 24px rgba(10, 110, 209, 0.12);
+  padding: 0.25rem 0.6rem 0.25rem 0.25rem;
+  cursor: pointer;
+}
+
+.kpiDiscoveryNoahPillAvatar {
+  cursor: pointer;
+}
+
+.kpiDiscoveryNoahPillButton .sapMBtnInner {
+  background: transparent;
+  border: none;
+  font-weight: 600;
+  color: #0a6ed1;
+}
+
+.kpiDiscoverySkeletonTray {
+  width: 100%;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: #e3e8ef;
+  animation: kpiSkeletonPulse 1.4s ease-in-out infinite;
+}
+
+.kpiDiscoverySkeletonGrid {
+  gap: 0.65rem;
+}
+
+.kpiDiscoverySkeletonTile {
+  width: 8rem;
+  height: 8rem;
+  border-radius: 0.6rem;
+  background: #e3e8ef;
+  animation: kpiSkeletonPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes kpiSkeletonPulse {
+  0%, 100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.kpiTrayWrap {
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(184, 197, 217, 0.6);
+  border-left: 4px solid #185fa5;
+}
+
+.kpiTrayTitle {
+  color: #344a63;
+}
+
+.kpiTrayCardsRow {
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.kpiTrayCard {
+  flex: 1 1 0;
+  min-width: 12rem;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #d2dcec;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+  padding: 0.6rem 0.7rem;
+}
+
+.kpiTrayCardTag {
+  display: inline-block;
+  background: #eaf2fd;
+  color: #185fa5;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.55rem;
+}
+
+.kpiTrayCardRemoveBtn .sapMBtnInner {
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+}
+
+.kpiTrayCardRemoveBtn .sapMBtnIcon {
+  font-size: 0.7rem;
+  color: #8392a6;
+}
+
+.kpiTrayCardName {
+  font-weight: 700;
+  color: #1f2a3c;
+}
+
+.kpiTrayCardDesc {
+  color: #6b7a8e;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpiTrayCardSourceRow {
+  color: #6b7a8e;
+}
+
+.kpiTrayCardSourceIcon {
+  color: #185fa5;
+}
+
+.kpiTrayCardSourceName {
+  font-size: 0.75rem;
+}
+
+.kpiTrayEmptyCard {
+  border: 1px dashed #b9c8de;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 1.25rem;
+}
+
+.kpiTrayEmptyText {
+  color: #6b7a8e;
+}
+
+.kpiTrayActionsRow {
+  gap: 0.5rem;
+}
+
+.kpiDiscoveryTileWrap {
+  position: relative;
+  display: inline-block;
+}
+
+.kpiDiscoveryTileBadge {
+  position: absolute;
+  top: -0.4rem;
+  left: -0.4rem;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: #185fa5;
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.3rem;
+  text-align: center;
+  z-index: 2;
+}
+
+.kpiDiscoveryTileSelected .sapMGT {
+  border: 2px solid #185fa5;
+  border-radius: 0.5rem;
+}
+
+.kpiDiscoveryTileDisabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.kpiTrayCard {
+  position: relative;
+  overflow: hidden;
+}
+
+.kpiTrayCardSkeletonOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(227, 232, 239, 0.85);
+  animation: kpiSkeletonPulse 1.4s ease-in-out infinite;
+  z-index: 3;
+}
+
+.kpiResultCard {
+  flex: 1 1 0;
+  min-width: 14rem;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #d2dcec;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+  padding: 0.7rem 0.8rem;
+}
+
+.kpiResultCardName {
+  color: #1f2a3c;
+}
+
+.kpiResultCardSummary {
+  color: #4a5a70;
+  font-size: 0.82rem;
+}
+
+.kpiResultComplexValue {
+  color: #185fa5;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.kpiMiniChartHost {
+  display: block;
+  width: 100%;
+  height: 170px;
+  margin-top: 0.6rem;
+  overflow: hidden;
+}
+
+.kpiMiniChartHost > div,
+.kpiMiniChartHost > svg {
+  width: 100%;
+  height: 170px;
+  display: block;
+}
+
+.kpiDiscoveryTileTooltipPopover .sapMPopoverCont {
+  max-width: 280px;
+  background: #ffffff;
+  border-radius: 0.6rem;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+}
+
+.kpiDiscoveryTileTooltipContent {
+  padding: 0.6rem 0.75rem;
+  color: #4a5a70;
+  font-size: 0.8rem;
+}
+
+.kpiDiscoveryTileTooltipContent .sapMTitle {
+  color: #1f2a3c;
+}
+
+.quoteResultLayout {
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.quoteTextPanel,
+.quotePreviewPanel {
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(210, 222, 240, 0.9);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.quoteCenterColumn {
+  flex: 0 0 6.5rem;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  gap: 0.5rem;
+}
+
+.quoteRefreshButton .sapMBtnInner {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 999px;
+  background: #0a6ed1;
+  border-color: #0a6ed1;
+  box-shadow: 0 12px 24px rgba(10, 110, 209, 0.35);
+}
+
+.quoteRefreshButton .sapMBtnIcon {
+  font-size: 1.5rem;
+  color: #ffffff;
+}
+
+.quoteRefreshCaption {
+  text-align: center;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.quoteEditableField input,
+.quoteEditableField .sapMInputBaseInner {
+  border: none;
+  border-bottom: 1px dashed #6f93c2;
+  border-radius: 0;
+  background: rgba(234, 242, 255, 0.5);
+}
+
+.quotePreviewToolbar {
+  border-bottom: 1px solid rgba(210, 222, 240, 0.9);
+}
+
+.quotePreviewFrame {
+  border: 0;
+}
+
+.quoteChatSection {
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(210, 222, 240, 0.9);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.quoteChatSection .chatBubbleAi,
+.quoteChatSection .chatBubbleUser {
+  max-width: min(70%, 32rem);
+}
+
+.quoteChatComposerBar {
+  gap: 0.4rem;
+  align-items: center;
+  border: 1px solid rgba(207, 219, 235, 0.95);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.97);
+  padding: 0.4rem 0.4rem 0.4rem 0.85rem;
+}
+
+.quoteChatSendButton .sapMBtnInner {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 999px;
+  background: #0a6ed1;
+  border-color: #0a6ed1;
+}
+
+.quoteChatSendButton .sapMBtnIcon {
+  color: #ffffff;
+}
+
+.quoteBottomBar {
+  padding-top: 0.25rem;
+}
+
 @media (max-width: 900px) {
   .jokerTile {
     width: 100%;
@@ -104,6 +651,15 @@
   .dummy9QuestionRow {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .quoteResultLayout {
+    flex-direction: column;
+  }
+
+  .quoteCenterColumn {
+    flex: 0 0 auto;
+    flex-direction: row;
   }
 }
 

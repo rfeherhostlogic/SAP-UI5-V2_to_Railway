@@ -211,88 +211,293 @@
             width="100%"
             placeholder="Pl.: Az ügyfél 50 darab terméket szeretne rendelni mennyiségi kedvezménnyel, 15 napos fizetési határidővel, a szállítást jövő hónap elejére kérik."/>
 
+          <Panel headerText="Azonosított mezők" expandable="true" expanded="true" class="quoteTemplateAccordion sapUiMediumMarginTop">
+            <VBox class="sapUiSmallMargin">
+              <Text text="A feltöltött Word sablonban automatikusan felismert mezők. Az egyszerű mezőket kézzel töltsd ki, a hosszabb szakaszokat a Noah gombbal generálhatod a megadott kontextusból." wrapping="true" class="sapUiTinyMarginBottom"/>
+              <MessageStrip
+                text="Nem található placeholder a feltöltött sablonban."
+                type="Information"
+                showIcon="true"
+                showCloseButton="false"
+                visible="{= ${jokers>/quoteTemplateFields}.length === 0 }"/>
+
+              <VBox items="{path: 'jokers>/quoteTemplateFields', filters: [{path: 'group', operator: 'EQ', value1: 'simple'}]}" class="quoteFieldGroup">
+                <items>
+                  <VBox class="quoteFieldRow">
+                    <Label text="{jokers>label}" class="sapUiTinyMarginBottom"/>
+                    <Input value="{jokers>value}" change=".onQuoteFieldValueChange" width="100%"/>
+                  </VBox>
+                </items>
+              </VBox>
+
+              <VBox items="{path: 'jokers>/quoteTemplateFields', filters: [{path: 'group', operator: 'EQ', value1: 'block'}]}" class="quoteFieldGroup sapUiMediumMarginTop">
+                <items>
+                  <VBox class="quoteFieldRow">
+                    <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiTinyMarginBottom">
+                      <Label text="{jokers>label}"/>
+                      <HBox alignItems="Center">
+                        <BusyIndicator size="1rem" visible="{jokers>busy}" class="sapUiTinyMarginEnd"/>
+                        <Avatar
+                          initials="N"
+                          displaySize="XS"
+                          press=".onQuoteGenerateBlockField"
+                          tooltip="Noah generálja ezt a szakaszt a megadott kontextusból"
+                          class="chatAvatar noahAvatar quoteNoahFieldAvatar"/>
+                      </HBox>
+                    </HBox>
+                    <TextArea
+                      value="{jokers>value}"
+                      rows="4"
+                      growing="true"
+                      growingMaxLines="10"
+                      width="100%"
+                      change=".onQuoteFieldValueChange"/>
+                  </VBox>
+                </items>
+              </VBox>
+            </VBox>
+          </Panel>
+
           <Button
             text="Ajánlat generálása"
             icon="sap-icon://lightbulb"
             type="Emphasized"
             press=".onGenerateQuote"
             busy="{jokers>/quoteBusy}"
-            enabled="{= ${jokers>/quoteBusy} ? false : (${jokers>/quoteSessionId} ? true : false) }"
+            enabled="{= ${jokers>/quoteBusy} ? false : (${jokers>/quoteCanGenerate} ? true : false) }"
             class="quoteGenerateButton sapUiMediumMarginTop"/>
-
-          <Panel headerText="Sablon beállításainak megtekintése" expandable="true" expanded="false" class="quoteTemplateAccordion sapUiMediumMarginTop">
-            <VBox class="sapUiSmallMargin">
-              <Text text="Az alábbi vázlat a kiválasztott Word sablon üres szerkezetét mutatja, kitöltött adat nélkül." wrapping="true" class="sapUiTinyMarginBottom"/>
-              <VBox class="quoteSkeletonDoc">
-                <VBox class="quoteSkeletonBlock">
-                  <Text text="Fejrész: cégnév, ajánlatszám, dátum" wrapping="true"/>
-                </VBox>
-                <VBox class="quoteSkeletonBlock">
-                  <Text text="Tételek táblázat: megnevezés, mennyiség, egységár" wrapping="true"/>
-                </VBox>
-                <VBox class="quoteSkeletonBlock">
-                  <Text text="Összesítés: nettó, ÁFA, bruttó végösszeg" wrapping="true"/>
-                </VBox>
-                <VBox class="quoteSkeletonBlock">
-                  <Text text="Aláírás blokk" wrapping="true"/>
-                </VBox>
-              </VBox>
-            </VBox>
-          </Panel>
         </VBox>
 
         <!-- Allapot 2: generalt ajanlat szerkesztese -->
         <VBox visible="{= ${jokers>/quoteState} === 'result' }" width="100%" class="sapUiTinyMarginTop">
           <HBox class="quoteResultLayout" wrap="Wrap" renderType="Bare">
-            <Panel headerText="Ajánlat szövege" class="quoteTextPanel">
+            <Panel headerText="Ajánlat adatai" class="quoteTextPanel">
               <VBox class="sapUiSmallMargin">
-                <HBox wrap="Wrap" class="sapUiTinyMarginBottom">
-                  <VBox class="sapUiTinyMarginEnd quoteEditableField">
-                    <Label text="Ajánlatszám"/>
-                    <Input value="{jokers>/quote/quoteNo}" width="10rem"/>
-                  </VBox>
-                  <VBox class="sapUiTinyMarginEnd quoteEditableField">
-                    <Label text="Ügyfél neve"/>
-                    <Input value="{jokers>/quote/customer}" width="14rem"/>
-                  </VBox>
-                  <VBox class="quoteEditableField">
-                    <Label text="Dátum"/>
-                    <Input value="{jokers>/quote/date}" width="8rem"/>
-                  </VBox>
+                <Link text="Vissza a kiindulóképernyőhöz" press=".onNewQuote" class="quoteResultBackLink sapUiTinyMarginBottom"/>
+
+                <HBox class="quoteStepBar" justifyContent="SpaceBetween" wrap="Wrap">
+                  <Button
+                    text="1. Fejléc"
+                    type="Transparent"
+                    press=".onQuoteResultStepPress"
+                    icon="{= ${jokers>/quoteResultPage} > 1 ? 'sap-icon://accept' : '' }"
+                    class="{= ${jokers>/quoteResultPage} === 1 ? 'quoteStepBtn quoteStepActive' : (${jokers>/quoteResultPage} > 1 ? 'quoteStepBtn quoteStepDone' : 'quoteStepBtn') }">
+                    <customData>
+                      <core:CustomData key="page" value="1"/>
+                    </customData>
+                  </Button>
+                  <Button
+                    text="2. Szereplők"
+                    type="Transparent"
+                    press=".onQuoteResultStepPress"
+                    icon="{= ${jokers>/quoteResultPage} > 2 ? 'sap-icon://accept' : '' }"
+                    class="{= ${jokers>/quoteResultPage} === 2 ? 'quoteStepBtn quoteStepActive' : (${jokers>/quoteResultPage} > 2 ? 'quoteStepBtn quoteStepDone' : 'quoteStepBtn') }">
+                    <customData>
+                      <core:CustomData key="page" value="2"/>
+                    </customData>
+                  </Button>
+                  <Button
+                    text="3. Tartalom"
+                    type="Transparent"
+                    press=".onQuoteResultStepPress"
+                    icon="{= ${jokers>/quoteResultPage} > 3 ? 'sap-icon://accept' : '' }"
+                    class="{= ${jokers>/quoteResultPage} === 3 ? 'quoteStepBtn quoteStepActive' : (${jokers>/quoteResultPage} > 3 ? 'quoteStepBtn quoteStepDone' : 'quoteStepBtn') }">
+                    <customData>
+                      <core:CustomData key="page" value="3"/>
+                    </customData>
+                  </Button>
+                  <Button
+                    text="4. Árazás"
+                    type="Transparent"
+                    press=".onQuoteResultStepPress"
+                    class="{= ${jokers>/quoteResultPage} === 4 ? 'quoteStepBtn quoteStepActive' : 'quoteStepBtn' }">
+                    <customData>
+                      <core:CustomData key="page" value="4"/>
+                    </customData>
+                  </Button>
                 </HBox>
 
-                <Title text="{jokers>/quote/title}" level="H4" class="sapUiTinyMarginBottom"/>
-                <Text text="{jokers>/quote/intro}" wrapping="true" class="sapUiSmallMarginBottom"/>
+                <ScrollContainer height="22rem" vertical="true" horizontal="false" class="quoteResultScrollArea sapUiTinyMarginTop">
+                  <VBox visible="{= ${jokers>/quoteResultPage} === 1 }" class="quoteResultPage">
+                    <VBox class="quoteFieldRow">
+                      <Label text="Ajánlat címe"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/proposal_title}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/proposal_title} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Alcím"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/proposal_subtitle}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/proposal_subtitle} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Érvényesség (nap)"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/validity_period}"
+                        type="Number"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/validity_period} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                  </VBox>
 
-                <List items="{jokers>/quote/items}" mode="None" showSeparators="Inner">
-                  <CustomListItem>
-                    <HBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" class="sapUiTinyMarginTop sapUiTinyMarginBottom">
-                      <VBox>
-                        <Text text="{jokers>description}" wrapping="true"/>
-                        <Text text="{= ${jokers>qty} + ' ' + ${jokers>unit} }" class="sapUiTinyMarginTop"/>
+                  <VBox visible="{= ${jokers>/quoteResultPage} === 2 }" class="quoteResultPage">
+                    <VBox class="quoteFieldRow">
+                      <Label text="Ügyfél teljes neve"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/customer_legal_name}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/customer_legal_name} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Ügyfél rövid neve"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/customer_short_name}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/customer_short_name} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Szolgáltatás tárgya"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/service_scope_summary}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/service_scope_summary} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Szolgáltató neve"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/provider_legal_name}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/provider_legal_name} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Szolgáltató rövid neve"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/provider_short_name}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/provider_short_name} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Szolgáltató szerepe"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/provider_role}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/provider_role} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                  </VBox>
+
+                  <VBox visible="{= ${jokers>/quoteResultPage} === 3 }" class="quoteResultPage">
+                    <VBox class="quoteFieldRow">
+                      <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
+                        <Label text="Titoktartási blokk"/>
+                        <Button icon="sap-icon://ai" text="Generálás" type="Transparent" press=".onQuoteResultGenerateField" busy="{jokers>/quoteResultGenerateBusy}" class="quoteNoahPillButton">
+                          <customData>
+                            <core:CustomData key="field" value="confidentiality_validity_block"/>
+                          </customData>
+                        </Button>
+                      </HBox>
+                      <TextArea value="{jokers>/quoteFieldValues/confidentiality_validity_block}" rows="6" growing="true" width="100%"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiMediumMarginTop">
+                      <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
+                        <Label text="Szolgáltatás terjedelme"/>
+                        <Button icon="sap-icon://ai" text="Generálás" type="Transparent" press=".onQuoteResultGenerateField" busy="{jokers>/quoteResultGenerateBusy}" class="quoteNoahPillButton">
+                          <customData>
+                            <core:CustomData key="field" value="scope_block"/>
+                          </customData>
+                        </Button>
+                      </HBox>
+                      <TextArea value="{jokers>/quoteFieldValues/scope_block}" rows="6" growing="true" width="100%"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiMediumMarginTop">
+                      <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
+                        <Label text="Megoldás bemutatása"/>
+                        <Button icon="sap-icon://ai" text="Generálás" type="Transparent" press=".onQuoteResultGenerateField" busy="{jokers>/quoteResultGenerateBusy}" class="quoteNoahPillButton">
+                          <customData>
+                            <core:CustomData key="field" value="product_introduction"/>
+                          </customData>
+                        </Button>
+                      </HBox>
+                      <TextArea value="{jokers>/quoteFieldValues/product_introduction}" rows="8" growing="true" width="100%"/>
+                    </VBox>
+                  </VBox>
+
+                  <VBox visible="{= ${jokers>/quoteResultPage} === 4 }" class="quoteResultPage">
+                    <VBox class="quotePriceGrid">
+                      <HBox class="quotePriceGridRow quotePriceGridHeaderRow">
+                        <Text text="Megnevezés" class="quotePriceGridCell quotePriceGridHeaderCell"/>
+                        <Text text="Mennyiség" class="quotePriceGridCell quotePriceGridHeaderCell quotePriceGridCellNarrow"/>
+                        <Text text="Nettó ár" class="quotePriceGridCell quotePriceGridHeaderCell quotePriceGridCellNarrow"/>
+                      </HBox>
+                      <HBox class="quotePriceGridRow">
+                        <Input value="{jokers>/quoteFieldValues/item_1_name}" class="quotePriceGridCell"/>
+                        <Input value="{jokers>/quoteFieldValues/item_1_days}" class="quotePriceGridCell quotePriceGridCellNarrow"/>
+                        <Input value="{jokers>/quoteFieldValues/item_1_net}" class="quotePriceGridCell quotePriceGridCellNarrow" change=".onQuoteResultPriceFieldChange"/>
+                      </HBox>
+                      <HBox class="quotePriceGridRow">
+                        <Input value="{jokers>/quoteFieldValues/item_2_name}" class="quotePriceGridCell"/>
+                        <Input value="{jokers>/quoteFieldValues/item_2_days}" class="quotePriceGridCell quotePriceGridCellNarrow"/>
+                        <Input value="{jokers>/quoteFieldValues/item_2_net}" class="quotePriceGridCell quotePriceGridCellNarrow" change=".onQuoteResultPriceFieldChange"/>
+                      </HBox>
+                      <HBox class="quotePriceGridRow">
+                        <Input value="{jokers>/quoteFieldValues/item_3_name}" class="quotePriceGridCell"/>
+                        <Input value="{jokers>/quoteFieldValues/item_3_days}" class="quotePriceGridCell quotePriceGridCellNarrow"/>
+                        <Input value="{jokers>/quoteFieldValues/item_3_net}" class="quotePriceGridCell quotePriceGridCellNarrow" change=".onQuoteResultPriceFieldChange"/>
+                      </HBox>
+                      <HBox class="quotePriceGridRow">
+                        <Input value="{jokers>/quoteFieldValues/item_4_name}" class="quotePriceGridCell"/>
+                        <Input value="{jokers>/quoteFieldValues/item_4_days}" class="quotePriceGridCell quotePriceGridCellNarrow"/>
+                        <Input value="{jokers>/quoteFieldValues/item_4_net}" class="quotePriceGridCell quotePriceGridCellNarrow" change=".onQuoteResultPriceFieldChange"/>
+                      </HBox>
+                    </VBox>
+
+                    <HBox class="quoteFieldRow sapUiMediumMarginTop" justifyContent="SpaceBetween" wrap="Wrap">
+                      <VBox class="quoteTotalField">
+                        <Label text="Nettó összesen"/>
+                        <Input value="{jokers>/quoteFieldValues/total_net}" editable="false"/>
                       </VBox>
-                      <VBox class="quoteEditableField">
-                        <Label text="Egységár"/>
-                        <Input value="{jokers>unitPrice}" width="7rem" type="Number"/>
+                      <VBox class="quoteTotalField">
+                        <Label text="Kedvezmény"/>
+                        <Input value="{jokers>/quoteFieldValues/total_discount}" change=".onQuoteResultPriceFieldChange"/>
+                      </VBox>
+                      <VBox class="quoteTotalField">
+                        <Label text="Bruttó összesen"/>
+                        <Input value="{jokers>/quoteFieldValues/total_gross}" editable="false"/>
                       </VBox>
                     </HBox>
-                  </CustomListItem>
-                </List>
 
-                <VBox class="sapUiSmallMarginTop" alignItems="End">
-                  <Text text="{= 'Nettó összesen: ' + ${jokers>/quote/totalNet} + ' ' + ${jokers>/quote/currency} }"/>
-                  <Text text="{= 'ÁFA (' + ${jokers>/quote/vatRate} + '%): ' + ${jokers>/quote/vatAmount} + ' ' + ${jokers>/quote/currency} }"/>
-                  <Text text="{= 'Bruttó összesen: ' + ${jokers>/quote/totalGross} + ' ' + ${jokers>/quote/currency} }" class="sapUiTinyMarginTop"/>
-                </VBox>
+                    <VBox class="quoteFieldRow sapUiMediumMarginTop">
+                      <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
+                        <Label text="Árazási megjegyzés"/>
+                        <Button icon="sap-icon://ai" text="Generálás" type="Transparent" press=".onQuoteResultGenerateField" busy="{jokers>/quoteResultGenerateBusy}" class="quoteNoahPillButton">
+                          <customData>
+                            <core:CustomData key="field" value="pricing_block"/>
+                          </customData>
+                        </Button>
+                      </HBox>
+                      <TextArea value="{jokers>/quoteFieldValues/pricing_block}" rows="4" growing="true" width="100%"/>
+                    </VBox>
 
-                <Text text="{jokers>/quote/terms}" wrapping="true" class="sapUiMediumMarginTop"/>
-                <Text text="{jokers>/quote/validity}" wrapping="true" class="sapUiTinyMarginTop"/>
+                    <VBox items="{jokers>/quoteExtraFields}" class="sapUiMediumMarginTop" visible="{= ${jokers>/quoteExtraFields}.length > 0 }">
+                      <items>
+                        <VBox class="quoteFieldRow sapUiTinyMarginBottom">
+                          <Label text="{jokers>label}"/>
+                          <Input value="{jokers>value}"/>
+                        </VBox>
+                      </items>
+                    </VBox>
+                  </VBox>
+                </ScrollContainer>
 
-                <List items="{jokers>/quote/notes}" visible="{= ${jokers>/quote/notes}.length > 0 }" class="sapUiSmallMarginTop" mode="None">
-                  <CustomListItem>
-                    <Text text="{= '- ' + ${jokers>} }" wrapping="true"/>
-                  </CustomListItem>
-                </List>
+                <HBox justifyContent="SpaceBetween" alignItems="Center" class="quoteResultBottomNav sapUiTinyMarginTop">
+                  <Button text="Előző" type="Transparent" press=".onQuoteResultPrev" enabled="{= ${jokers>/quoteResultPage} > 1 }"/>
+                  <Button
+                    text="{= ${jokers>/quoteResultPage} >= 4 ? 'Kész' : 'Következő' }"
+                    type="Emphasized"
+                    press=".onQuoteResultNext"/>
+                </HBox>
               </VBox>
             </Panel>
 
@@ -326,8 +531,8 @@
               <List items="{jokers>/quoteChatMessages}" showSeparators="None" mode="None">
                 <CustomListItem>
                   <HBox justifyContent="{= ${jokers>role} === 'user' ? 'End' : 'Start' }" alignItems="Start" width="100%" class="sapUiTinyMarginBottom">
-                    <Text text="N" class="quoteChatAvatar sapUiTinyMarginEnd" visible="{= ${jokers>role} !== 'user' }"/>
-                    <VBox class="{= ${jokers>role} === 'user' ? 'quoteChatBubbleUser' : 'quoteChatBubbleNoah' }">
+                    <Avatar initials="N" displaySize="XS" class="chatAvatar noahAvatar" visible="{= ${jokers>role} !== 'user' }"/>
+                    <VBox class="{= ${jokers>role} === 'user' ? 'chatBubble chatBubbleUser noahBubbleUser' : 'chatBubble chatBubbleAi noahBubbleAi' }">
                       <Text text="{jokers>text}" wrapping="true"/>
                     </VBox>
                   </HBox>
@@ -683,78 +888,209 @@
       </VBox>
 
       <VBox visible="{= ${jokers>/selectedJoker/id} === 'kpi-discovery' }" width="100%">
-        <Panel headerText="KPI felfedezes">
+        <Panel class="kpiDiscoveryHeaderPanel">
+          <headerToolbar>
+            <Toolbar class="kpiDiscoveryHeaderToolbar">
+              <Title text="KPI felfedezes" level="H4"/>
+              <ToolbarSpacer/>
+              <Button
+                icon="sap-icon://database"
+                tooltip="Adatforrások"
+                type="Transparent"
+                press=".onToggleKpiSourcesTab"
+                class="{= ${jokers>/kpiDiscoveryActiveTab} === 'sources' ? 'kpiDiscoveryTabButton kpiDiscoveryTabButtonActive' : 'kpiDiscoveryTabButton' }"/>
+              <Button
+                icon="sap-icon://table-view"
+                tooltip="Adatbázis séma"
+                type="Transparent"
+                press=".onToggleKpiSchemaTab"
+                class="{= ${jokers>/kpiDiscoveryActiveTab} === 'schema' ? 'kpiDiscoveryTabButton kpiDiscoveryTabButtonActive sapUiTinyMarginBegin' : 'kpiDiscoveryTabButton sapUiTinyMarginBegin' }"/>
+            </Toolbar>
+          </headerToolbar>
           <VBox class="sapUiSmallMargin">
             <Text text="A rendszer a SQLite adatbazis tablait olvassa, majd olyan KPI jelolteket keszit, amelyek mindig valamilyen viszonyitasi alaphoz merik az aktualis adatot." wrapping="true"/>
-            <HBox class="sapUiSmallMarginTop" wrap="Wrap" alignItems="Center">
-              <Button text="KPI otletek keresese" icon="sap-icon://lightbulb" type="Emphasized" press=".onDiscoverKpis" busy="{jokers>/kpiDiscoveryBusy}" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }"/>
-              <Button text="Kivalasztott KPI futtatasa" icon="sap-icon://play" type="Transparent" press=".onRunSelectedKpi" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : (${jokers>/kpiDiscoverySelectedId} ? true : false) }" class="sapUiTinyMarginBegin"/>
+            <HBox class="sapUiSmallMarginTop" wrap="Wrap" alignItems="Center" visible="{= ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
+              <Button text="KPI otletek keresese ujra" icon="sap-icon://refresh" type="Transparent" press=".onDiscoverKpis" busy="{jokers>/kpiDiscoverySuggestionsLoading}" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }"/>
               <Button text="Cancel" type="Reject" press=".onCancel" enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }" class="sapUiTinyMarginBegin"/>
             </HBox>
             <MessageStrip text="{jokers>/kpiDiscoveryError}" type="Error" showIcon="true" visible="{= ${jokers>/kpiDiscoveryError} ? true : false }" class="sapUiSmallMarginTop"/>
           </VBox>
         </Panel>
 
-        <Panel headerText="Adatbazis sema" expandable="true" expanded="false" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoverySchemaSummary} ? true : false }">
-          <Text text="{jokers>/kpiDiscoverySchemaSummary}" wrapping="true" class="sapUiSmallMargin"/>
-        </Panel>
+        <!-- Allapot 1: ures prompt zona, nincs meg AI hivas -->
+        <VBox
+          class="kpiDiscoveryEmptyState sapUiMediumMarginTop"
+          alignItems="Center"
+          visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length === 0 }">
+          <core:Icon src="sap-icon://lightbulb" size="2.25rem" class="kpiDiscoveryEmptyIcon"/>
+          <Title text="Fedezz fel KPI lehetőségeket" level="H4" class="sapUiTinyMarginTop"/>
+          <Text text="Az AI elemzi az adatbázis tábláit és releváns KPI javaslatokat készít." wrapping="true" class="kpiDiscoveryEmptyDesc sapUiTinyMarginTop"/>
+          <HBox class="kpiDiscoveryNoahPill sapUiMediumMarginTop" alignItems="Center">
+            <Avatar initials="N" displaySize="XS" press=".onDiscoverKpis" class="chatAvatar noahAvatar kpiDiscoveryNoahPillAvatar"/>
+            <Button
+              text="KPI ötletek keresése"
+              type="Transparent"
+              press=".onDiscoverKpis"
+              busy="{jokers>/kpiDiscoverySuggestionsLoading}"
+              enabled="{= !${jokers>/kpiDiscoverySuggestionsLoading} }"
+              class="kpiDiscoveryNoahPillButton"/>
+          </HBox>
+        </VBox>
 
-        <Panel headerText="Javasolt KPI csempek" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
-          <FlexBox items="{jokers>/kpiDiscoverySuggestions}" wrap="Wrap">
-            <items>
-              <GenericTile
-                class="sapUiTinyMarginEnd sapUiTinyMarginBottom"
-                header="{jokers>title}"
-                subheader="{= 'Viszonyitas: ' + ${jokers>comparison} }"
-                frameType="OneByOne"
-                press=".onSelectKpiSuggestion">
-                <tileContent>
-                  <TileContent footer="{= ${jokers>id} === ${jokers>/kpiDiscoverySelectedId} ? 'Kivalasztva' : 'Kattints a valasztashoz' }">
-                    <content>
-                      <ImageContent src="sap-icon://business-objects-experience"/>
-                    </content>
-                  </TileContent>
-                </tileContent>
-              </GenericTile>
-            </items>
+        <!-- Atmenet: skeleton loader amig az AI valasz meg nem erkezik meg -->
+        <VBox class="kpiDiscoverySkeletonWrap sapUiMediumMarginTop" visible="{jokers>/kpiDiscoverySuggestionsLoading}">
+          <VBox class="kpiDiscoverySkeletonTray"/>
+          <FlexBox wrap="Wrap" class="kpiDiscoverySkeletonGrid sapUiSmallMarginTop">
+            <VBox class="kpiDiscoverySkeletonTile"/>
+            <VBox class="kpiDiscoverySkeletonTile"/>
+            <VBox class="kpiDiscoverySkeletonTile"/>
+            <VBox class="kpiDiscoverySkeletonTile"/>
+            <VBox class="kpiDiscoverySkeletonTile"/>
+            <VBox class="kpiDiscoverySkeletonTile"/>
           </FlexBox>
-          <List items="{jokers>/kpiDiscoverySuggestions}" mode="None" class="sapUiSmallMarginTop">
-            <CustomListItem>
-              <VBox class="sapUiSmallMargin">
-                <ObjectStatus text="{= ${jokers>title} + ' | ' + ${jokers>comparison} }" state="{= ${jokers>id} === ${jokers>/kpiDiscoverySelectedId} ? 'Success' : 'Information' }"/>
-                <Text text="{jokers>description}" wrapping="true" class="sapUiTinyMarginTop"/>
-                <Text text="{= 'Miert erdemes figyelni: ' + ${jokers>why} }" wrapping="true" class="sapUiTinyMarginTop"/>
-              </VBox>
-            </CustomListItem>
-          </List>
-        </Panel>
+        </VBox>
 
-        <Panel headerText="KPI eredmeny" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoverySummary} ? true : false }">
+        <Panel headerText="Adatforrások" class="kpiDiscoveryTabPanel sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryActiveTab} === 'sources' }">
           <VBox class="sapUiSmallMargin">
-            <Text text="{jokers>/kpiDiscoverySummary}" wrapping="true"/>
-            <HBox wrap="Wrap" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryComparison} ? true : false }">
-              <ObjectStatus
-                text="{= 'Aktualis: ' + ${jokers>/kpiDiscoveryComparison/current} + ' ' + (${jokers>/kpiDiscoveryComparison/unit} || '') }"
-                state="Information"
-                class="sapUiTinyMarginEnd"/>
-              <ObjectStatus
-                text="{= ${jokers>/kpiDiscoveryComparison/referenceLabel} + ': ' + ${jokers>/kpiDiscoveryComparison/reference} + ' ' + (${jokers>/kpiDiscoveryComparison/unit} || '') }"
-                state="Information"
-                class="sapUiTinyMarginEnd"/>
-              <ObjectStatus
-                text="{= 'Eltérés: ' + ${jokers>/kpiDiscoveryComparison/delta} + ' / ' + (${jokers>/kpiDiscoveryComparison/deltaPct} === null ? 'n/a' : ${jokers>/kpiDiscoveryComparison/deltaPct} + '%') }"
-                state="{= ${jokers>/kpiDiscoveryComparison/status} === 'Good' ? 'Success' : (${jokers>/kpiDiscoveryComparison/status} === 'Warning' ? 'Warning' : 'None') }"/>
-            </HBox>
-            <HBox wrap="Wrap" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryMetrics}.length > 0 }">
-              <ObjectStatus text="{= ${jokers>/kpiDiscoveryMetrics/0/label} ? ${jokers>/kpiDiscoveryMetrics/0/label} + ': ' + ${jokers>/kpiDiscoveryMetrics/0/value} + ' ' + (${jokers>/kpiDiscoveryMetrics/0/unit} || '') : '' }" state="Success" class="sapUiTinyMarginEnd"/>
-              <ObjectStatus text="{= ${jokers>/kpiDiscoveryMetrics/1/label} ? ${jokers>/kpiDiscoveryMetrics/1/label} + ': ' + ${jokers>/kpiDiscoveryMetrics/1/value} + ' ' + (${jokers>/kpiDiscoveryMetrics/1/unit} || '') : '' }" state="Information"/>
-            </HBox>
-            <VBox id="kpiDiscoveryChartHost" class="sapUiSmallMarginTop"/>
+            <Text text="Az alább látható adatforrások érhetők el a KPI felfedezéshez." wrapping="true" class="sapUiTinyMarginBottom"/>
+            <BusyIndicator size="1.5rem" visible="{jokers>/kpiDiscoverySourcesBusy}"/>
+            <List items="{jokers>/kpiDiscoveryAvailableSources}" visible="{= !${jokers>/kpiDiscoverySourcesBusy} }" noDataText="Nem sikerült adatforrást beolvasni.">
+              <CustomListItem>
+                <HBox alignItems="Center" class="sapUiTinyMarginTopBottom">
+                  <core:Icon src="sap-icon://database" color="#0854a0" class="sapUiTinyMarginEnd"/>
+                  <Text text="{jokers>}"/>
+                </HBox>
+              </CustomListItem>
+            </List>
           </VBox>
         </Panel>
 
-        <Panel headerText="Szamitasi reszletek" class="sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryRows}.length > 0 }">
-          <Table id="kpiDiscoveryResultTable" growing="true" growingThreshold="50" inset="false"/>
+        <Panel headerText="Adatbázis séma" class="kpiDiscoveryTabPanel sapUiSmallMarginTop" visible="{= ${jokers>/kpiDiscoveryActiveTab} === 'schema' }">
+          <VBox class="sapUiSmallMargin">
+            <Text text="{jokers>/kpiDiscoverySchemaSummary}" wrapping="true" visible="{= ${jokers>/kpiDiscoverySchemaSummary} ? true : false }"/>
+            <MessageStrip
+              text="A séma összegzés a 'KPI ötletek keresése' gomb lefuttatása után jelenik meg itt."
+              type="Information"
+              showIcon="true"
+              showCloseButton="false"
+              visible="{= ${jokers>/kpiDiscoverySchemaSummary} ? false : true }"/>
+          </VBox>
+        </Panel>
+
+        <!-- Allapot 2: Munkaterulet tálca a kivalasztott KPI-kkal -->
+        <VBox
+          class="kpiTrayWrap sapUiMediumMarginTop"
+          visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length > 0 &amp;&amp; !${jokers>/kpiDiscoveryResultsView} }">
+          <Title text="Munkaterület" level="H5" class="kpiTrayTitle"/>
+
+          <HBox items="{jokers>/kpiDiscoveryTrayItems}" class="kpiTrayCardsRow sapUiTinyMarginTop" wrap="Wrap" visible="{= ${jokers>/kpiDiscoveryTrayItems}.length > 0 }">
+            <items>
+              <VBox class="kpiTrayCard">
+                <VBox class="kpiTrayCardSkeletonOverlay" visible="{jokers>/kpiDiscoveryBusy}"/>
+                <HBox alignItems="Center" justifyContent="SpaceBetween">
+                  <Text text="{jokers>categoryTag}" class="kpiTrayCardTag"/>
+                  <Button
+                    icon="sap-icon://decline"
+                    type="Transparent"
+                    tooltip="KPI eltávolítása"
+                    press=".onRemoveKpiFromTray"
+                    class="kpiTrayCardRemoveBtn"/>
+                </HBox>
+                <Title text="{jokers>title}" level="H6" class="kpiTrayCardName sapUiTinyMarginTop"/>
+                <Text text="{jokers>description}" class="kpiTrayCardDesc" wrapping="false"/>
+                <HBox alignItems="Center" class="kpiTrayCardSourceRow sapUiTinyMarginTop">
+                  <core:Icon src="{jokers>dataSourceIcon}" size="0.75rem" class="kpiTrayCardSourceIcon"/>
+                  <Text text="{jokers>dataSourceName}" class="kpiTrayCardSourceName sapUiTinyMarginBeginEnd"/>
+                </HBox>
+              </VBox>
+            </items>
+          </HBox>
+
+          <VBox class="kpiTrayEmptyCard sapUiTinyMarginTop" alignItems="Center" justifyContent="Center" visible="{= ${jokers>/kpiDiscoveryTrayItems}.length === 0 }">
+            <Text text="Válassz legalább egy KPI-t a futtatáshoz" class="kpiTrayEmptyText"/>
+          </VBox>
+
+          <HBox class="kpiTrayActionsRow sapUiSmallMarginTop" alignItems="Center" visible="{= ${jokers>/kpiDiscoveryTrayItems}.length > 0 }">
+            <Button
+              text="{= ${jokers>/kpiDiscoveryTrayItems}.length === 1 ? 'KPI futtatása' : ${jokers>/kpiDiscoveryTrayItems}.length + ' KPI futtatása' }"
+              type="Emphasized"
+              press=".onRunSelectedKpi"
+              busy="{jokers>/kpiDiscoveryBusy}"
+              enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }"
+              class="kpiTrayRunBtn"/>
+            <Button
+              text="Kijelölés törlése"
+              type="Transparent"
+              press=".onClearKpiTraySelection"
+              enabled="{= ${jokers>/kpiDiscoveryBusy} ? false : true }"
+              class="kpiTrayClearBtn sapUiTinyMarginBegin"/>
+          </HBox>
+        </VBox>
+
+        <!-- Allapot 3: Eredmenyek zona, ugyanazon a helyen mint a Munkaterulet -->
+        <VBox
+          class="kpiTrayWrap kpiResultsWrap sapUiMediumMarginTop"
+          visible="{= ${jokers>/kpiDiscoveryResultsView} }">
+          <HBox alignItems="Center" justifyContent="SpaceBetween">
+            <Title text="Eredmények" level="H5" class="kpiTrayTitle"/>
+            <Button
+              text="Vissza a kiválasztáshoz"
+              type="Transparent"
+              press=".onBackToKpiSelection"
+              class="kpiTrayClearBtn"/>
+          </HBox>
+
+          <HBox items="{jokers>/kpiDiscoveryMultiResults}" class="kpiTrayCardsRow sapUiTinyMarginTop" wrap="Wrap">
+            <items>
+              <VBox class="kpiResultCard">
+                <Title text="{jokers>title}" level="H6" class="kpiResultCardName"/>
+
+                <!-- Mini oszlopdiagram: nyers SVG/HTML, a controller-ben epitve es
+                     a "chartHtml" mezon keresztul kotve (lasd _buildKpiDiscoveryMiniChart). -->
+                <core:HTML
+                  content="{jokers>chartHtml}"
+                  class="kpiMiniChartHost"/>
+
+                <Text text="{jokers>summary}" wrapping="true" class="kpiResultCardSummary sapUiTinyMarginTop"/>
+              </VBox>
+            </items>
+          </HBox>
+
+          <HBox class="kpiTrayActionsRow sapUiSmallMarginTop" alignItems="Center">
+            <Button
+              text="Vissza a kiválasztáshoz"
+              type="Transparent"
+              press=".onBackToKpiSelection"
+              class="kpiTrayClearBtn"/>
+          </HBox>
+        </VBox>
+
+        <Panel id="kpiDiscoveryTilesPanel" headerText="Javasolt KPI csempek" class="sapUiSmallMarginTop" visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length > 0 &amp;&amp; !${jokers>/kpiDiscoveryResultsView} }">
+          <FlexBox items="{jokers>/kpiDiscoverySuggestions}" wrap="Wrap">
+            <items>
+              <VBox
+                class="{= ${jokers>/kpiDiscoveryResultsView} ? 'kpiDiscoveryTileWrap kpiDiscoveryTileDisabled sapUiTinyMarginEnd sapUiTinyMarginBottom' : (${jokers>selected} ? 'kpiDiscoveryTileWrap kpiDiscoveryTileSelected sapUiTinyMarginEnd sapUiTinyMarginBottom' : (${jokers>/kpiDiscoveryMaxReached} ? 'kpiDiscoveryTileWrap kpiDiscoveryTileDisabled sapUiTinyMarginEnd sapUiTinyMarginBottom' : 'kpiDiscoveryTileWrap sapUiTinyMarginEnd sapUiTinyMarginBottom')) }"
+                tooltip="{= !${jokers>selected} &amp;&amp; ${jokers>/kpiDiscoveryMaxReached} &amp;&amp; !${jokers>/kpiDiscoveryResultsView} ? 'Maximum 3 KPI választható egyszerre.' : '' }">
+                <customData>
+                  <core:CustomData key="kpiid" value="{jokers>id}" writeToDom="true"/>
+                </customData>
+                <Text text="{jokers>selectionOrder}" visible="{= ${jokers>selected} &amp;&amp; !${jokers>/kpiDiscoveryResultsView} }" class="kpiDiscoveryTileBadge"/>
+                <GenericTile
+                  header="{jokers>title}"
+                  subheader="{= 'Viszonyitas: ' + ${jokers>comparison} }"
+                  frameType="OneByOne"
+                  press=".onSelectKpiSuggestion">
+                  <tileContent>
+                    <TileContent footer="{= ${jokers>selected} &amp;&amp; !${jokers>/kpiDiscoveryResultsView} ? 'Kivalasztva' : 'Kattints a valasztashoz' }">
+                      <content>
+                        <ImageContent src="sap-icon://business-objects-experience"/>
+                      </content>
+                    </TileContent>
+                  </tileContent>
+                </GenericTile>
+              </VBox>
+            </items>
+          </FlexBox>
         </Panel>
       </VBox>
 
@@ -2000,7 +2336,7 @@
       </VBox>
       <!-- ═══════════════════════════════════════════════════ DUMMY 14 END ══ -->
 
-      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' &amp;&amp; ${jokers>/selectedJoker/id} !== 'kpi-discovery' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-11' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-12' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-13' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-14' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-21' }" width="100%">
+      <VBox visible="{= ${jokers>/selectedJoker/id} !== 'dummy-4' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-5' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-7' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-8' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-9' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-10' &amp;&amp; ${jokers>/selectedJoker/id} !== 'kpi-discovery' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-11' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-12' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-13' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-14' &amp;&amp; ${jokers>/selectedJoker/id} !== 'dummy-21' &amp;&amp; ${jokers>/selectedJoker/id} !== 'quote-builder' }" width="100%">
         <TextArea value="{jokers>/promptInput}" rows="10" growing="true" growingMaxLines="16" width="100%" placeholder="Ide ird a feldolgozando szoveget..."/>
 
         <HBox class="jokerPromptButtons sapUiSmallMarginTop" justifyContent="Start" wrap="Wrap">

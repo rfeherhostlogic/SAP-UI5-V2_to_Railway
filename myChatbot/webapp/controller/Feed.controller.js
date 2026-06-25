@@ -9,6 +9,15 @@ sap.ui.define([
   return Controller.extend("sap.suite.ui.commons.demo.tutorial.controller.Feed", {
     onInit: function() {
       this._pollTimer = null;
+
+      var oAppModel = this.getOwnerComponent().getModel("app");
+      if (oAppModel && !oAppModel.getProperty("/isAuthenticated")) {
+        // A bejelentkezes meg nincs lezarva (pl. a sessionre varunk) -
+        // a hirfolyam hivasat addig nem inditjuk el, amig nincs ervenyes
+        // bejelentkezett allapot, igy nem kuldunk hitelesites nelkuli kerest.
+        return;
+      }
+
       this._loadFeed();
       this._pollTimer = setInterval(this._loadFeed.bind(this), FEED_POLL_MS);
     },
@@ -43,11 +52,33 @@ sap.ui.define([
         }));
         this._scrollToBottom();
       } catch (oError) {
+        if (oError && oError.status === 401) {
+          // A session lejart vagy ervenytelen - nem nyeljuk el csendben,
+          // hanem visszairanyitjuk a felhasznalot a bejelentkezeshez.
+          this._handleSessionExpired();
+          return;
+        }
         oModel.setProperty("/messages", this._normalizeItems([]));
         oModel.setProperty("/error", oError && oError.message ? oError.message : "A hirfolyam nem toltheto be.");
       } finally {
         oModel.setProperty("/busy", false);
       }
+    },
+
+    _handleSessionExpired: function() {
+      if (this._pollTimer) {
+        clearInterval(this._pollTimer);
+        this._pollTimer = null;
+      }
+
+      var oAppModel = this.getOwnerComponent().getModel("app");
+      if (oAppModel) {
+        oAppModel.setProperty("/isAuthenticated", false);
+        oAppModel.setProperty("/userName", "");
+        oAppModel.setProperty("/loginPassword", "");
+      }
+
+      this.getOwnerComponent().getRouter().navTo("login", {}, true);
     },
 
     _normalizeItems: function(aItems) {

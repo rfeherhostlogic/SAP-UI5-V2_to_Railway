@@ -16,7 +16,10 @@ sap.ui.define([
   "sap/viz/ui5/controls/common/feeds/FeedItem",
   "sap/m/Panel",
   "sap/m/VBox",
-  "sap/m/ObjectStatus"
+  "sap/m/ObjectStatus",
+  "sap/m/Popover",
+  "sap/m/Title",
+  "sap/ui/core/Element"
 ], function(
   Controller,
   MessageToast,
@@ -35,9 +38,34 @@ sap.ui.define([
   FeedItem,
   Panel,
   VBox,
-  ObjectStatus
+  ObjectStatus,
+  Popover,
+  Title,
+  Element
 ) {
   "use strict";
+
+  // Arajanlat keszito - State 2 (eredmeny) lapozhato mezoszerkeszto oldalbeosztasa.
+  // A "Group A" (egyszeru, kotelezo) mezok az 1-2. oldalon vannak, ezeket kell
+  // kitoltottsegre ellenorizni "Kovetkezo" lenyomasakor.
+  var QUOTE_RESULT_PAGE1_FIELDS = ["proposal_title", "proposal_subtitle", "validity_period"];
+  var QUOTE_RESULT_PAGE2_FIELDS = ["customer_legal_name", "customer_short_name", "service_scope_summary", "provider_legal_name", "provider_short_name", "provider_role"];
+  var QUOTE_RESULT_PAGE3_FIELDS = ["confidentiality_validity_block", "scope_block", "product_introduction"];
+  var QUOTE_RESULT_PAGE4_ITEM_FIELDS = [
+    "item_1_name", "item_1_days", "item_1_net",
+    "item_2_name", "item_2_days", "item_2_net",
+    "item_3_name", "item_3_days", "item_3_net",
+    "item_4_name", "item_4_days", "item_4_net"
+  ];
+  var QUOTE_RESULT_PAGE4_TOTAL_FIELDS = ["total_net", "total_discount", "total_gross"];
+  var QUOTE_RESULT_PAGE4_BLOCK_FIELDS = ["pricing_block"];
+  var QUOTE_RESULT_REQUIRED_FIELDS = QUOTE_RESULT_PAGE1_FIELDS.concat(QUOTE_RESULT_PAGE2_FIELDS);
+  var QUOTE_RESULT_KNOWN_FIELDS = QUOTE_RESULT_PAGE1_FIELDS
+    .concat(QUOTE_RESULT_PAGE2_FIELDS)
+    .concat(QUOTE_RESULT_PAGE3_FIELDS)
+    .concat(QUOTE_RESULT_PAGE4_ITEM_FIELDS)
+    .concat(QUOTE_RESULT_PAGE4_TOTAL_FIELDS)
+    .concat(QUOTE_RESULT_PAGE4_BLOCK_FIELDS);
 
   return Controller.extend("sap.suite.ui.commons.demo.tutorial.controller.JokerPrompt", {
     onInit: function() {
@@ -48,6 +76,7 @@ sap.ui.define([
 
     onAfterRendering: function() {
       this._bindDummy9DropZoneEvents();
+      this._bindKpiDiscoveryTileHoverEvents();
     },
 
     onGenerate: async function() {
@@ -155,6 +184,13 @@ sap.ui.define([
       oModel.setProperty("/quotePdfDownloadUrl", "");
       oModel.setProperty("/quoteDocxDownloadUrl", "");
       oModel.setProperty("/quoteChatMessages", []);
+      // Az elozo sablon mezoformja azonnal eltunik, meg mielott az uj
+      // feltoltes valasza megerkezik.
+      oModel.setProperty("/quoteTemplatePlaceholders", []);
+      oModel.setProperty("/quoteTemplateFields", []);
+      oModel.setProperty("/quoteCanGenerate", false);
+      oModel.setProperty("/quoteMissingPlaceholders", []);
+      oModel.setProperty("/quotePlaceholderValues", {});
 
       try {
         var oUpload = await AiService.uploadQuoteTemplate(oFile);
@@ -162,8 +198,10 @@ sap.ui.define([
         oModel.setProperty("/quoteTemplateFileName", oUpload.templateFileName || oFile.name || "");
         oModel.setProperty("/quoteTemplatePreview", oUpload.templateTextPreview || "");
         oModel.setProperty("/quoteTemplatePlaceholders", Array.isArray(oUpload.templatePlaceholders) ? oUpload.templatePlaceholders : []);
+        oModel.setProperty("/quoteTemplateFields", this._buildQuoteTemplateFields(oUpload));
         oModel.setProperty("/quoteMissingPlaceholders", Array.isArray(oUpload.missingPlaceholders) ? oUpload.missingPlaceholders : []);
         oModel.setProperty("/quotePlaceholderValues", {});
+        this._updateQuoteGenerateButtonState();
         MessageToast.show(oUpload.message || "Sablon feltoltve.");
       } catch (oError) {
         oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "Sablon feltoltesi hiba.");
@@ -179,6 +217,8 @@ sap.ui.define([
       oModel.setProperty("/quoteTemplateFileName", "");
       oModel.setProperty("/quoteTemplatePreview", "");
       oModel.setProperty("/quoteTemplatePlaceholders", []);
+      oModel.setProperty("/quoteTemplateFields", []);
+      oModel.setProperty("/quoteCanGenerate", false);
       oModel.setProperty("/quoteMissingPlaceholders", []);
       oModel.setProperty("/quotePlaceholderValues", {});
       oModel.setProperty("/quoteState", "input");
@@ -193,6 +233,109 @@ sap.ui.define([
       if (oFileUploader && oFileUploader.clear) {
         oFileUploader.clear();
       }
+    },
+
+    // A feltoltesi valasz "templatePlaceholderFields" mezojebol epiti fel a
+    // szerkesztheto mezo-tomb modellt (name/label/group/value/busy). Ha a
+    // szerver valamiert nem kuldte vissza a besorolast, egyszeru
+    // visszaesesi mezokent kezeljuk az adott placeholdert.
+    _buildQuoteTemplateFields: function(oUpload) {
+      var aClassified = Array.isArray(oUpload && oUpload.templatePlaceholderFields) ? oUpload.templatePlaceholderFields : null;
+      if (aClassified) {
+        return aClassified.map(function(oField) {
+          return {
+            name: oField.name,
+            label: oField.label || oField.name,
+            group: oField.group === "block" ? "block" : "simple",
+            value: "",
+            busy: false
+          };
+        });
+      }
+      var aNames = Array.isArray(oUpload && oUpload.templatePlaceholders) ? oUpload.templatePlaceholders : [];
+      return aNames.map(function(sName) {
+        return { name: sName, label: sName, group: "simple", value: "", busy: false };
+      });
+    },
+
+    // "Azonositott mezok" - egyszeru mezo erteket kezzel adja meg a
+    // felhasznalo, ezert minden valtozaskor frissitjuk a generalas gomb
+    // engedelyezettseget.
+    onQuoteFieldValueChange: function() {
+      this._updateQuoteGenerateButtonState();
+    },
+
+    onQuoteGenerateBlockField: async function(oEvent) {
+      var oModel = this.getView().getModel("jokers");
+      var oContext = oEvent.getSource().getBindingContext("jokers");
+      if (!oContext) {
+        return;
+      }
+      var sPath = oContext.getPath();
+      var oField = oContext.getObject();
+      var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
+      var sContext = (oModel.getProperty("/quoteContextText") || "").trim();
+
+      if (!sSessionId) {
+        MessageToast.show("Elobb tolts fel egy sablont.");
+        return;
+      }
+      if (!sContext) {
+        MessageToast.show("Az ajanlat kontextusat add meg.");
+        return;
+      }
+
+      oModel.setProperty(sPath + "/busy", true);
+      try {
+        var oResult = await AiService.generateQuoteBlockField({
+          sessionId: sSessionId,
+          placeholderName: oField.name,
+          contextText: sContext,
+          placeholderValues: this._collectQuotePlaceholderValues()
+        });
+        oModel.setProperty(sPath + "/value", oResult.value || "");
+      } catch (oError) {
+        MessageToast.show(oError && oError.message ? oError.message : "Mezo generalasi hiba.");
+      } finally {
+        oModel.setProperty(sPath + "/busy", false);
+      }
+    },
+
+    // A "simple" csoport minden mezojenek kell ertekkel rendelkeznie, hogy
+    // az "Arajanlat generalasa" gomb engedelyezve legyen.
+    _updateQuoteGenerateButtonState: function() {
+      var oModel = this.getView().getModel("jokers");
+      var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
+      var aFields = oModel.getProperty("/quoteTemplateFields") || [];
+      var bAllSimpleFilled = aFields
+        .filter(function(oField) { return oField.group === "simple"; })
+        .every(function(oField) { return !!String(oField.value || "").trim(); });
+      oModel.setProperty("/quoteCanGenerate", !!sSessionId && bAllSimpleFilled);
+    },
+
+    _collectQuotePlaceholderValues: function() {
+      var oModel = this.getView().getModel("jokers");
+      var aFields = oModel.getProperty("/quoteTemplateFields") || [];
+      var mValues = {};
+      aFields.forEach(function(oField) {
+        mValues[oField.name] = oField.value || "";
+      });
+      return mValues;
+    },
+
+    // A generalas/modositas valaszaban kapott vegleges ertekekkel (pl. AI
+    // altal kitoltott "block" mezok) frissiti a mezoforma sorait, hogy a
+    // felhasznalo lathassa es szerkeszthesse azokat.
+    _syncQuoteTemplateFieldsFromValues: function(mValues) {
+      if (!mValues) {
+        return;
+      }
+      var oModel = this.getView().getModel("jokers");
+      var aFields = (oModel.getProperty("/quoteTemplateFields") || []).map(function(oField) {
+        var vValue = mValues[oField.name];
+        return vValue == null ? oField : Object.assign({}, oField, { value: String(vValue) });
+      });
+      oModel.setProperty("/quoteTemplateFields", aFields);
     },
 
     onQuoteTextSampleChange: function(oEvent) {
@@ -221,6 +364,10 @@ sap.ui.define([
         MessageToast.show("Az ajanlat kontextusat add meg.");
         return;
       }
+      if (!oModel.getProperty("/quoteCanGenerate")) {
+        MessageToast.show("Toltsd ki az osszes egyszeru mezot a generalas elott.");
+        return;
+      }
 
       oModel.setProperty("/quoteBusy", true);
       oModel.setProperty("/quoteError", "");
@@ -228,10 +375,11 @@ sap.ui.define([
         var oResult = await AiService.generateQuote({
           sessionId: sSessionId,
           contextText: sContext,
-          placeholderValues: {},
+          placeholderValues: this._collectQuotePlaceholderValues(),
           force: true
         });
         this._applyQuoteResult(oResult, true);
+        this._initQuoteResultEditor(oResult.placeholderValues);
         oModel.setProperty("/quoteState", "result");
         MessageToast.show("Az ajanlat elkeszult.");
       } catch (oError) {
@@ -261,7 +409,7 @@ sap.ui.define([
         var oResult = await AiService.reviseQuote({
           sessionId: sSessionId,
           message: sMessage,
-          placeholderValues: {},
+          placeholderValues: this._collectQuotePlaceholderValues(),
           force: true,
           skipRender: true
         });
@@ -290,7 +438,8 @@ sap.ui.define([
       try {
         var oResult = await AiService.renderQuote({
           sessionId: sSessionId,
-          quote: oQuote
+          quote: oQuote,
+          placeholderValues: oModel.getProperty("/quoteFieldValues") || {}
         });
         this._applyQuoteResult(oResult, true);
         MessageToast.show("A PDF elonezet frissult.");
@@ -314,6 +463,10 @@ sap.ui.define([
       oModel.setProperty("/quoteChatMessages", []);
       oModel.setProperty("/quoteRevisionMessage", "");
       oModel.setProperty("/quoteError", "");
+      oModel.setProperty("/quoteFieldValues", {});
+      oModel.setProperty("/quoteExtraFields", []);
+      oModel.setProperty("/quoteResultPage", 1);
+      oModel.setProperty("/quoteResultValidationActive", false);
     },
 
     onSaveQuote: async function() {
@@ -364,6 +517,7 @@ sap.ui.define([
       }
       if (oResult && oResult.placeholderValues) {
         oModel.setProperty("/quotePlaceholderValues", oResult.placeholderValues);
+        this._syncQuoteTemplateFieldsFromValues(oResult.placeholderValues);
       }
       if (Array.isArray(oResult && oResult.chatMessages)) {
         oModel.setProperty("/quoteChatMessages", oResult.chatMessages);
@@ -376,6 +530,142 @@ sap.ui.define([
         var oQuote = oModel.getProperty("/quote");
         var sQuoteNo = oQuote && oQuote.quoteNo ? String(oQuote.quoteNo) : "arajanlat";
         oModel.setProperty("/quoteFileName", sQuoteNo.replace(/[^a-z0-9_-]+/gi, "_") + ".pdf");
+      }
+    },
+
+    // State 2 (eredmeny) lapozhato mezoszerkeszto inicializalasa a generalas
+    // valaszaban kapott placeholder ertekekkel. Csak friss generalas utan
+    // hivjuk - PDF frissites/modositas nem nullazza az oldalt vagy a mar
+    // beirt ertekeket.
+    _initQuoteResultEditor: function(mPlaceholderValues) {
+      var oModel = this.getView().getModel("jokers");
+      var aAllNames = oModel.getProperty("/quoteTemplatePlaceholders") || [];
+      var mValues = Object.assign({}, mPlaceholderValues || {});
+
+      QUOTE_RESULT_KNOWN_FIELDS.forEach(function(sName) {
+        if (mValues[sName] == null) {
+          mValues[sName] = "";
+        }
+      });
+
+      var aExtra = aAllNames
+        .filter(function(sName) { return QUOTE_RESULT_KNOWN_FIELDS.indexOf(sName) < 0; })
+        .map(function(sName) {
+          return { name: sName, label: sName, value: mValues[sName] || "" };
+        });
+
+      oModel.setProperty("/quoteFieldValues", mValues);
+      oModel.setProperty("/quoteExtraFields", aExtra);
+      oModel.setProperty("/quoteResultPage", 1);
+      oModel.setProperty("/quoteResultValidationActive", false);
+    },
+
+    onQuoteResultNext: function() {
+      var oModel = this.getView().getModel("jokers");
+      var iPage = oModel.getProperty("/quoteResultPage") || 1;
+
+      if (iPage >= 4) {
+        MessageToast.show("A mezők kitöltve. Frissítsd a PDF-et a végleges előnézethez.");
+        return;
+      }
+      if ((iPage === 1 || iPage === 2) && !this._validateQuoteResultPage(iPage)) {
+        return;
+      }
+      oModel.setProperty("/quoteResultValidationActive", false);
+      oModel.setProperty("/quoteResultPage", iPage + 1);
+    },
+
+    onQuoteResultPrev: function() {
+      var oModel = this.getView().getModel("jokers");
+      var iPage = oModel.getProperty("/quoteResultPage") || 1;
+      if (iPage <= 1) {
+        return;
+      }
+      oModel.setProperty("/quoteResultPage", iPage - 1);
+    },
+
+    onQuoteResultStepPress: function(oEvent) {
+      var oModel = this.getView().getModel("jokers");
+      var iPage = Number(oEvent.getSource().data("page"));
+      if (iPage >= 1 && iPage <= 4) {
+        oModel.setProperty("/quoteResultPage", iPage);
+      }
+    },
+
+    _validateQuoteResultPage: function(iPage) {
+      var oModel = this.getView().getModel("jokers");
+      var aFields = iPage === 1 ? QUOTE_RESULT_PAGE1_FIELDS : QUOTE_RESULT_PAGE2_FIELDS;
+      var mValues = oModel.getProperty("/quoteFieldValues") || {};
+      var bValid = aFields.every(function(sName) {
+        return !!String(mValues[sName] || "").trim();
+      });
+      oModel.setProperty("/quoteResultValidationActive", !bValid);
+      if (!bValid) {
+        MessageToast.show("Tölts ki minden kötelező mezőt a folytatáshoz.");
+      }
+      return bValid;
+    },
+
+    // 4. oldal: a tetel nettó arak osszege adja a vegosszeget, amibol a
+    // kedvezmeny levonasaval szamolodik a brutto vegosszeg.
+    onQuoteResultPriceFieldChange: function() {
+      var oModel = this.getView().getModel("jokers");
+      var mValues = oModel.getProperty("/quoteFieldValues") || {};
+      var aItemNetKeys = ["item_1_net", "item_2_net", "item_3_net", "item_4_net"];
+      var nNet = aItemNetKeys.reduce(function(nSum, sKey) {
+        return nSum + (parseFloat(String(mValues[sKey] || "").replace(",", ".")) || 0);
+      }, 0);
+      var nDiscount = parseFloat(String(mValues.total_discount || "").replace(",", ".")) || 0;
+      oModel.setProperty("/quoteFieldValues/total_net", this._formatQuoteAmount(nNet));
+      oModel.setProperty("/quoteFieldValues/total_gross", this._formatQuoteAmount(nNet - nDiscount));
+    },
+
+    _formatQuoteAmount: function(nValue) {
+      var nRounded = Math.round((nValue || 0) * 100) / 100;
+      return String(nRounded);
+    },
+
+    // Noah "N" gomb a 3-4. oldal block mezoinel: AI-generalas a kontextus es
+    // a mar megadott "simple" mezoertekek (1-2. oldal) alapjan.
+    onQuoteResultGenerateField: async function(oEvent) {
+      var oModel = this.getView().getModel("jokers");
+      var sFieldName = String(oEvent.getSource().data("field") || "");
+      var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
+      var sContext = (oModel.getProperty("/quoteContextText") || "").trim();
+
+      if (!sFieldName) {
+        return;
+      }
+      if (!sSessionId) {
+        MessageToast.show("Nincs aktiv arajanlat session.");
+        return;
+      }
+      if (!sContext) {
+        MessageToast.show("Az ajanlat kontextusat add meg.");
+        return;
+      }
+
+      var mValues = oModel.getProperty("/quoteFieldValues") || {};
+      var mKnownValues = {};
+      QUOTE_RESULT_PAGE1_FIELDS.concat(QUOTE_RESULT_PAGE2_FIELDS).forEach(function(sName) {
+        if (mValues[sName]) {
+          mKnownValues[sName] = mValues[sName];
+        }
+      });
+
+      oModel.setProperty("/quoteResultGenerateBusy", true);
+      try {
+        var oResult = await AiService.generateQuoteBlockField({
+          sessionId: sSessionId,
+          placeholderName: sFieldName,
+          contextText: sContext,
+          placeholderValues: mKnownValues
+        });
+        oModel.setProperty("/quoteFieldValues/" + sFieldName, oResult.value || "");
+      } catch (oError) {
+        MessageToast.show(oError && oError.message ? oError.message : "Mezo generalasi hiba.");
+      } finally {
+        oModel.setProperty("/quoteResultGenerateBusy", false);
       }
     },
 
@@ -653,6 +943,7 @@ sap.ui.define([
     onDiscoverKpis: async function() {
       var oModel = this.getView().getModel("jokers");
       oModel.setProperty("/kpiDiscoveryBusy", true);
+      oModel.setProperty("/kpiDiscoverySuggestionsLoading", true);
       oModel.setProperty("/kpiDiscoveryError", "");
       oModel.setProperty("/kpiDiscoverySummary", "");
       oModel.setProperty("/kpiDiscoveryComparison", null);
@@ -665,63 +956,339 @@ sap.ui.define([
       try {
         var oResp = await AiService.getKpiDiscoverySuggestions();
         var aSuggestions = Array.isArray(oResp && oResp.suggestions) ? oResp.suggestions : [];
+        aSuggestions = this._decorateKpiDiscoverySuggestions(aSuggestions);
         oModel.setProperty("/kpiDiscoverySchemaSummary", String(oResp && oResp.schemaSummary ? oResp.schemaSummary : ""));
         oModel.setProperty("/kpiDiscoverySuggestions", aSuggestions);
-        oModel.setProperty("/kpiDiscoverySelectedId", aSuggestions.length ? String(aSuggestions[0].id || "") : "");
+        this._setKpiDiscoverySelection(aSuggestions.length ? [String(aSuggestions[0].id || "")] : []);
         MessageToast.show(aSuggestions.length ? "KPI javaslatok elkeszultek." : "Nem talaltam KPI javaslatot.");
       } catch (oError) {
         oModel.setProperty("/kpiDiscoveryError", oError && oError.message ? oError.message : "KPI felfedezesi hiba.");
         MessageToast.show(oError && oError.message ? oError.message : "KPI felfedezesi hiba.");
       } finally {
         oModel.setProperty("/kpiDiscoveryBusy", false);
+        oModel.setProperty("/kpiDiscoverySuggestionsLoading", false);
       }
+    },
+
+    _getKpiDiscoverySourceMeta: function(sId) {
+      if (sId.indexOf("sales_") === 0) {
+        return { categoryTag: "Árbevétel", dataSourceName: "SalesOrder", dataSourceIcon: "sap-icon://sales-order" };
+      }
+      if (sId.indexOf("customer_") === 0) {
+        return { categoryTag: "Ügyfél", dataSourceName: "Customer", dataSourceIcon: "sap-icon://customer" };
+      }
+      var aParts = sId.split("__");
+      var sTable = aParts.length > 1 ? aParts[1] : "Adatbázis";
+      return { categoryTag: "Általános", dataSourceName: sTable, dataSourceIcon: "sap-icon://database" };
+    },
+
+    _decorateKpiDiscoverySuggestions: function(aSuggestions) {
+      var that = this;
+      return aSuggestions.map(function(oItem) {
+        var sId = String(oItem.id || "");
+        var oMeta = that._getKpiDiscoverySourceMeta(sId);
+        return Object.assign({}, oItem, {
+          selected: false,
+          selectionOrder: "",
+          categoryTag: oMeta.categoryTag,
+          dataSourceName: oMeta.dataSourceName,
+          dataSourceIcon: oMeta.dataSourceIcon
+        });
+      });
+    },
+
+    _setKpiDiscoverySelection: function(aIds) {
+      var oModel = this.getView().getModel("jokers");
+      var aSuggestions = (oModel.getProperty("/kpiDiscoverySuggestions") || []).map(function(oItem) {
+        var iOrder = aIds.indexOf(oItem.id);
+        return Object.assign({}, oItem, {
+          selected: iOrder >= 0,
+          selectionOrder: iOrder >= 0 ? String(iOrder + 1) : ""
+        });
+      });
+      var aTrayItems = aIds.map(function(sId) {
+        return aSuggestions.filter(function(oItem) { return oItem.id === sId; })[0];
+      }).filter(Boolean);
+
+      oModel.setProperty("/kpiDiscoverySuggestions", aSuggestions);
+      oModel.setProperty("/kpiDiscoverySelectedIds", aIds.slice());
+      oModel.setProperty("/kpiDiscoveryMaxReached", aIds.length >= 3);
+      oModel.setProperty("/kpiDiscoveryTrayItems", aTrayItems);
+      oModel.setProperty("/kpiDiscoverySelectedId", aIds.length ? aIds[aIds.length - 1] : "");
     },
 
     onSelectKpiSuggestion: function(oEvent) {
       var oContext = oEvent.getSource().getBindingContext("jokers");
       var oModel = this.getView().getModel("jokers");
+      if (!oContext || oModel.getProperty("/kpiDiscoveryResultsView")) {
+        return;
+      }
+      var sId = String(oContext.getObject().id || "");
+      var aIds = (oModel.getProperty("/kpiDiscoverySelectedIds") || []).slice();
+      var iIdx = aIds.indexOf(sId);
+      if (iIdx >= 0) {
+        aIds.splice(iIdx, 1);
+      } else {
+        if (aIds.length >= 3) {
+          MessageToast.show("Maximum 3 KPI választható egyszerre.");
+          return;
+        }
+        aIds.push(sId);
+      }
+      this._setKpiDiscoverySelection(aIds);
+    },
+
+    onRemoveKpiFromTray: function(oEvent) {
+      var oContext = oEvent.getSource().getBindingContext("jokers");
+      var oModel = this.getView().getModel("jokers");
       if (!oContext) {
         return;
       }
-      oModel.setProperty("/kpiDiscoverySelectedId", String(oContext.getObject().id || ""));
+      var sId = String(oContext.getObject().id || "");
+      var aIds = (oModel.getProperty("/kpiDiscoverySelectedIds") || []).filter(function(sSelectedId) {
+        return sSelectedId !== sId;
+      });
+      this._setKpiDiscoverySelection(aIds);
+    },
+
+    onClearKpiTraySelection: function() {
+      this._setKpiDiscoverySelection([]);
     },
 
     onRunSelectedKpi: async function() {
       var oModel = this.getView().getModel("jokers");
-      var sKpiId = String(oModel.getProperty("/kpiDiscoverySelectedId") || "").trim();
+      var aIds = (oModel.getProperty("/kpiDiscoverySelectedIds") || []).slice();
 
-      if (!sKpiId) {
-        MessageToast.show("Valassz KPI-t a listabol.");
+      if (!aIds.length) {
+        MessageToast.show("Válassz legalább egy KPI-t a futtatáshoz.");
         return;
       }
 
       oModel.setProperty("/kpiDiscoveryBusy", true);
       oModel.setProperty("/kpiDiscoveryError", "");
-      oModel.setProperty("/kpiDiscoverySummary", "");
-      oModel.setProperty("/kpiDiscoveryComparison", null);
-      oModel.setProperty("/kpiDiscoveryMetrics", []);
-      oModel.setProperty("/kpiDiscoveryChartRows", []);
-      oModel.setProperty("/kpiDiscoveryRows", []);
-      this._resetKpiDiscoveryChart();
-      this._rebindKpiDiscoveryTable();
+      oModel.setProperty("/kpiDiscoveryMultiResults", []);
+
+      var aSuggestions = oModel.getProperty("/kpiDiscoverySuggestions") || [];
 
       try {
-        var oResp = await AiService.runKpiDiscovery({ kpiId: sKpiId });
-        var oRun = oResp && oResp.run ? oResp.run : {};
-        var aChartRows = Array.isArray(oRun.chart) ? oRun.chart : [];
-        oModel.setProperty("/kpiDiscoverySummary", String(oRun.summary || ""));
-        oModel.setProperty("/kpiDiscoveryComparison", oRun.comparison || null);
-        oModel.setProperty("/kpiDiscoveryMetrics", Array.isArray(oRun.metrics) ? oRun.metrics : []);
-        oModel.setProperty("/kpiDiscoveryChartRows", aChartRows);
-        oModel.setProperty("/kpiDiscoveryRows", Array.isArray(oRun.rows) ? oRun.rows : []);
-        this._renderKpiDiscoveryChart(aChartRows);
-        this._rebindKpiDiscoveryTable();
+        var aResults = [];
+        for (var i = 0; i < aIds.length; i++) {
+          var sKpiId = aIds[i];
+          var oResp = await AiService.runKpiDiscovery({ kpiId: sKpiId });
+          var oRun = oResp && oResp.run ? oResp.run : {};
+          var oSuggestion = aSuggestions.filter(function(oItem) { return oItem.id === sKpiId; })[0] || {};
+          aResults.push(this._buildKpiDiscoveryResultCard(sKpiId, oSuggestion, oRun));
+        }
+
+        oModel.setProperty("/kpiDiscoveryMultiResults", aResults);
+        oModel.setProperty("/kpiDiscoveryResultsView", true);
       } catch (oError) {
         oModel.setProperty("/kpiDiscoveryError", oError && oError.message ? oError.message : "KPI futtatasi hiba.");
         MessageToast.show(oError && oError.message ? oError.message : "KPI futtatasi hiba.");
       } finally {
         oModel.setProperty("/kpiDiscoveryBusy", false);
       }
+    },
+
+    onBackToKpiSelection: function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/kpiDiscoveryResultsView", false);
+    },
+
+    _buildKpiDiscoveryResultCard: function(sKpiId, oSuggestion, oRun) {
+      var aChart = Array.isArray(oRun.chart) ? oRun.chart : [];
+      var oComparison = oRun.comparison || null;
+      var oChartInfo = this._buildKpiDiscoveryMiniChart(aChart, oComparison);
+
+      return {
+        kpiId: sKpiId,
+        title: oSuggestion.title || sKpiId,
+        summary: String(oRun.summary || ""),
+        comparison: oComparison,
+        chartType: oChartInfo.chartType,
+        chartHtml: oChartInfo.chartHtml
+      };
+    },
+
+    // Adatpontok forrasa: a backend run() valasz "chart" tombje, elemei
+    // { label, value } alakuak (lasd server/kpi_discovery_runner.py
+    // comparison_chart()/run_kpi()). Ket pontos tomb mindig "Aktualis" +
+    // viszonyitasi alap part (osszehasonlitas), "YYYY-MM" formatumu label
+    // tobb ponton idosor, minden mas tobb pontos tomb rangsor/kategoria.
+    _buildKpiDiscoveryMiniChart: function(aChart, oComparison) {
+      var HIGHLIGHT = "#185FA5";
+      var MUTED = "#B5D4F4";
+      var NEGATIVE = "#F09595";
+
+      if (!aChart.length) {
+        // TODO: complex KPI visualization not yet implemented
+        // Komplex KPI tipusok (szegmentacio, ML-alapu elemzes): a teljes
+        // vizualizacio kesobbi feladat, addig csak a kulcsszamot mutatjuk.
+        var sComplexText = oComparison
+          ? (oComparison.label + ": " + oComparison.current + (oComparison.unit ? " " + oComparison.unit : ""))
+          : "";
+        return { chartType: "none", chartHtml: this._renderKpiComplexValueHtml(sComplexText) };
+      }
+
+      if (aChart.length === 2) {
+        var nCurrent = Number(aChart[0] && aChart[0].value) || 0;
+        var nReference = Number(aChart[1] && aChart[1].value) || 0;
+        var sCurrentColor = nCurrent < nReference ? NEGATIVE : HIGHLIGHT;
+        var aComparisonBars = [
+          { label: String(aChart[0] && aChart[0].label || ""), value: nCurrent, color: sCurrentColor },
+          { label: String(aChart[1] && aChart[1].label || ""), value: nReference, color: MUTED }
+        ];
+        return { chartType: "comparison", chartHtml: this._renderKpiVerticalBarSvg(aComparisonBars) };
+      }
+
+      var bLooksLikeDate = /^\d{4}-\d{2}/.test(String(aChart[0] && aChart[0].label || ""));
+
+      if (bLooksLikeDate) {
+        var aTimeBars = this._markKpiHighlightBar(aChart, HIGHLIGHT, MUTED);
+        return { chartType: "timeseries", chartHtml: this._renderKpiVerticalBarSvg(aTimeBars) };
+      }
+
+      var aRankBars = this._markKpiHighlightBar(aChart, HIGHLIGHT, MUTED);
+      return { chartType: "ranking", chartHtml: this._renderKpiHorizontalBarSvg(aRankBars) };
+    },
+
+    // Az elso legnagyobb erteku pontot jeloli kiemeltnek - soha nem kerul
+    // tobb mint egy bar #185FA5 szinre, holtverseny eseten az elso nyer.
+    _markKpiHighlightBar: function(aChart, sHighlightColor, sMutedColor) {
+      var nMax = -Infinity;
+      var iMaxIndex = -1;
+      aChart.forEach(function(oPoint, iIndex) {
+        var nValue = Number(oPoint && oPoint.value) || 0;
+        if (nValue > nMax) {
+          nMax = nValue;
+          iMaxIndex = iIndex;
+        }
+      });
+
+      return aChart.map(function(oPoint, iIndex) {
+        return {
+          label: String(oPoint && oPoint.label || ""),
+          value: Number(oPoint && oPoint.value) || 0,
+          color: iIndex === iMaxIndex ? sHighlightColor : sMutedColor
+        };
+      });
+    },
+
+    _escapeKpiChartText: function(sValue) {
+      return String(sValue == null ? "" : sValue)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    },
+
+    _formatKpiChartNumber: function(nValue) {
+      var nAbs = Math.abs(nValue);
+      var iDigits = nAbs >= 100 ? 0 : (nAbs >= 1 ? 1 : 2);
+      return new Intl.NumberFormat("hu-HU", {
+        maximumFractionDigits: iDigits
+      }).format(nValue);
+    },
+
+    // "Szep" felso hatar a tengelyhez (1/2/5 * 10^n), hogy a racsvonalak
+    // kerek ertekeknel legyenek, ne a nyers maximumnal.
+    _niceKpiChartMax: function(nValue) {
+      if (!(nValue > 0)) {
+        return 1;
+      }
+      var nExponent = Math.floor(Math.log(nValue) / Math.LN10);
+      var nFraction = nValue / Math.pow(10, nExponent);
+      var nNiceFraction = nFraction <= 1 ? 1 : (nFraction <= 2 ? 2 : (nFraction <= 5 ? 5 : 10));
+      return nNiceFraction * Math.pow(10, nExponent);
+    },
+
+    _renderKpiVerticalBarSvg: function(aBars) {
+      var VIEW_W = 320;
+      var VIEW_H = 170;
+      var MARGIN_TOP = 20;
+      var MARGIN_BOTTOM = 24;
+      var MARGIN_LEFT = 42;
+      var MARGIN_RIGHT = 8;
+      var PLOT_W = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
+      var PLOT_H = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
+      var that = this;
+
+      var nRawMax = Math.max.apply(null, aBars.map(function(oBar) { return oBar.value; }).concat([0]));
+      var nNiceMax = this._niceKpiChartMax(nRawMax);
+
+      var aGridLines = [0, 0.25, 0.5, 0.75, 1].map(function(fFraction) {
+        var nY = MARGIN_TOP + PLOT_H * (1 - fFraction);
+        return (
+          '<line x1="' + MARGIN_LEFT + '" y1="' + nY.toFixed(1) + '" x2="' + (VIEW_W - MARGIN_RIGHT) + '" y2="' + nY.toFixed(1) + '" stroke="#8C8C8C" stroke-opacity="0.15" stroke-width="1"></line>' +
+          '<text x="' + (MARGIN_LEFT - 6) + '" y="' + (nY + 3).toFixed(1) + '" font-size="9" fill="#8C8C8C" text-anchor="end">' + that._formatKpiChartNumber(nNiceMax * fFraction) + '</text>'
+        );
+      }).join("");
+
+      var nSlotW = PLOT_W / aBars.length;
+      var nBarW = Math.max(10, nSlotW * 0.6);
+
+      var sBars = aBars.map(function(oBar, iIndex) {
+        var nHeight = Math.max(2, (oBar.value / nNiceMax) * PLOT_H);
+        var nX = MARGIN_LEFT + iIndex * nSlotW + (nSlotW - nBarW) / 2;
+        var nY = MARGIN_TOP + PLOT_H - nHeight;
+        var nLabelX = MARGIN_LEFT + iIndex * nSlotW + nSlotW / 2;
+        var nValueLabelY = Math.max(MARGIN_TOP - 4, nY - 5);
+        return (
+          '<rect x="' + nX.toFixed(1) + '" y="' + nY.toFixed(1) + '" width="' + nBarW.toFixed(1) + '" height="' + nHeight.toFixed(1) + '" fill="' + oBar.color + '" rx="3"></rect>' +
+          '<text x="' + nLabelX.toFixed(1) + '" y="' + nValueLabelY.toFixed(1) + '" font-size="9.5" font-weight="700" fill="#344A63" text-anchor="middle">' + that._formatKpiChartNumber(oBar.value) + '</text>' +
+          '<text x="' + nLabelX.toFixed(1) + '" y="' + (VIEW_H - 6) + '" font-size="10.5" fill="#8C8C8C" text-anchor="middle">' + that._escapeKpiChartText(oBar.label) + '</text>'
+        );
+      }).join("");
+
+      return '<svg width="100%" height="170" viewBox="0 0 ' + VIEW_W + ' ' + VIEW_H + '" preserveAspectRatio="none">' + aGridLines + sBars + '</svg>';
+    },
+
+    _renderKpiHorizontalBarSvg: function(aBars) {
+      var VIEW_W = 320;
+      var VIEW_H = 170;
+      var MARGIN_TOP = 6;
+      var MARGIN_BOTTOM = 18;
+      var MARGIN_LEFT = 82;
+      var MARGIN_RIGHT = 38;
+      var PLOT_W = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
+      var PLOT_H = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
+      var that = this;
+
+      var nRawMax = Math.max.apply(null, aBars.map(function(oBar) { return oBar.value; }).concat([0]));
+      var nNiceMax = this._niceKpiChartMax(nRawMax);
+
+      var aGridLines = [0, 0.25, 0.5, 0.75, 1].map(function(fFraction) {
+        var nX = MARGIN_LEFT + PLOT_W * fFraction;
+        return (
+          '<line x1="' + nX.toFixed(1) + '" y1="' + MARGIN_TOP + '" x2="' + nX.toFixed(1) + '" y2="' + (VIEW_H - MARGIN_BOTTOM) + '" stroke="#8C8C8C" stroke-opacity="0.15" stroke-width="1"></line>' +
+          '<text x="' + nX.toFixed(1) + '" y="' + (VIEW_H - 4) + '" font-size="9" fill="#8C8C8C" text-anchor="middle">' + that._formatKpiChartNumber(nNiceMax * fFraction) + '</text>'
+        );
+      }).join("");
+
+      var nRowH = PLOT_H / aBars.length;
+      var nBarH = Math.max(10, nRowH * 0.55);
+
+      var sBars = aBars.map(function(oBar, iIndex) {
+        var nWidth = Math.max(4, (oBar.value / nNiceMax) * PLOT_W);
+        var nY = MARGIN_TOP + iIndex * nRowH + (nRowH - nBarH) / 2;
+        var nRowCenterY = MARGIN_TOP + iIndex * nRowH + nRowH / 2 + 3.5;
+        return (
+          '<rect x="' + MARGIN_LEFT + '" y="' + nY.toFixed(1) + '" width="' + nWidth.toFixed(1) + '" height="' + nBarH.toFixed(1) + '" fill="' + oBar.color + '" rx="3"></rect>' +
+          '<text x="' + (MARGIN_LEFT - 6) + '" y="' + nRowCenterY.toFixed(1) + '" font-size="10.5" fill="#8C8C8C" text-anchor="end">' + that._escapeKpiChartText(oBar.label) + '</text>' +
+          '<text x="' + (MARGIN_LEFT + nWidth + 4).toFixed(1) + '" y="' + nRowCenterY.toFixed(1) + '" font-size="9.5" font-weight="700" fill="#344A63">' + that._formatKpiChartNumber(oBar.value) + '</text>'
+        );
+      }).join("");
+
+      return '<svg width="100%" height="170" viewBox="0 0 ' + VIEW_W + ' ' + VIEW_H + '" preserveAspectRatio="none">' + aGridLines + sBars + '</svg>';
+    },
+
+    _renderKpiComplexValueHtml: function(sText) {
+      return (
+        '<div style="height:170px;display:flex;align-items:center;justify-content:center;' +
+        'font-size:1.4rem;font-weight:700;color:#185FA5;text-align:center;">' +
+        this._escapeKpiChartText(sText) +
+        '</div>'
+      );
     },
 
     onSaveDummy10Schedule: async function() {
@@ -1413,13 +1980,52 @@ sap.ui.define([
       oModel.setProperty("/kpiDiscoverySchemaSummary", "");
       oModel.setProperty("/kpiDiscoverySuggestions", []);
       oModel.setProperty("/kpiDiscoverySelectedId", "");
+      oModel.setProperty("/kpiDiscoverySelectedIds", []);
+      oModel.setProperty("/kpiDiscoveryMaxReached", false);
+      oModel.setProperty("/kpiDiscoveryTrayItems", []);
+      oModel.setProperty("/kpiDiscoveryMultiResults", []);
+      oModel.setProperty("/kpiDiscoveryResultsView", false);
       oModel.setProperty("/kpiDiscoverySummary", "");
       oModel.setProperty("/kpiDiscoveryComparison", null);
       oModel.setProperty("/kpiDiscoveryMetrics", []);
       oModel.setProperty("/kpiDiscoveryChartRows", []);
       oModel.setProperty("/kpiDiscoveryRows", []);
+      oModel.setProperty("/kpiDiscoveryActiveTab", "");
+      oModel.setProperty("/kpiDiscoveryAvailableSources", []);
+      oModel.setProperty("/kpiDiscoverySourcesBusy", false);
+      oModel.setProperty("/kpiDiscoverySuggestionsLoading", false);
       this._resetKpiDiscoveryChart();
       this._rebindKpiDiscoveryTable();
+    },
+
+    onToggleKpiSourcesTab: function() {
+      var oModel = this.getView().getModel("jokers");
+      var bWasOpen = oModel.getProperty("/kpiDiscoveryActiveTab") === "sources";
+      oModel.setProperty("/kpiDiscoveryActiveTab", bWasOpen ? "" : "sources");
+      if (!bWasOpen) {
+        this._loadKpiDiscoveryAvailableSources();
+      }
+    },
+
+    onToggleKpiSchemaTab: function() {
+      var oModel = this.getView().getModel("jokers");
+      var bWasOpen = oModel.getProperty("/kpiDiscoveryActiveTab") === "schema";
+      oModel.setProperty("/kpiDiscoveryActiveTab", bWasOpen ? "" : "schema");
+    },
+
+    _loadKpiDiscoveryAvailableSources: async function() {
+      var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/kpiDiscoverySourcesBusy", true);
+      try {
+        var oResp = await AiService.mlWizardGetDbTables();
+        var aTables = Array.isArray(oResp && oResp.tables) ? oResp.tables.filter(Boolean) : [];
+        oModel.setProperty("/kpiDiscoveryAvailableSources", aTables);
+      } catch (oError) {
+        oModel.setProperty("/kpiDiscoveryAvailableSources", []);
+        MessageToast.show(oError && oError.message ? oError.message : "Adatforrasok betoltesi hibaja.");
+      } finally {
+        oModel.setProperty("/kpiDiscoverySourcesBusy", false);
+      }
     },
 
     _loadJokerSchedule: async function(sJokerId, sPrefix) {
@@ -2847,6 +3453,93 @@ sap.ui.define([
       });
 
       this._dummy9DropZoneBound = true;
+    },
+
+    _bindKpiDiscoveryTileHoverEvents: function() {
+      if (this._kpiDiscoveryTileHoverBound) {
+        return;
+      }
+
+      var oPanel = this.byId("kpiDiscoveryTilesPanel");
+      if (!oPanel || !oPanel.getDomRef()) {
+        return;
+      }
+
+      var dom = oPanel.getDomRef();
+      var that = this;
+
+      dom.addEventListener("mouseover", function(ev) {
+        var oTileEl = ev.target.closest(".kpiDiscoveryTileWrap");
+        if (!oTileEl || oTileEl.contains(ev.relatedTarget)) {
+          return;
+        }
+        that._showKpiDiscoveryTileTooltip(oTileEl);
+      });
+
+      dom.addEventListener("mouseout", function(ev) {
+        var oTileEl = ev.target.closest(".kpiDiscoveryTileWrap");
+        if (!oTileEl || oTileEl.contains(ev.relatedTarget)) {
+          return;
+        }
+        that._hideKpiDiscoveryTileTooltip();
+      });
+
+      this._kpiDiscoveryTileHoverBound = true;
+    },
+
+    _getKpiDiscoveryTileTooltipPopover: function() {
+      if (!this._oKpiDiscoveryTileTooltipPopover) {
+        this._oKpiDiscoveryTileTooltipPopover = new Popover({
+          showHeader: false,
+          placement: "Auto",
+          showArrow: true,
+          class: "kpiDiscoveryTileTooltipPopover",
+          content: [
+            new VBox({
+              class: "kpiDiscoveryTileTooltipContent",
+              items: [
+                new Title({ text: "{tileTooltip>/title}", level: "H6" }),
+                new Text({ text: "{tileTooltip>/comparisonText}", class: "sapUiTinyMarginTop" }),
+                new Text({ text: "{tileTooltip>/description}", wrapping: true, class: "sapUiTinyMarginTop" }),
+                new Text({ text: "{tileTooltip>/why}", wrapping: true, class: "sapUiTinyMarginTop" })
+              ]
+            })
+          ]
+        });
+        this._oKpiDiscoveryTileTooltipPopover.setModel(new JSONModel({}), "tileTooltip");
+        this.getView().addDependent(this._oKpiDiscoveryTileTooltipPopover);
+      }
+      return this._oKpiDiscoveryTileTooltipPopover;
+    },
+
+    _showKpiDiscoveryTileTooltip: function(oTileEl) {
+      var oTileControl = Element.closestTo(oTileEl);
+      if (!oTileControl) {
+        return;
+      }
+
+      var sId = oTileEl.getAttribute("data-kpiid") || "";
+      var oModel = this.getView().getModel("jokers");
+      var aSuggestions = oModel.getProperty("/kpiDiscoverySuggestions") || [];
+      var oItem = aSuggestions.filter(function(oSuggestion) { return oSuggestion.id === sId; })[0];
+      if (!oItem) {
+        return;
+      }
+
+      var oPopover = this._getKpiDiscoveryTileTooltipPopover();
+      oPopover.getModel("tileTooltip").setData({
+        title: oItem.title || "",
+        comparisonText: "Viszonyítás: " + (oItem.comparison || ""),
+        description: oItem.description || "",
+        why: "Miért érdemes figyelni: " + (oItem.why || "")
+      });
+      oPopover.openBy(oTileControl);
+    },
+
+    _hideKpiDiscoveryTileTooltip: function() {
+      if (this._oKpiDiscoveryTileTooltipPopover && this._oKpiDiscoveryTileTooltipPopover.isOpen()) {
+        this._oKpiDiscoveryTileTooltipPopover.close();
+      }
     },
 
     _appendDummy9Files: function(aFilesLike) {

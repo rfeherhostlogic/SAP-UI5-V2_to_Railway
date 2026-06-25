@@ -514,6 +514,28 @@
     });
   }
 
+  function generateQuoteBlockField(mPayload) {
+    return fetch("/api/jokers/quote-builder/generate-block-field", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        sessionId: mPayload.sessionId || "",
+        placeholderName: mPayload.placeholderName || "",
+        contextText: mPayload.contextText || "",
+        placeholderValues: mPayload.placeholderValues || {}
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function generateQuote(mPayload) {
     return fetch("/api/jokers/quote-builder/generate", {
       method: "POST",
@@ -567,7 +589,8 @@
       },
       body: JSON.stringify({
         sessionId: mPayload.sessionId || "",
-        quote: mPayload.quote || {}
+        quote: mPayload.quote || {},
+        placeholderValues: mPayload.placeholderValues || {}
       })
     }).then(function(oResponse) {
       if (!oResponse.ok) {
@@ -745,11 +768,14 @@
     var iParsedLimit = Number(iLimit || 10);
     var iSafeLimit = Number.isFinite(iParsedLimit) ? Math.max(1, Math.min(iParsedLimit, 50)) : 10;
     return fetch("/api/reports/feed?limit=" + encodeURIComponent(String(iSafeLimit)), {
-      method: "GET"
+      method: "GET",
+      credentials: "same-origin"
     }).then(function(oResponse) {
       if (!oResponse.ok) {
         return oResponse.text().then(function(sError) {
-          throw new Error("API hiba: " + sError);
+          var oHttpError = new Error("API hiba: " + sError);
+          oHttpError.status = oResponse.status;
+          throw oHttpError;
         });
       }
       return oResponse.json();
@@ -1392,6 +1418,7 @@
     summarizeDummy5: summarizeDummy5,
     askDummy5: askDummy5,
     uploadQuoteTemplate: uploadQuoteTemplate,
+    generateQuoteBlockField: generateQuoteBlockField,
     generateQuote: generateQuote,
     reviseQuote: reviseQuote,
     renderQuote: renderQuote,
