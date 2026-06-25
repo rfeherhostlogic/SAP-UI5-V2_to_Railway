@@ -899,54 +899,110 @@ sap.ui.define([
         .replace(/"/g, "&quot;");
     },
 
+    _formatKpiChartNumber: function(nValue) {
+      var nAbs = Math.abs(nValue);
+      var iDigits = nAbs >= 100 ? 0 : (nAbs >= 1 ? 1 : 2);
+      return new Intl.NumberFormat("hu-HU", {
+        maximumFractionDigits: iDigits
+      }).format(nValue);
+    },
+
+    // "Szep" felso hatar a tengelyhez (1/2/5 * 10^n), hogy a racsvonalak
+    // kerek ertekeknel legyenek, ne a nyers maximumnal.
+    _niceKpiChartMax: function(nValue) {
+      if (!(nValue > 0)) {
+        return 1;
+      }
+      var nExponent = Math.floor(Math.log(nValue) / Math.LN10);
+      var nFraction = nValue / Math.pow(10, nExponent);
+      var nNiceFraction = nFraction <= 1 ? 1 : (nFraction <= 2 ? 2 : (nFraction <= 5 ? 5 : 10));
+      return nNiceFraction * Math.pow(10, nExponent);
+    },
+
     _renderKpiVerticalBarSvg: function(aBars) {
-      var VIEW_W = 300;
-      var VIEW_H = 60;
-      var PLOT_H = 44;
-      var nMax = Math.max.apply(null, aBars.map(function(oBar) { return oBar.value; }).concat([0])) || 1;
-      var nSlotW = VIEW_W / aBars.length;
-      var nBarW = Math.max(4, nSlotW * 0.5);
+      var VIEW_W = 320;
+      var VIEW_H = 170;
+      var MARGIN_TOP = 20;
+      var MARGIN_BOTTOM = 24;
+      var MARGIN_LEFT = 42;
+      var MARGIN_RIGHT = 8;
+      var PLOT_W = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
+      var PLOT_H = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
       var that = this;
 
-      var sBars = aBars.map(function(oBar, iIndex) {
-        var nHeight = Math.max(2, Math.round((oBar.value / nMax) * PLOT_H));
-        var nX = iIndex * nSlotW + (nSlotW - nBarW) / 2;
-        var nY = PLOT_H - nHeight;
-        var nLabelX = iIndex * nSlotW + nSlotW / 2;
+      var nRawMax = Math.max.apply(null, aBars.map(function(oBar) { return oBar.value; }).concat([0]));
+      var nNiceMax = this._niceKpiChartMax(nRawMax);
+
+      var aGridLines = [0, 0.25, 0.5, 0.75, 1].map(function(fFraction) {
+        var nY = MARGIN_TOP + PLOT_H * (1 - fFraction);
         return (
-          '<rect x="' + nX.toFixed(1) + '" y="' + nY.toFixed(1) + '" width="' + nBarW.toFixed(1) + '" height="' + nHeight.toFixed(1) + '" fill="' + oBar.color + '" rx="2"></rect>' +
-          '<text x="' + nLabelX.toFixed(1) + '" y="58" font-size="8" fill="#8C8C8C" text-anchor="middle">' + that._escapeKpiChartText(oBar.label) + '</text>'
+          '<line x1="' + MARGIN_LEFT + '" y1="' + nY.toFixed(1) + '" x2="' + (VIEW_W - MARGIN_RIGHT) + '" y2="' + nY.toFixed(1) + '" stroke="#8C8C8C" stroke-opacity="0.15" stroke-width="1"></line>' +
+          '<text x="' + (MARGIN_LEFT - 6) + '" y="' + (nY + 3).toFixed(1) + '" font-size="9" fill="#8C8C8C" text-anchor="end">' + that._formatKpiChartNumber(nNiceMax * fFraction) + '</text>'
         );
       }).join("");
 
-      return '<svg width="100%" height="60" viewBox="0 0 ' + VIEW_W + ' ' + VIEW_H + '" preserveAspectRatio="none">' + sBars + '</svg>';
+      var nSlotW = PLOT_W / aBars.length;
+      var nBarW = Math.max(10, nSlotW * 0.6);
+
+      var sBars = aBars.map(function(oBar, iIndex) {
+        var nHeight = Math.max(2, (oBar.value / nNiceMax) * PLOT_H);
+        var nX = MARGIN_LEFT + iIndex * nSlotW + (nSlotW - nBarW) / 2;
+        var nY = MARGIN_TOP + PLOT_H - nHeight;
+        var nLabelX = MARGIN_LEFT + iIndex * nSlotW + nSlotW / 2;
+        var nValueLabelY = Math.max(MARGIN_TOP - 4, nY - 5);
+        return (
+          '<rect x="' + nX.toFixed(1) + '" y="' + nY.toFixed(1) + '" width="' + nBarW.toFixed(1) + '" height="' + nHeight.toFixed(1) + '" fill="' + oBar.color + '" rx="3"></rect>' +
+          '<text x="' + nLabelX.toFixed(1) + '" y="' + nValueLabelY.toFixed(1) + '" font-size="9.5" font-weight="700" fill="#344A63" text-anchor="middle">' + that._formatKpiChartNumber(oBar.value) + '</text>' +
+          '<text x="' + nLabelX.toFixed(1) + '" y="' + (VIEW_H - 6) + '" font-size="10.5" fill="#8C8C8C" text-anchor="middle">' + that._escapeKpiChartText(oBar.label) + '</text>'
+        );
+      }).join("");
+
+      return '<svg width="100%" height="170" viewBox="0 0 ' + VIEW_W + ' ' + VIEW_H + '" preserveAspectRatio="none">' + aGridLines + sBars + '</svg>';
     },
 
     _renderKpiHorizontalBarSvg: function(aBars) {
-      var VIEW_W = 300;
-      var VIEW_H = 60;
-      var nMax = Math.max.apply(null, aBars.map(function(oBar) { return oBar.value; }).concat([0])) || 1;
-      var nRowH = VIEW_H / aBars.length;
-      var nBarH = Math.max(4, nRowH * 0.55);
+      var VIEW_W = 320;
+      var VIEW_H = 170;
+      var MARGIN_TOP = 6;
+      var MARGIN_BOTTOM = 18;
+      var MARGIN_LEFT = 82;
+      var MARGIN_RIGHT = 38;
+      var PLOT_W = VIEW_W - MARGIN_LEFT - MARGIN_RIGHT;
+      var PLOT_H = VIEW_H - MARGIN_TOP - MARGIN_BOTTOM;
       var that = this;
 
-      var sBars = aBars.map(function(oBar, iIndex) {
-        var nWidth = Math.max(8, Math.round((oBar.value / nMax) * (VIEW_W - 6)));
-        var nY = iIndex * nRowH + (nRowH - nBarH) / 2;
-        var nLabelY = iIndex * nRowH + nRowH / 2 + 2.5;
+      var nRawMax = Math.max.apply(null, aBars.map(function(oBar) { return oBar.value; }).concat([0]));
+      var nNiceMax = this._niceKpiChartMax(nRawMax);
+
+      var aGridLines = [0, 0.25, 0.5, 0.75, 1].map(function(fFraction) {
+        var nX = MARGIN_LEFT + PLOT_W * fFraction;
         return (
-          '<rect x="0" y="' + nY.toFixed(1) + '" width="' + nWidth.toFixed(1) + '" height="' + nBarH.toFixed(1) + '" fill="' + oBar.color + '" rx="2"></rect>' +
-          '<text x="4" y="' + nLabelY.toFixed(1) + '" font-size="8" fill="#8C8C8C">' + that._escapeKpiChartText(oBar.label) + '</text>'
+          '<line x1="' + nX.toFixed(1) + '" y1="' + MARGIN_TOP + '" x2="' + nX.toFixed(1) + '" y2="' + (VIEW_H - MARGIN_BOTTOM) + '" stroke="#8C8C8C" stroke-opacity="0.15" stroke-width="1"></line>' +
+          '<text x="' + nX.toFixed(1) + '" y="' + (VIEW_H - 4) + '" font-size="9" fill="#8C8C8C" text-anchor="middle">' + that._formatKpiChartNumber(nNiceMax * fFraction) + '</text>'
         );
       }).join("");
 
-      return '<svg width="100%" height="60" viewBox="0 0 ' + VIEW_W + ' ' + VIEW_H + '" preserveAspectRatio="none">' + sBars + '</svg>';
+      var nRowH = PLOT_H / aBars.length;
+      var nBarH = Math.max(10, nRowH * 0.55);
+
+      var sBars = aBars.map(function(oBar, iIndex) {
+        var nWidth = Math.max(4, (oBar.value / nNiceMax) * PLOT_W);
+        var nY = MARGIN_TOP + iIndex * nRowH + (nRowH - nBarH) / 2;
+        var nRowCenterY = MARGIN_TOP + iIndex * nRowH + nRowH / 2 + 3.5;
+        return (
+          '<rect x="' + MARGIN_LEFT + '" y="' + nY.toFixed(1) + '" width="' + nWidth.toFixed(1) + '" height="' + nBarH.toFixed(1) + '" fill="' + oBar.color + '" rx="3"></rect>' +
+          '<text x="' + (MARGIN_LEFT - 6) + '" y="' + nRowCenterY.toFixed(1) + '" font-size="10.5" fill="#8C8C8C" text-anchor="end">' + that._escapeKpiChartText(oBar.label) + '</text>' +
+          '<text x="' + (MARGIN_LEFT + nWidth + 4).toFixed(1) + '" y="' + nRowCenterY.toFixed(1) + '" font-size="9.5" font-weight="700" fill="#344A63">' + that._formatKpiChartNumber(oBar.value) + '</text>'
+        );
+      }).join("");
+
+      return '<svg width="100%" height="170" viewBox="0 0 ' + VIEW_W + ' ' + VIEW_H + '" preserveAspectRatio="none">' + aGridLines + sBars + '</svg>';
     },
 
     _renderKpiComplexValueHtml: function(sText) {
       return (
-        '<div style="height:60px;display:flex;align-items:center;justify-content:center;' +
-        'font-size:1.05rem;font-weight:700;color:#185FA5;text-align:center;">' +
+        '<div style="height:170px;display:flex;align-items:center;justify-content:center;' +
+        'font-size:1.4rem;font-weight:700;color:#185FA5;text-align:center;">' +
         this._escapeKpiChartText(sText) +
         '</div>'
       );

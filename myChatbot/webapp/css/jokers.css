@@ -421,7 +421,7 @@
 .kpiMiniChartHost {
   display: block;
   width: 100%;
-  height: 60px;
+  height: 170px;
   margin-top: 0.6rem;
   overflow: hidden;
 }
@@ -429,7 +429,7 @@
 .kpiMiniChartHost > div,
 .kpiMiniChartHost > svg {
   width: 100%;
-  height: 60px;
+  height: 170px;
   display: block;
 }
 

@@ -860,7 +860,7 @@
           </HBox>
         </VBox>
 
-        <Panel id="kpiDiscoveryTilesPanel" headerText="Javasolt KPI csempek" class="sapUiSmallMarginTop" visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length > 0 }">
+        <Panel id="kpiDiscoveryTilesPanel" headerText="Javasolt KPI csempek" class="sapUiSmallMarginTop" visible="{= !${jokers>/kpiDiscoverySuggestionsLoading} &amp;&amp; ${jokers>/kpiDiscoverySuggestions}.length > 0 &amp;&amp; !${jokers>/kpiDiscoveryResultsView} }">
           <FlexBox items="{jokers>/kpiDiscoverySuggestions}" wrap="Wrap">
             <items>
               <VBox
