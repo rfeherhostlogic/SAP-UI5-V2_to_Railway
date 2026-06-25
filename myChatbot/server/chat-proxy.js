@@ -1173,6 +1173,26 @@ function extractTemplatePlaceholders(text) {
   return out;
 }
 
+// Word gyakran tobb <w:t> futasra (run) bontja egy latszolag egyben levo
+// szoveget (helyesirás-ellenorzes, formazasvaltas, stb. miatt), igy egy
+// "{{placeholder}}" tokenen belul is lehet XML tag-hatar. A nyers XML-en
+// futtatott regex ezert kihagyhat placeholdereket - eloszor a <w:t> futasok
+// tartalmat fuzzuk ossze (dokumentum-sorrendben), es csak az igy
+// rekonstrualt sima szovegen keresunk.
+function extractDocxXmlPlainText(xml) {
+  const parts = [];
+  String(xml || "").replace(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g, function(_match, sInner) {
+    parts.push(sInner);
+    return _match;
+  });
+  return parts.join("")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 function readDocxTemplatePlaceholders(buffer, fallbackText) {
   const found = extractTemplatePlaceholders(fallbackText);
   if (!buffer) {
@@ -1187,7 +1207,8 @@ function readDocxTemplatePlaceholders(buffer, fallbackText) {
       }
       const file = zip.file(name);
       const xml = file ? file.asText() : "";
-      extractTemplatePlaceholders(xml).forEach(function(ph) {
+      const plainText = extractDocxXmlPlainText(xml);
+      extractTemplatePlaceholders(plainText).forEach(function(ph) {
         if (found.indexOf(ph) < 0) {
           found.push(ph);
         }
@@ -10752,4 +10773,9 @@ if (require.main === module) {
   bootstrapServer();
 }
 
-module.exports = { convertDocxToPdfBuffer };
+module.exports = {
+  convertDocxToPdfBuffer,
+  extractTemplatePlaceholders,
+  extractDocxXmlPlainText,
+  readDocxTemplatePlaceholders
+};

@@ -162,6 +162,11 @@ sap.ui.define([
       oModel.setProperty("/quotePdfDownloadUrl", "");
       oModel.setProperty("/quoteDocxDownloadUrl", "");
       oModel.setProperty("/quoteChatMessages", []);
+      // Az elozo sablon placeholder-listaja azonnal eltunik, meg mielott az
+      // uj feltoltes valasza megerkezik.
+      oModel.setProperty("/quoteTemplatePlaceholders", []);
+      oModel.setProperty("/quoteMissingPlaceholders", []);
+      oModel.setProperty("/quotePlaceholderValues", {});
 
       try {
         var oUpload = await AiService.uploadQuoteTemplate(oFile);

@@ -220,23 +220,20 @@
             enabled="{= ${jokers>/quoteBusy} ? false : (${jokers>/quoteSessionId} ? true : false) }"
             class="quoteGenerateButton sapUiMediumMarginTop"/>
 
-          <Panel headerText="Sablon beállításainak megtekintése" expandable="true" expanded="false" class="quoteTemplateAccordion sapUiMediumMarginTop">
+          <Panel headerText="Azonosított placeholderek" expandable="true" expanded="false" class="quoteTemplateAccordion sapUiMediumMarginTop">
             <VBox class="sapUiSmallMargin">
-              <Text text="Az alábbi vázlat a kiválasztott Word sablon üres szerkezetét mutatja, kitöltött adat nélkül." wrapping="true" class="sapUiTinyMarginBottom"/>
-              <VBox class="quoteSkeletonDoc">
-                <VBox class="quoteSkeletonBlock">
-                  <Text text="Fejrész: cégnév, ajánlatszám, dátum" wrapping="true"/>
-                </VBox>
-                <VBox class="quoteSkeletonBlock">
-                  <Text text="Tételek táblázat: megnevezés, mennyiség, egységár" wrapping="true"/>
-                </VBox>
-                <VBox class="quoteSkeletonBlock">
-                  <Text text="Összesítés: nettó, ÁFA, bruttó végösszeg" wrapping="true"/>
-                </VBox>
-                <VBox class="quoteSkeletonBlock">
-                  <Text text="Aláírás blokk" wrapping="true"/>
-                </VBox>
-              </VBox>
+              <Text text="A feltöltött Word sablonban automatikusan felismert placeholderek, kitöltött érték nélkül." wrapping="true" class="sapUiTinyMarginBottom"/>
+              <MessageStrip
+                text="Nem található placeholder a feltöltött sablonban."
+                type="Information"
+                showIcon="true"
+                showCloseButton="false"
+                visible="{= ${jokers>/quoteTemplatePlaceholders}.length === 0 }"/>
+              <FlexBox wrap="Wrap" class="quotePlaceholderChipRow" visible="{= ${jokers>/quoteTemplatePlaceholders}.length > 0 }" items="{jokers>/quoteTemplatePlaceholders}">
+                <items>
+                  <Text text="{jokers>}" class="quotePlaceholderChip"/>
+                </items>
+              </FlexBox>
             </VBox>
           </Panel>
         </VBox>
