@@ -843,7 +843,6 @@
                 <!-- Mini oszlopdiagram: nyers SVG/HTML, a controller-ben epitve es
                      a "chartHtml" mezon keresztul kotve (lasd _buildKpiDiscoveryMiniChart). -->
                 <core:HTML
-                  id="kpiChartHost-{jokers>kpiId}"
                   content="{jokers>chartHtml}"
                   class="kpiMiniChartHost"/>
 
