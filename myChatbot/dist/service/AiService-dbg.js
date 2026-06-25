@@ -589,7 +589,8 @@
       },
       body: JSON.stringify({
         sessionId: mPayload.sessionId || "",
-        quote: mPayload.quote || {}
+        quote: mPayload.quote || {},
+        placeholderValues: mPayload.placeholderValues || {}
       })
     }).then(function(oResponse) {
       if (!oResponse.ok) {

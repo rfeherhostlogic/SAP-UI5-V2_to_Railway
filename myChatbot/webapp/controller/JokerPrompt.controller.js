@@ -45,6 +45,28 @@ sap.ui.define([
 ) {
   "use strict";
 
+  // Arajanlat keszito - State 2 (eredmeny) lapozhato mezoszerkeszto oldalbeosztasa.
+  // A "Group A" (egyszeru, kotelezo) mezok az 1-2. oldalon vannak, ezeket kell
+  // kitoltottsegre ellenorizni "Kovetkezo" lenyomasakor.
+  var QUOTE_RESULT_PAGE1_FIELDS = ["proposal_title", "proposal_subtitle", "validity_period"];
+  var QUOTE_RESULT_PAGE2_FIELDS = ["customer_legal_name", "customer_short_name", "service_scope_summary", "provider_legal_name", "provider_short_name", "provider_role"];
+  var QUOTE_RESULT_PAGE3_FIELDS = ["confidentiality_validity_block", "scope_block", "product_introduction"];
+  var QUOTE_RESULT_PAGE4_ITEM_FIELDS = [
+    "item_1_name", "item_1_days", "item_1_net",
+    "item_2_name", "item_2_days", "item_2_net",
+    "item_3_name", "item_3_days", "item_3_net",
+    "item_4_name", "item_4_days", "item_4_net"
+  ];
+  var QUOTE_RESULT_PAGE4_TOTAL_FIELDS = ["total_net", "total_discount", "total_gross"];
+  var QUOTE_RESULT_PAGE4_BLOCK_FIELDS = ["pricing_block"];
+  var QUOTE_RESULT_REQUIRED_FIELDS = QUOTE_RESULT_PAGE1_FIELDS.concat(QUOTE_RESULT_PAGE2_FIELDS);
+  var QUOTE_RESULT_KNOWN_FIELDS = QUOTE_RESULT_PAGE1_FIELDS
+    .concat(QUOTE_RESULT_PAGE2_FIELDS)
+    .concat(QUOTE_RESULT_PAGE3_FIELDS)
+    .concat(QUOTE_RESULT_PAGE4_ITEM_FIELDS)
+    .concat(QUOTE_RESULT_PAGE4_TOTAL_FIELDS)
+    .concat(QUOTE_RESULT_PAGE4_BLOCK_FIELDS);
+
   return Controller.extend("sap.suite.ui.commons.demo.tutorial.controller.JokerPrompt", {
     onInit: function() {
       this._dummy9DropZoneBound = false;
@@ -357,6 +379,7 @@ sap.ui.define([
           force: true
         });
         this._applyQuoteResult(oResult, true);
+        this._initQuoteResultEditor(oResult.placeholderValues);
         oModel.setProperty("/quoteState", "result");
         MessageToast.show("Az ajanlat elkeszult.");
       } catch (oError) {
@@ -415,7 +438,8 @@ sap.ui.define([
       try {
         var oResult = await AiService.renderQuote({
           sessionId: sSessionId,
-          quote: oQuote
+          quote: oQuote,
+          placeholderValues: oModel.getProperty("/quoteFieldValues") || {}
         });
         this._applyQuoteResult(oResult, true);
         MessageToast.show("A PDF elonezet frissult.");
@@ -439,6 +463,10 @@ sap.ui.define([
       oModel.setProperty("/quoteChatMessages", []);
       oModel.setProperty("/quoteRevisionMessage", "");
       oModel.setProperty("/quoteError", "");
+      oModel.setProperty("/quoteFieldValues", {});
+      oModel.setProperty("/quoteExtraFields", []);
+      oModel.setProperty("/quoteResultPage", 1);
+      oModel.setProperty("/quoteResultValidationActive", false);
     },
 
     onSaveQuote: async function() {
@@ -502,6 +530,142 @@ sap.ui.define([
         var oQuote = oModel.getProperty("/quote");
         var sQuoteNo = oQuote && oQuote.quoteNo ? String(oQuote.quoteNo) : "arajanlat";
         oModel.setProperty("/quoteFileName", sQuoteNo.replace(/[^a-z0-9_-]+/gi, "_") + ".pdf");
+      }
+    },
+
+    // State 2 (eredmeny) lapozhato mezoszerkeszto inicializalasa a generalas
+    // valaszaban kapott placeholder ertekekkel. Csak friss generalas utan
+    // hivjuk - PDF frissites/modositas nem nullazza az oldalt vagy a mar
+    // beirt ertekeket.
+    _initQuoteResultEditor: function(mPlaceholderValues) {
+      var oModel = this.getView().getModel("jokers");
+      var aAllNames = oModel.getProperty("/quoteTemplatePlaceholders") || [];
+      var mValues = Object.assign({}, mPlaceholderValues || {});
+
+      QUOTE_RESULT_KNOWN_FIELDS.forEach(function(sName) {
+        if (mValues[sName] == null) {
+          mValues[sName] = "";
+        }
+      });
+
+      var aExtra = aAllNames
+        .filter(function(sName) { return QUOTE_RESULT_KNOWN_FIELDS.indexOf(sName) < 0; })
+        .map(function(sName) {
+          return { name: sName, label: sName, value: mValues[sName] || "" };
+        });
+
+      oModel.setProperty("/quoteFieldValues", mValues);
+      oModel.setProperty("/quoteExtraFields", aExtra);
+      oModel.setProperty("/quoteResultPage", 1);
+      oModel.setProperty("/quoteResultValidationActive", false);
+    },
+
+    onQuoteResultNext: function() {
+      var oModel = this.getView().getModel("jokers");
+      var iPage = oModel.getProperty("/quoteResultPage") || 1;
+
+      if (iPage >= 4) {
+        MessageToast.show("A mezők kitöltve. Frissítsd a PDF-et a végleges előnézethez.");
+        return;
+      }
+      if ((iPage === 1 || iPage === 2) && !this._validateQuoteResultPage(iPage)) {
+        return;
+      }
+      oModel.setProperty("/quoteResultValidationActive", false);
+      oModel.setProperty("/quoteResultPage", iPage + 1);
+    },
+
+    onQuoteResultPrev: function() {
+      var oModel = this.getView().getModel("jokers");
+      var iPage = oModel.getProperty("/quoteResultPage") || 1;
+      if (iPage <= 1) {
+        return;
+      }
+      oModel.setProperty("/quoteResultPage", iPage - 1);
+    },
+
+    onQuoteResultStepPress: function(oEvent) {
+      var oModel = this.getView().getModel("jokers");
+      var iPage = Number(oEvent.getSource().data("page"));
+      if (iPage >= 1 && iPage <= 4) {
+        oModel.setProperty("/quoteResultPage", iPage);
+      }
+    },
+
+    _validateQuoteResultPage: function(iPage) {
+      var oModel = this.getView().getModel("jokers");
+      var aFields = iPage === 1 ? QUOTE_RESULT_PAGE1_FIELDS : QUOTE_RESULT_PAGE2_FIELDS;
+      var mValues = oModel.getProperty("/quoteFieldValues") || {};
+      var bValid = aFields.every(function(sName) {
+        return !!String(mValues[sName] || "").trim();
+      });
+      oModel.setProperty("/quoteResultValidationActive", !bValid);
+      if (!bValid) {
+        MessageToast.show("Tölts ki minden kötelező mezőt a folytatáshoz.");
+      }
+      return bValid;
+    },
+
+    // 4. oldal: a tetel nettó arak osszege adja a vegosszeget, amibol a
+    // kedvezmeny levonasaval szamolodik a brutto vegosszeg.
+    onQuoteResultPriceFieldChange: function() {
+      var oModel = this.getView().getModel("jokers");
+      var mValues = oModel.getProperty("/quoteFieldValues") || {};
+      var aItemNetKeys = ["item_1_net", "item_2_net", "item_3_net", "item_4_net"];
+      var nNet = aItemNetKeys.reduce(function(nSum, sKey) {
+        return nSum + (parseFloat(String(mValues[sKey] || "").replace(",", ".")) || 0);
+      }, 0);
+      var nDiscount = parseFloat(String(mValues.total_discount || "").replace(",", ".")) || 0;
+      oModel.setProperty("/quoteFieldValues/total_net", this._formatQuoteAmount(nNet));
+      oModel.setProperty("/quoteFieldValues/total_gross", this._formatQuoteAmount(nNet - nDiscount));
+    },
+
+    _formatQuoteAmount: function(nValue) {
+      var nRounded = Math.round((nValue || 0) * 100) / 100;
+      return String(nRounded);
+    },
+
+    // Noah "N" gomb a 3-4. oldal block mezoinel: AI-generalas a kontextus es
+    // a mar megadott "simple" mezoertekek (1-2. oldal) alapjan.
+    onQuoteResultGenerateField: async function(oEvent) {
+      var oModel = this.getView().getModel("jokers");
+      var sFieldName = String(oEvent.getSource().data("field") || "");
+      var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
+      var sContext = (oModel.getProperty("/quoteContextText") || "").trim();
+
+      if (!sFieldName) {
+        return;
+      }
+      if (!sSessionId) {
+        MessageToast.show("Nincs aktiv arajanlat session.");
+        return;
+      }
+      if (!sContext) {
+        MessageToast.show("Az ajanlat kontextusat add meg.");
+        return;
+      }
+
+      var mValues = oModel.getProperty("/quoteFieldValues") || {};
+      var mKnownValues = {};
+      QUOTE_RESULT_PAGE1_FIELDS.concat(QUOTE_RESULT_PAGE2_FIELDS).forEach(function(sName) {
+        if (mValues[sName]) {
+          mKnownValues[sName] = mValues[sName];
+        }
+      });
+
+      oModel.setProperty("/quoteResultGenerateBusy", true);
+      try {
+        var oResult = await AiService.generateQuoteBlockField({
+          sessionId: sSessionId,
+          placeholderName: sFieldName,
+          contextText: sContext,
+          placeholderValues: mKnownValues
+        });
+        oModel.setProperty("/quoteFieldValues/" + sFieldName, oResult.value || "");
+      } catch (oError) {
+        MessageToast.show(oError && oError.message ? oError.message : "Mezo generalasi hiba.");
+      } finally {
+        oModel.setProperty("/quoteResultGenerateBusy", false);
       }
     },
 

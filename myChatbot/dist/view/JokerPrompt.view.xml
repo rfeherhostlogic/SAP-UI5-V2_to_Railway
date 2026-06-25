@@ -271,55 +271,233 @@
         <!-- Allapot 2: generalt ajanlat szerkesztese -->
         <VBox visible="{= ${jokers>/quoteState} === 'result' }" width="100%" class="sapUiTinyMarginTop">
           <HBox class="quoteResultLayout" wrap="Wrap" renderType="Bare">
-            <Panel headerText="Ajánlat szövege" class="quoteTextPanel">
+            <Panel headerText="Ajánlat adatai" class="quoteTextPanel">
               <VBox class="sapUiSmallMargin">
-                <HBox wrap="Wrap" class="sapUiTinyMarginBottom">
-                  <VBox class="sapUiTinyMarginEnd quoteEditableField">
-                    <Label text="Ajánlatszám"/>
-                    <Input value="{jokers>/quote/quoteNo}" width="10rem"/>
-                  </VBox>
-                  <VBox class="sapUiTinyMarginEnd quoteEditableField">
-                    <Label text="Ügyfél neve"/>
-                    <Input value="{jokers>/quote/customer}" width="14rem"/>
-                  </VBox>
-                  <VBox class="quoteEditableField">
-                    <Label text="Dátum"/>
-                    <Input value="{jokers>/quote/date}" width="8rem"/>
-                  </VBox>
+                <Link text="Vissza a kiindulóképernyőhöz" press=".onNewQuote" class="quoteResultBackLink sapUiTinyMarginBottom"/>
+
+                <HBox class="quoteStepBar" justifyContent="SpaceBetween" wrap="Wrap">
+                  <Button
+                    text="1. Fejléc"
+                    type="Transparent"
+                    press=".onQuoteResultStepPress"
+                    icon="{= ${jokers>/quoteResultPage} > 1 ? 'sap-icon://accept' : '' }"
+                    class="{= ${jokers>/quoteResultPage} === 1 ? 'quoteStepBtn quoteStepActive' : (${jokers>/quoteResultPage} > 1 ? 'quoteStepBtn quoteStepDone' : 'quoteStepBtn') }">
+                    <customData>
+                      <core:CustomData key="page" value="1"/>
+                    </customData>
+                  </Button>
+                  <Button
+                    text="2. Szereplők"
+                    type="Transparent"
+                    press=".onQuoteResultStepPress"
+                    icon="{= ${jokers>/quoteResultPage} > 2 ? 'sap-icon://accept' : '' }"
+                    class="{= ${jokers>/quoteResultPage} === 2 ? 'quoteStepBtn quoteStepActive' : (${jokers>/quoteResultPage} > 2 ? 'quoteStepBtn quoteStepDone' : 'quoteStepBtn') }">
+                    <customData>
+                      <core:CustomData key="page" value="2"/>
+                    </customData>
+                  </Button>
+                  <Button
+                    text="3. Tartalom"
+                    type="Transparent"
+                    press=".onQuoteResultStepPress"
+                    icon="{= ${jokers>/quoteResultPage} > 3 ? 'sap-icon://accept' : '' }"
+                    class="{= ${jokers>/quoteResultPage} === 3 ? 'quoteStepBtn quoteStepActive' : (${jokers>/quoteResultPage} > 3 ? 'quoteStepBtn quoteStepDone' : 'quoteStepBtn') }">
+                    <customData>
+                      <core:CustomData key="page" value="3"/>
+                    </customData>
+                  </Button>
+                  <Button
+                    text="4. Árazás"
+                    type="Transparent"
+                    press=".onQuoteResultStepPress"
+                    class="{= ${jokers>/quoteResultPage} === 4 ? 'quoteStepBtn quoteStepActive' : 'quoteStepBtn' }">
+                    <customData>
+                      <core:CustomData key="page" value="4"/>
+                    </customData>
+                  </Button>
                 </HBox>
 
-                <Title text="{jokers>/quote/title}" level="H4" class="sapUiTinyMarginBottom"/>
-                <Text text="{jokers>/quote/intro}" wrapping="true" class="sapUiSmallMarginBottom"/>
+                <ScrollContainer height="22rem" vertical="true" horizontal="false" class="quoteResultScrollArea sapUiTinyMarginTop">
+                  <VBox visible="{= ${jokers>/quoteResultPage} === 1 }" class="quoteResultPage">
+                    <VBox class="quoteFieldRow">
+                      <Label text="Ajánlat címe"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/proposal_title}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/proposal_title} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Alcím"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/proposal_subtitle}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/proposal_subtitle} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Érvényesség (nap)"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/validity_period}"
+                        type="Number"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/validity_period} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                  </VBox>
 
-                <List items="{jokers>/quote/items}" mode="None" showSeparators="Inner">
-                  <CustomListItem>
-                    <HBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" class="sapUiTinyMarginTop sapUiTinyMarginBottom">
-                      <VBox>
-                        <Text text="{jokers>description}" wrapping="true"/>
-                        <Text text="{= ${jokers>qty} + ' ' + ${jokers>unit} }" class="sapUiTinyMarginTop"/>
+                  <VBox visible="{= ${jokers>/quoteResultPage} === 2 }" class="quoteResultPage">
+                    <VBox class="quoteFieldRow">
+                      <Label text="Ügyfél teljes neve"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/customer_legal_name}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/customer_legal_name} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Ügyfél rövid neve"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/customer_short_name}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/customer_short_name} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Szolgáltatás tárgya"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/service_scope_summary}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/service_scope_summary} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Szolgáltató neve"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/provider_legal_name}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/provider_legal_name} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Szolgáltató rövid neve"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/provider_short_name}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/provider_short_name} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiTinyMarginTop">
+                      <Label text="Szolgáltató szerepe"/>
+                      <Input
+                        value="{jokers>/quoteFieldValues/provider_role}"
+                        valueState="{= ${jokers>/quoteResultValidationActive} &amp;&amp; !${jokers>/quoteFieldValues/provider_role} ? 'Error' : 'None' }"
+                        valueStateText="Kötelező mező"/>
+                    </VBox>
+                  </VBox>
+
+                  <VBox visible="{= ${jokers>/quoteResultPage} === 3 }" class="quoteResultPage">
+                    <VBox class="quoteFieldRow">
+                      <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
+                        <Label text="Titoktartási blokk"/>
+                        <Button icon="sap-icon://ai" text="Generálás" type="Transparent" press=".onQuoteResultGenerateField" busy="{jokers>/quoteResultGenerateBusy}" class="quoteNoahPillButton">
+                          <customData>
+                            <core:CustomData key="field" value="confidentiality_validity_block"/>
+                          </customData>
+                        </Button>
+                      </HBox>
+                      <TextArea value="{jokers>/quoteFieldValues/confidentiality_validity_block}" rows="6" growing="true" width="100%"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiMediumMarginTop">
+                      <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
+                        <Label text="Szolgáltatás terjedelme"/>
+                        <Button icon="sap-icon://ai" text="Generálás" type="Transparent" press=".onQuoteResultGenerateField" busy="{jokers>/quoteResultGenerateBusy}" class="quoteNoahPillButton">
+                          <customData>
+                            <core:CustomData key="field" value="scope_block"/>
+                          </customData>
+                        </Button>
+                      </HBox>
+                      <TextArea value="{jokers>/quoteFieldValues/scope_block}" rows="6" growing="true" width="100%"/>
+                    </VBox>
+                    <VBox class="quoteFieldRow sapUiMediumMarginTop">
+                      <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
+                        <Label text="Megoldás bemutatása"/>
+                        <Button icon="sap-icon://ai" text="Generálás" type="Transparent" press=".onQuoteResultGenerateField" busy="{jokers>/quoteResultGenerateBusy}" class="quoteNoahPillButton">
+                          <customData>
+                            <core:CustomData key="field" value="product_introduction"/>
+                          </customData>
+                        </Button>
+                      </HBox>
+                      <TextArea value="{jokers>/quoteFieldValues/product_introduction}" rows="8" growing="true" width="100%"/>
+                    </VBox>
+                  </VBox>
+
+                  <VBox visible="{= ${jokers>/quoteResultPage} === 4 }" class="quoteResultPage">
+                    <VBox class="quotePriceGrid">
+                      <HBox class="quotePriceGridRow quotePriceGridHeaderRow">
+                        <Text text="Megnevezés" class="quotePriceGridCell quotePriceGridHeaderCell"/>
+                        <Text text="Mennyiség" class="quotePriceGridCell quotePriceGridHeaderCell quotePriceGridCellNarrow"/>
+                        <Text text="Nettó ár" class="quotePriceGridCell quotePriceGridHeaderCell quotePriceGridCellNarrow"/>
+                      </HBox>
+                      <HBox class="quotePriceGridRow">
+                        <Input value="{jokers>/quoteFieldValues/item_1_name}" class="quotePriceGridCell"/>
+                        <Input value="{jokers>/quoteFieldValues/item_1_days}" class="quotePriceGridCell quotePriceGridCellNarrow"/>
+                        <Input value="{jokers>/quoteFieldValues/item_1_net}" class="quotePriceGridCell quotePriceGridCellNarrow" change=".onQuoteResultPriceFieldChange"/>
+                      </HBox>
+                      <HBox class="quotePriceGridRow">
+                        <Input value="{jokers>/quoteFieldValues/item_2_name}" class="quotePriceGridCell"/>
+                        <Input value="{jokers>/quoteFieldValues/item_2_days}" class="quotePriceGridCell quotePriceGridCellNarrow"/>
+                        <Input value="{jokers>/quoteFieldValues/item_2_net}" class="quotePriceGridCell quotePriceGridCellNarrow" change=".onQuoteResultPriceFieldChange"/>
+                      </HBox>
+                      <HBox class="quotePriceGridRow">
+                        <Input value="{jokers>/quoteFieldValues/item_3_name}" class="quotePriceGridCell"/>
+                        <Input value="{jokers>/quoteFieldValues/item_3_days}" class="quotePriceGridCell quotePriceGridCellNarrow"/>
+                        <Input value="{jokers>/quoteFieldValues/item_3_net}" class="quotePriceGridCell quotePriceGridCellNarrow" change=".onQuoteResultPriceFieldChange"/>
+                      </HBox>
+                      <HBox class="quotePriceGridRow">
+                        <Input value="{jokers>/quoteFieldValues/item_4_name}" class="quotePriceGridCell"/>
+                        <Input value="{jokers>/quoteFieldValues/item_4_days}" class="quotePriceGridCell quotePriceGridCellNarrow"/>
+                        <Input value="{jokers>/quoteFieldValues/item_4_net}" class="quotePriceGridCell quotePriceGridCellNarrow" change=".onQuoteResultPriceFieldChange"/>
+                      </HBox>
+                    </VBox>
+
+                    <HBox class="quoteFieldRow sapUiMediumMarginTop" justifyContent="SpaceBetween" wrap="Wrap">
+                      <VBox class="quoteTotalField">
+                        <Label text="Nettó összesen"/>
+                        <Input value="{jokers>/quoteFieldValues/total_net}" editable="false"/>
                       </VBox>
-                      <VBox class="quoteEditableField">
-                        <Label text="Egységár"/>
-                        <Input value="{jokers>unitPrice}" width="7rem" type="Number"/>
+                      <VBox class="quoteTotalField">
+                        <Label text="Kedvezmény"/>
+                        <Input value="{jokers>/quoteFieldValues/total_discount}" change=".onQuoteResultPriceFieldChange"/>
+                      </VBox>
+                      <VBox class="quoteTotalField">
+                        <Label text="Bruttó összesen"/>
+                        <Input value="{jokers>/quoteFieldValues/total_gross}" editable="false"/>
                       </VBox>
                     </HBox>
-                  </CustomListItem>
-                </List>
 
-                <VBox class="sapUiSmallMarginTop" alignItems="End">
-                  <Text text="{= 'Nettó összesen: ' + ${jokers>/quote/totalNet} + ' ' + ${jokers>/quote/currency} }"/>
-                  <Text text="{= 'ÁFA (' + ${jokers>/quote/vatRate} + '%): ' + ${jokers>/quote/vatAmount} + ' ' + ${jokers>/quote/currency} }"/>
-                  <Text text="{= 'Bruttó összesen: ' + ${jokers>/quote/totalGross} + ' ' + ${jokers>/quote/currency} }" class="sapUiTinyMarginTop"/>
-                </VBox>
+                    <VBox class="quoteFieldRow sapUiMediumMarginTop">
+                      <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiTinyMarginBottom">
+                        <Label text="Árazási megjegyzés"/>
+                        <Button icon="sap-icon://ai" text="Generálás" type="Transparent" press=".onQuoteResultGenerateField" busy="{jokers>/quoteResultGenerateBusy}" class="quoteNoahPillButton">
+                          <customData>
+                            <core:CustomData key="field" value="pricing_block"/>
+                          </customData>
+                        </Button>
+                      </HBox>
+                      <TextArea value="{jokers>/quoteFieldValues/pricing_block}" rows="4" growing="true" width="100%"/>
+                    </VBox>
 
-                <Text text="{jokers>/quote/terms}" wrapping="true" class="sapUiMediumMarginTop"/>
-                <Text text="{jokers>/quote/validity}" wrapping="true" class="sapUiTinyMarginTop"/>
+                    <VBox items="{jokers>/quoteExtraFields}" class="sapUiMediumMarginTop" visible="{= ${jokers>/quoteExtraFields}.length > 0 }">
+                      <items>
+                        <VBox class="quoteFieldRow sapUiTinyMarginBottom">
+                          <Label text="{jokers>label}"/>
+                          <Input value="{jokers>value}"/>
+                        </VBox>
+                      </items>
+                    </VBox>
+                  </VBox>
+                </ScrollContainer>
 
-                <List items="{jokers>/quote/notes}" visible="{= ${jokers>/quote/notes}.length > 0 }" class="sapUiSmallMarginTop" mode="None">
-                  <CustomListItem>
-                    <Text text="{= '- ' + ${jokers>} }" wrapping="true"/>
-                  </CustomListItem>
-                </List>
+                <HBox justifyContent="SpaceBetween" alignItems="Center" class="quoteResultBottomNav sapUiTinyMarginTop">
+                  <Button text="Előző" type="Transparent" press=".onQuoteResultPrev" enabled="{= ${jokers>/quoteResultPage} > 1 }"/>
+                  <Button
+                    text="{= ${jokers>/quoteResultPage} >= 4 ? 'Kész' : 'Következő' }"
+                    type="Emphasized"
+                    press=".onQuoteResultNext"/>
+                </HBox>
               </VBox>
             </Panel>
 

@@ -164,6 +164,104 @@
   cursor: pointer;
 }
 
+.quoteResultBackLink {
+  display: inline-block;
+}
+
+.quoteStepBar {
+  border-bottom: 1px solid rgba(210, 222, 240, 0.9);
+  padding-bottom: 0.4rem;
+  gap: 0.25rem;
+}
+
+.quoteStepBtn .sapMBtnInner {
+  background: transparent;
+  border: none;
+  color: #8c96a6;
+  font-weight: 600;
+  border-radius: 0;
+  padding: 0 0.2rem;
+}
+
+.quoteStepActive .sapMBtnInner {
+  color: #185fa5;
+  border-bottom: 2px solid #185fa5;
+}
+
+.quoteStepDone .sapMBtnInner {
+  color: #185fa5;
+}
+
+.quoteResultScrollArea {
+  border: 1px solid rgba(210, 222, 240, 0.6);
+  border-radius: 0.6rem;
+  background: rgba(248, 250, 253, 0.6);
+  padding: 0.75rem;
+}
+
+.quoteResultPage {
+  gap: 0;
+}
+
+.quoteResultBottomNav {
+  border-top: 1px solid rgba(210, 222, 240, 0.9);
+  padding-top: 0.6rem;
+}
+
+.quoteNoahPillButton {
+  border-radius: 999px;
+}
+
+.quoteNoahPillButton .sapMBtnInner {
+  background: #eaf2fd;
+  border: 1px solid rgba(150, 180, 222, 0.6);
+  border-radius: 999px;
+  color: #185fa5;
+  font-weight: 600;
+  height: 1.8rem;
+  padding: 0 0.7rem;
+}
+
+.quotePriceGrid {
+  border: 1px solid rgba(210, 222, 240, 0.9);
+  border-radius: 0.6rem;
+  overflow: hidden;
+}
+
+.quotePriceGridRow {
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid rgba(210, 222, 240, 0.6);
+}
+
+.quotePriceGridRow:last-child {
+  border-bottom: none;
+}
+
+.quotePriceGridHeaderRow {
+  background: #eaf2fd;
+}
+
+.quotePriceGridCell {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.quotePriceGridHeaderCell {
+  font-weight: 600;
+  color: #344a63;
+  font-size: 0.8rem;
+}
+
+.quotePriceGridCellNarrow {
+  flex: 0 0 5.5rem;
+}
+
+.quoteTotalField {
+  flex: 1 1 0;
+  min-width: 7rem;
+}
+
 .kpiDiscoveryHeaderToolbar {
   background: transparent;
   padding: 0 0.25rem;

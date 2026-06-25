@@ -8838,17 +8838,31 @@ app.post("/api/jokers/quote-builder/render", async function(req, res) {
   try {
     const sessionId = String(req.body && req.body.sessionId ? req.body.sessionId : "").trim();
     const editedQuote = req.body && req.body.quote && typeof req.body.quote === "object" ? req.body.quote : {};
+    const manualValues = req.body && req.body.placeholderValues && typeof req.body.placeholderValues === "object" ? req.body.placeholderValues : null;
     const session = oQuoteSessions.get(sessionId);
     if (!session || !session.quote) {
       res.status(404).json({ error: "Nincs modosithato arajanlat preview. Generalj eloszor ajanlatot." });
       return;
     }
     session.quote = normalizeQuoteDraft(Object.assign({}, session.quote, editedQuote));
+    if (manualValues && Array.isArray(session.templatePlaceholders) && session.templatePlaceholders.length > 0) {
+      // A State 2 mezoform aktualis ertekei felulirjak a sessionben tartott
+      // placeholder ertekeket, igy a PDF frissites a felhasznalo altal
+      // szerkesztett szoveggel megy ki, nem a regi/generalt ertekekkel.
+      const normalized = normalizePlaceholderValues(manualValues);
+      session.templatePlaceholders.forEach(function(name) {
+        if (normalized[name] != null) {
+          session.placeholderValues[name] = normalized[name];
+        }
+      });
+    }
     await renderQuoteDocuments(session);
     res.json({
       sessionId: session.sessionId,
       summary: quotePlainText(session.quote),
       quote: session.quote,
+      templatePlaceholders: session.templatePlaceholders,
+      placeholderValues: session.placeholderValues,
       previewUrl: "/api/jokers/quote-builder/preview/" + encodeURIComponent(session.sessionId) + "?v=" + encodeURIComponent(session.updatedAt),
       pdfDownloadUrl: "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/pdf",
       docxDownloadUrl: "/api/jokers/quote-builder/download/" + encodeURIComponent(session.sessionId) + "/docx",
