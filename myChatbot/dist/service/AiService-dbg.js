@@ -745,11 +745,14 @@
     var iParsedLimit = Number(iLimit || 10);
     var iSafeLimit = Number.isFinite(iParsedLimit) ? Math.max(1, Math.min(iParsedLimit, 50)) : 10;
     return fetch("/api/reports/feed?limit=" + encodeURIComponent(String(iSafeLimit)), {
-      method: "GET"
+      method: "GET",
+      credentials: "same-origin"
     }).then(function(oResponse) {
       if (!oResponse.ok) {
         return oResponse.text().then(function(sError) {
-          throw new Error("API hiba: " + sError);
+          var oHttpError = new Error("API hiba: " + sError);
+          oHttpError.status = oResponse.status;
+          throw oHttpError;
         });
       }
       return oResponse.json();
