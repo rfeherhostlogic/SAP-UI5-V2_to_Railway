@@ -514,6 +514,28 @@
     });
   }
 
+  function generateQuoteBlockField(mPayload) {
+    return fetch("/api/jokers/quote-builder/generate-block-field", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        sessionId: mPayload.sessionId || "",
+        placeholderName: mPayload.placeholderName || "",
+        contextText: mPayload.contextText || "",
+        placeholderValues: mPayload.placeholderValues || {}
+      })
+    }).then(function(oResponse) {
+      if (!oResponse.ok) {
+        return oResponse.text().then(function(sError) {
+          throw new Error("API hiba: " + sError);
+        });
+      }
+      return oResponse.json();
+    });
+  }
+
   function generateQuote(mPayload) {
     return fetch("/api/jokers/quote-builder/generate", {
       method: "POST",
@@ -1395,6 +1417,7 @@
     summarizeDummy5: summarizeDummy5,
     askDummy5: askDummy5,
     uploadQuoteTemplate: uploadQuoteTemplate,
+    generateQuoteBlockField: generateQuoteBlockField,
     generateQuote: generateQuote,
     reviseQuote: reviseQuote,
     renderQuote: renderQuote,

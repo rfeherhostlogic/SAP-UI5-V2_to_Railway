@@ -162,9 +162,11 @@ sap.ui.define([
       oModel.setProperty("/quotePdfDownloadUrl", "");
       oModel.setProperty("/quoteDocxDownloadUrl", "");
       oModel.setProperty("/quoteChatMessages", []);
-      // Az elozo sablon placeholder-listaja azonnal eltunik, meg mielott az
-      // uj feltoltes valasza megerkezik.
+      // Az elozo sablon mezoformja azonnal eltunik, meg mielott az uj
+      // feltoltes valasza megerkezik.
       oModel.setProperty("/quoteTemplatePlaceholders", []);
+      oModel.setProperty("/quoteTemplateFields", []);
+      oModel.setProperty("/quoteCanGenerate", false);
       oModel.setProperty("/quoteMissingPlaceholders", []);
       oModel.setProperty("/quotePlaceholderValues", {});
 
@@ -174,8 +176,10 @@ sap.ui.define([
         oModel.setProperty("/quoteTemplateFileName", oUpload.templateFileName || oFile.name || "");
         oModel.setProperty("/quoteTemplatePreview", oUpload.templateTextPreview || "");
         oModel.setProperty("/quoteTemplatePlaceholders", Array.isArray(oUpload.templatePlaceholders) ? oUpload.templatePlaceholders : []);
+        oModel.setProperty("/quoteTemplateFields", this._buildQuoteTemplateFields(oUpload));
         oModel.setProperty("/quoteMissingPlaceholders", Array.isArray(oUpload.missingPlaceholders) ? oUpload.missingPlaceholders : []);
         oModel.setProperty("/quotePlaceholderValues", {});
+        this._updateQuoteGenerateButtonState();
         MessageToast.show(oUpload.message || "Sablon feltoltve.");
       } catch (oError) {
         oModel.setProperty("/quoteError", oError && oError.message ? oError.message : "Sablon feltoltesi hiba.");
@@ -191,6 +195,8 @@ sap.ui.define([
       oModel.setProperty("/quoteTemplateFileName", "");
       oModel.setProperty("/quoteTemplatePreview", "");
       oModel.setProperty("/quoteTemplatePlaceholders", []);
+      oModel.setProperty("/quoteTemplateFields", []);
+      oModel.setProperty("/quoteCanGenerate", false);
       oModel.setProperty("/quoteMissingPlaceholders", []);
       oModel.setProperty("/quotePlaceholderValues", {});
       oModel.setProperty("/quoteState", "input");
@@ -205,6 +211,109 @@ sap.ui.define([
       if (oFileUploader && oFileUploader.clear) {
         oFileUploader.clear();
       }
+    },
+
+    // A feltoltesi valasz "templatePlaceholderFields" mezojebol epiti fel a
+    // szerkesztheto mezo-tomb modellt (name/label/group/value/busy). Ha a
+    // szerver valamiert nem kuldte vissza a besorolast, egyszeru
+    // visszaesesi mezokent kezeljuk az adott placeholdert.
+    _buildQuoteTemplateFields: function(oUpload) {
+      var aClassified = Array.isArray(oUpload && oUpload.templatePlaceholderFields) ? oUpload.templatePlaceholderFields : null;
+      if (aClassified) {
+        return aClassified.map(function(oField) {
+          return {
+            name: oField.name,
+            label: oField.label || oField.name,
+            group: oField.group === "block" ? "block" : "simple",
+            value: "",
+            busy: false
+          };
+        });
+      }
+      var aNames = Array.isArray(oUpload && oUpload.templatePlaceholders) ? oUpload.templatePlaceholders : [];
+      return aNames.map(function(sName) {
+        return { name: sName, label: sName, group: "simple", value: "", busy: false };
+      });
+    },
+
+    // "Azonositott mezok" - egyszeru mezo erteket kezzel adja meg a
+    // felhasznalo, ezert minden valtozaskor frissitjuk a generalas gomb
+    // engedelyezettseget.
+    onQuoteFieldValueChange: function() {
+      this._updateQuoteGenerateButtonState();
+    },
+
+    onQuoteGenerateBlockField: async function(oEvent) {
+      var oModel = this.getView().getModel("jokers");
+      var oContext = oEvent.getSource().getBindingContext("jokers");
+      if (!oContext) {
+        return;
+      }
+      var sPath = oContext.getPath();
+      var oField = oContext.getObject();
+      var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
+      var sContext = (oModel.getProperty("/quoteContextText") || "").trim();
+
+      if (!sSessionId) {
+        MessageToast.show("Elobb tolts fel egy sablont.");
+        return;
+      }
+      if (!sContext) {
+        MessageToast.show("Az ajanlat kontextusat add meg.");
+        return;
+      }
+
+      oModel.setProperty(sPath + "/busy", true);
+      try {
+        var oResult = await AiService.generateQuoteBlockField({
+          sessionId: sSessionId,
+          placeholderName: oField.name,
+          contextText: sContext,
+          placeholderValues: this._collectQuotePlaceholderValues()
+        });
+        oModel.setProperty(sPath + "/value", oResult.value || "");
+      } catch (oError) {
+        MessageToast.show(oError && oError.message ? oError.message : "Mezo generalasi hiba.");
+      } finally {
+        oModel.setProperty(sPath + "/busy", false);
+      }
+    },
+
+    // A "simple" csoport minden mezojenek kell ertekkel rendelkeznie, hogy
+    // az "Arajanlat generalasa" gomb engedelyezve legyen.
+    _updateQuoteGenerateButtonState: function() {
+      var oModel = this.getView().getModel("jokers");
+      var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
+      var aFields = oModel.getProperty("/quoteTemplateFields") || [];
+      var bAllSimpleFilled = aFields
+        .filter(function(oField) { return oField.group === "simple"; })
+        .every(function(oField) { return !!String(oField.value || "").trim(); });
+      oModel.setProperty("/quoteCanGenerate", !!sSessionId && bAllSimpleFilled);
+    },
+
+    _collectQuotePlaceholderValues: function() {
+      var oModel = this.getView().getModel("jokers");
+      var aFields = oModel.getProperty("/quoteTemplateFields") || [];
+      var mValues = {};
+      aFields.forEach(function(oField) {
+        mValues[oField.name] = oField.value || "";
+      });
+      return mValues;
+    },
+
+    // A generalas/modositas valaszaban kapott vegleges ertekekkel (pl. AI
+    // altal kitoltott "block" mezok) frissiti a mezoforma sorait, hogy a
+    // felhasznalo lathassa es szerkeszthesse azokat.
+    _syncQuoteTemplateFieldsFromValues: function(mValues) {
+      if (!mValues) {
+        return;
+      }
+      var oModel = this.getView().getModel("jokers");
+      var aFields = (oModel.getProperty("/quoteTemplateFields") || []).map(function(oField) {
+        var vValue = mValues[oField.name];
+        return vValue == null ? oField : Object.assign({}, oField, { value: String(vValue) });
+      });
+      oModel.setProperty("/quoteTemplateFields", aFields);
     },
 
     onQuoteTextSampleChange: function(oEvent) {
@@ -233,6 +342,10 @@ sap.ui.define([
         MessageToast.show("Az ajanlat kontextusat add meg.");
         return;
       }
+      if (!oModel.getProperty("/quoteCanGenerate")) {
+        MessageToast.show("Toltsd ki az osszes egyszeru mezot a generalas elott.");
+        return;
+      }
 
       oModel.setProperty("/quoteBusy", true);
       oModel.setProperty("/quoteError", "");
@@ -240,7 +353,7 @@ sap.ui.define([
         var oResult = await AiService.generateQuote({
           sessionId: sSessionId,
           contextText: sContext,
-          placeholderValues: {},
+          placeholderValues: this._collectQuotePlaceholderValues(),
           force: true
         });
         this._applyQuoteResult(oResult, true);
@@ -273,7 +386,7 @@ sap.ui.define([
         var oResult = await AiService.reviseQuote({
           sessionId: sSessionId,
           message: sMessage,
-          placeholderValues: {},
+          placeholderValues: this._collectQuotePlaceholderValues(),
           force: true,
           skipRender: true
         });
@@ -376,6 +489,7 @@ sap.ui.define([
       }
       if (oResult && oResult.placeholderValues) {
         oModel.setProperty("/quotePlaceholderValues", oResult.placeholderValues);
+        this._syncQuoteTemplateFieldsFromValues(oResult.placeholderValues);
       }
       if (Array.isArray(oResult && oResult.chatMessages)) {
         oModel.setProperty("/quoteChatMessages", oResult.chatMessages);

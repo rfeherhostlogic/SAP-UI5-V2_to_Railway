@@ -1217,13 +1217,74 @@ function readDocxTemplatePlaceholders(buffer, fallbackText) {
   } catch (err) {
     console.warn("[quote] DOCX placeholder extraction failed", err && err.message ? err.message : String(err));
   }
+  found.sort();
   return found;
 }
 
+// "Block" mezok: bekezdes-hosszu, AI-tamogatott tartalom (Noah gombbal generalhato).
+// Minden mas azonositott placeholder "simple" mezo: rovid, a felhasznalo altal
+// kezzel beirt ertek, AI hivas nelkul.
+const QUOTE_GROUP_B_PLACEHOLDERS = [
+  "service_scope_summary",
+  "confidentiality_validity_block",
+  "scope_block",
+  "product_introduction",
+  "pricing_block"
+];
+
+const QUOTE_PLACEHOLDER_LABELS = {
+  customer_legal_name: "Ügyfél teljes neve",
+  customer_short_name: "Ügyfél rövid neve",
+  proposal_title: "Ajánlat címe",
+  proposal_subtitle: "Ajánlat alcíme",
+  provider_legal_name: "Szolgáltató teljes neve",
+  provider_short_name: "Szolgáltató rövid neve",
+  provider_role: "Szolgáltató szerepe",
+  validity_period: "Érvényesség (nap)",
+  item_1_name: "1. tétel neve",
+  item_1_days: "1. tétel napok száma",
+  item_1_net: "1. tétel nettó ára",
+  item_2_name: "2. tétel neve",
+  item_2_days: "2. tétel napok száma",
+  item_2_net: "2. tétel nettó ára",
+  item_3_name: "3. tétel neve",
+  item_3_days: "3. tétel napok száma",
+  item_3_net: "3. tétel nettó ára",
+  item_4_name: "4. tétel neve",
+  item_4_days: "4. tétel napok száma",
+  item_4_net: "4. tétel nettó ára",
+  total_net: "Nettó végösszeg",
+  total_discount: "Kedvezmény összege",
+  total_gross: "Bruttó végösszeg",
+  service_scope_summary: "Szolgáltatás összefoglalása",
+  confidentiality_validity_block: "Titoktartási és érvényességi szakasz",
+  scope_block: "Terjedelem leírása",
+  product_introduction: "Termékbemutató",
+  pricing_block: "Árazási szakasz"
+};
+
+function isQuoteGroupBPlaceholder(name) {
+  return QUOTE_GROUP_B_PLACEHOLDERS.indexOf(String(name || "")) >= 0;
+}
+
 function labelForPlaceholder(name) {
-  return String(name || "")
+  const clean = String(name || "");
+  if (QUOTE_PLACEHOLDER_LABELS[clean]) {
+    return QUOTE_PLACEHOLDER_LABELS[clean];
+  }
+  return clean
     .replace(/_/g, " ")
     .replace(/\b\w/g, function(ch) { return ch.toUpperCase(); });
+}
+
+function classifyQuotePlaceholders(names) {
+  return (names || []).map(function(name) {
+    return {
+      name: name,
+      label: labelForPlaceholder(name),
+      group: isQuoteGroupBPlaceholder(name) ? "block" : "simple"
+    };
+  });
 }
 
 function normalizePlaceholderValues(values) {
@@ -1427,50 +1488,50 @@ async function generateQuoteDraft(session, contextText, revisionText) {
   });
 }
 
-async function generateQuotePlaceholderValues(session, contextText, revisionText, manualValues) {
-  const placeholders = Array.isArray(session && session.templatePlaceholders) ? session.templatePlaceholders : [];
-  const manual = normalizePlaceholderValues(manualValues);
-  if (placeholders.length === 0) {
-    return { values: manual, missingPlaceholders: [] };
+// Szigoru, hallucinacio-mentes prompt egyetlen "block" placeholder kitoltesehez.
+// Csak a megadott kontextusra es a felhasznalo altal mar megerositett "simple"
+// mezoertekekre tamaszkodhat - semmilyen tenyadatot (nev, ar, datum, mennyiseg)
+// nem talalhat ki.
+async function generateQuoteBlockFieldWithAi(placeholderName, contextText, knownValues, extraGrounding) {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY hianyzik a placeholder generalashoz.");
   }
 
-  const quote = session && session.quote ? normalizeQuoteDraft(session.quote) : normalizeQuoteDraft({});
-  const prices = await retrieveQuotePrices(contextText);
-  let productIntro = "";
-  if (placeholders.indexOf("product_introduction") >= 0 && !manual.product_introduction) {
-    productIntro = await retrieveProductIntroduction(contextText);
-  }
+  const knownValuesText = Object.keys(knownValues || {})
+    .filter(function(key) { return String(knownValues[key] || "").trim(); })
+    .map(function(key) { return key + " = " + knownValues[key]; })
+    .join("\n");
 
-  const prompt = [
-    "Toltsd ki egy Word arajanlat sablon placeholder ertekeit magyarul.",
-    "Csak JSON objektumot adj vissza ilyen formatumban:",
-    "{\"values\":{\"placeholder\":\"ertek\"},\"missing\":{\"placeholder\":\"rovid ok\"}}",
-    "Ha egy placeholder erteke nem allapithato meg a kontextusbol, ne talald ki: hagyd ki a values-bol vagy adj ures stringet, es tedd a missing objektumba.",
-    "A manualValues ertekeit kotelezo megtartani.",
-    "A product_introduction ertekehez a megadott termekbemutato forrast hasznald.",
-    "A pricing es item mezoknel a vector store areredmenyt hasznald, ne talalj ki arat.",
+  const systemPrompt = [
+    "Profi uzleti ajanlatiro vagy. Az egyetlen feladatod egy magyar nyelvu uzleti",
+    "ajanlat dokumentum egy adott szakaszanak (placeholder) kitoltese.",
     "",
-    "Placeholderek:",
-    placeholders.join(", "),
+    "Kapni fogod:",
+    "1. A kitoltendo szakasz/placeholder nevet.",
+    "2. A felhasznalo altal megadott kontextust az ugyletrol.",
+    "3. A felhasznalo altal mar megerositett egyszeru mezoertekeket.",
     "",
-    "Manualis ertekek:",
-    JSON.stringify(manual),
+    "SZIGORU SZABALYOK - megsertesuk tonkreteszi a dokumentumot:",
+    "- Csak olyan tenyeket hasznalj, amelyek kifejezetten szerepelnek a megadott",
+    "  kontextusban vagy a megerositett mezoertekek kozott.",
+    "- SOHA ne talalj ki, ne tegyezz fel, es ne hallucinalj ugyfelneveket, cegneveket,",
+    "  termekneveket, arakat, datumokat, mennyisegeket vagy barmilyen tenyadatot.",
+    "- Ha a kontextus nem tartalmaz eleg informaciot a szakasz kitoltesehez, csak azt",
+    "  ird le, amiben biztos vagy, a hianyzo reszeket jelold '[TÖLTSE KI]' jelolessel.",
+    "- Magyarul irj.",
+    "- Kizarolag a szakasz szoveget add vissza - ne irj bevezetot, magyarazatot,",
+    "  markdown jelolest vagy meta-kommentart."
+  ].join("\n");
+
+  const userPrompt = [
+    "Kitoltendo szakasz: " + placeholderName,
     "",
-    "Ajanlat osszefoglalo:",
-    quoteTemplateSummary(quote),
+    "Felhasznalo altal megerositett mezoertekek:",
+    knownValuesText || "(nincs megerositett mezoertek)",
+    extraGrounding || "",
     "",
-    "Vector store areredmeny:",
-    JSON.stringify(prices).slice(0, 8000),
-    "",
-    "Termekbemutato forras:",
-    productIntro || "(nincs termekbemutato talalat)",
-    "",
-    "Sablon szoveges minta:",
-    String(session && session.templateText ? session.templateText : "").slice(0, 6000),
-    "",
-    "Felhasznaloi kontextus:",
-    String(contextText || "").slice(0, 12000),
-    revisionText ? "\nModositasi keres:\n" + String(revisionText || "").slice(0, 4000) : ""
+    "Felhasznalo altal megadott kontextus:",
+    String(contextText || "").slice(0, 8000)
   ].filter(Boolean).join("\n");
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -1481,28 +1542,78 @@ async function generateQuotePlaceholderValues(session, contextText, revisionText
     },
     body: JSON.stringify({
       model: OPENAI_MODEL,
-      instructions: "Word sablon placeholder kitolto asszisztens vagy. Kizarolag valid JSON objektumot adj vissza.",
-      input: prompt
+      instructions: systemPrompt,
+      input: userPrompt
     })
   });
   const raw = await response.text();
   const json = parseOpenAiReply(raw);
   if (!response.ok) {
-    throw new Error("Placeholder kitoltesi OpenAI hiba: " + (raw || response.status));
+    throw new Error("Placeholder (" + placeholderName + ") generalasi OpenAI hiba: " + (raw || response.status));
   }
-  const parsed = parseJsonObjectFromText(extractResponsesOutputText(json)) || {};
-  const values = Object.assign({}, normalizePlaceholderValues(parsed.values || {}), manual);
-  if (productIntro && !values.product_introduction) {
-    values.product_introduction = productIntro;
+  return String(extractResponsesOutputText(json) || "").trim();
+}
+
+// Egyetlen "block" placeholder AI-tamogatott generalasa (Noah gomb). A
+// product_introduction/pricing_block mezok a mar meglevo, vector store-alapu
+// visszakereseseket hasznaljak (nem parhuzamos adatforras-logika), minden mas
+// block mezo a szigoru, hallucinacio-mentes prompton megy at.
+async function generateSingleQuoteBlockField(placeholderName, contextText, knownValues) {
+  if (placeholderName === "product_introduction") {
+    return retrieveProductIntroduction(contextText);
+  }
+  if (placeholderName === "pricing_block") {
+    const prices = await retrieveQuotePrices(contextText);
+    return generateQuoteBlockFieldWithAi(
+      placeholderName,
+      contextText,
+      knownValues,
+      "Vector store areredmeny (csak ezekre az arakra tamaszkodhatsz, ne talalj ki arat):\n" + JSON.stringify(prices).slice(0, 6000)
+    );
+  }
+  return generateQuoteBlockFieldWithAi(placeholderName, contextText, knownValues, "");
+}
+
+// Fazis 3a/3b: a "simple" mezok kizarolag a felhasznalo altal beirt ertekkel
+// toltodnek ki (nincs AI hivas), a "block" mezok pedig - ha a felhasznalo meg
+// nem irt/szerkesztett bele szoveget - egyenkent, a szigoru anti-hallucinacios
+// prompttal generalodnak.
+async function generateQuotePlaceholderValues(session, contextText, manualValues) {
+  const placeholders = Array.isArray(session && session.templatePlaceholders) ? session.templatePlaceholders : [];
+  const manual = normalizePlaceholderValues(manualValues);
+  if (placeholders.length === 0) {
+    return { values: manual, missingPlaceholders: [] };
   }
 
-  placeholders.forEach(function(name) {
-    if (values[name] == null) {
+  const values = {};
+  const missingReasons = {};
+
+  for (let i = 0; i < placeholders.length; i += 1) {
+    const name = placeholders[i];
+    const manualValue = manual[name] || "";
+
+    if (!isQuoteGroupBPlaceholder(name)) {
+      values[name] = manualValue;
+      continue;
+    }
+
+    if (manualValue) {
+      values[name] = manualValue;
+      continue;
+    }
+
+    try {
+      values[name] = await generateSingleQuoteBlockField(name, contextText, manual);
+    } catch (err) {
+      console.warn("[quote] Block placeholder generalasi hiba (" + name + ")", err && err.message ? err.message : String(err));
       values[name] = "";
     }
-  });
 
-  const missingReasons = parsed.missing || {};
+    if (!String(values[name] || "").trim()) {
+      missingReasons[name] = "Az AI nem tudott eleg informaciot megallapitani a kontextusbol.";
+    }
+  }
+
   const missingPlaceholders = createMissingPlaceholderItems(placeholders, values, missingReasons);
   return {
     values: values,
@@ -1522,9 +1633,12 @@ function tableCell(text, bold) {
 async function buildQuoteDocxBuffer(quote, session) {
   if (session && session.templateBuffer && Array.isArray(session.templatePlaceholders) && session.templatePlaceholders.length > 0) {
     const values = normalizePlaceholderValues(session.placeholderValues || {});
+    // Fazis 3c: a vegleges dokumentumban soha nem maradhat nyers {{...}} token -
+    // minden olyan placeholder, amelyhez nem szuletett ertek, '[TÖLTSE KI]'
+    // jelolest kap, igy a hianyossag lathato es szandekosan jelolt marad.
     session.templatePlaceholders.forEach(function(name) {
-      if (values[name] == null) {
-        values[name] = "";
+      if (!String(values[name] || "").trim()) {
+        values[name] = "[TÖLTSE KI]";
       }
     });
     const zip = new PizZip(session.templateBuffer);
@@ -1536,7 +1650,7 @@ async function buildQuoteDocxBuffer(quote, session) {
         end: "}}"
       },
       nullGetter: function() {
-        return "";
+        return "[TÖLTSE KI]";
       }
     });
     doc.render(values);
@@ -8562,12 +8676,43 @@ app.post("/api/jokers/quote-builder/upload-template", oQuoteTemplateUpload.singl
       templateFileName: name,
       templateTextPreview: templateText.slice(0, 1200),
       templatePlaceholders: templatePlaceholders,
+      templatePlaceholderFields: classifyQuotePlaceholders(templatePlaceholders),
       missingPlaceholders: createMissingPlaceholderItems(templatePlaceholders, {}, {}),
       message: templateText ? "Sablon feltoltve es szoveges minta kinyerve." : "Sablon feltoltve. A .doc fajlbol nem keszult szoveges minta, de a dokumentum referenciakent megmarad."
     });
   } catch (err) {
     res.status(500).json({
       error: "Arajanlat sablon feltoltesi hiba",
+      details: err && err.message ? err.message : String(err)
+    });
+  }
+});
+
+app.post("/api/jokers/quote-builder/generate-block-field", async function(req, res) {
+  try {
+    const sessionId = String(req.body && req.body.sessionId ? req.body.sessionId : "").trim();
+    const placeholderName = String(req.body && req.body.placeholderName ? req.body.placeholderName : "").trim();
+    const contextText = String(req.body && req.body.contextText ? req.body.contextText : "").trim();
+    const manualValues = req.body && req.body.placeholderValues ? req.body.placeholderValues : {};
+    const session = oQuoteSessions.get(sessionId);
+    if (!session) {
+      res.status(404).json({ error: "Az arajanlat session nem erheto el. Toltsd fel ujra a sablont." });
+      return;
+    }
+    if (!placeholderName || !isQuoteGroupBPlaceholder(placeholderName)) {
+      res.status(400).json({ error: "Ismeretlen vagy nem AI-generalhato mezo." });
+      return;
+    }
+    if (!contextText) {
+      res.status(400).json({ error: "A kontextus mezot toltsd ki." });
+      return;
+    }
+    const manual = normalizePlaceholderValues(manualValues);
+    const value = await generateSingleQuoteBlockField(placeholderName, contextText, manual);
+    res.json({ placeholderName: placeholderName, value: value });
+  } catch (err) {
+    res.status(500).json({
+      error: "Mezo generalasi hiba",
       details: err && err.message ? err.message : String(err)
     });
   }
@@ -8590,7 +8735,7 @@ app.post("/api/jokers/quote-builder/generate", async function(req, res) {
     }
     session.contextText = contextText;
     session.quote = await generateQuoteDraft(session, contextText, "");
-    const placeholderResult = await generateQuotePlaceholderValues(session, contextText, "", manualValues);
+    const placeholderResult = await generateQuotePlaceholderValues(session, contextText, manualValues);
     session.placeholderValues = placeholderResult.values;
     session.missingPlaceholders = placeholderResult.missingPlaceholders;
     if (session.missingPlaceholders.length > 0 && !force) {
@@ -8646,7 +8791,7 @@ app.post("/api/jokers/quote-builder/revise", async function(req, res) {
     }
     session.chatMessages.push({ role: "user", text: message, at: new Date().toISOString() });
     session.quote = await generateQuoteDraft(session, session.contextText, message);
-    const placeholderResult = await generateQuotePlaceholderValues(session, session.contextText, message, Object.assign({}, session.placeholderValues || {}, manualValues));
+    const placeholderResult = await generateQuotePlaceholderValues(session, session.contextText, Object.assign({}, session.placeholderValues || {}, manualValues));
     session.placeholderValues = placeholderResult.values;
     session.missingPlaceholders = placeholderResult.missingPlaceholders;
     if (session.missingPlaceholders.length > 0 && !force) {
@@ -10777,5 +10922,10 @@ module.exports = {
   convertDocxToPdfBuffer,
   extractTemplatePlaceholders,
   extractDocxXmlPlainText,
-  readDocxTemplatePlaceholders
+  readDocxTemplatePlaceholders,
+  isQuoteGroupBPlaceholder,
+  labelForPlaceholder,
+  classifyQuotePlaceholders,
+  generateQuotePlaceholderValues,
+  buildQuoteDocxBuffer
 };

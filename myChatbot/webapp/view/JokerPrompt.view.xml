@@ -211,31 +211,61 @@
             width="100%"
             placeholder="Pl.: Az ügyfél 50 darab terméket szeretne rendelni mennyiségi kedvezménnyel, 15 napos fizetési határidővel, a szállítást jövő hónap elejére kérik."/>
 
+          <Panel headerText="Azonosított mezők" expandable="true" expanded="true" class="quoteTemplateAccordion sapUiMediumMarginTop">
+            <VBox class="sapUiSmallMargin">
+              <Text text="A feltöltött Word sablonban automatikusan felismert mezők. Az egyszerű mezőket kézzel töltsd ki, a hosszabb szakaszokat a Noah gombbal generálhatod a megadott kontextusból." wrapping="true" class="sapUiTinyMarginBottom"/>
+              <MessageStrip
+                text="Nem található placeholder a feltöltött sablonban."
+                type="Information"
+                showIcon="true"
+                showCloseButton="false"
+                visible="{= ${jokers>/quoteTemplateFields}.length === 0 }"/>
+
+              <VBox items="{path: 'jokers>/quoteTemplateFields', filters: [{path: 'group', operator: 'EQ', value1: 'simple'}]}" class="quoteFieldGroup">
+                <items>
+                  <VBox class="quoteFieldRow">
+                    <Label text="{jokers>label}" class="sapUiTinyMarginBottom"/>
+                    <Input value="{jokers>value}" change=".onQuoteFieldValueChange" width="100%"/>
+                  </VBox>
+                </items>
+              </VBox>
+
+              <VBox items="{path: 'jokers>/quoteTemplateFields', filters: [{path: 'group', operator: 'EQ', value1: 'block'}]}" class="quoteFieldGroup sapUiMediumMarginTop">
+                <items>
+                  <VBox class="quoteFieldRow">
+                    <HBox alignItems="Center" justifyContent="SpaceBetween" class="sapUiTinyMarginBottom">
+                      <Label text="{jokers>label}"/>
+                      <HBox alignItems="Center">
+                        <BusyIndicator size="1rem" visible="{jokers>busy}" class="sapUiTinyMarginEnd"/>
+                        <Avatar
+                          initials="N"
+                          displaySize="XS"
+                          press=".onQuoteGenerateBlockField"
+                          tooltip="Noah generálja ezt a szakaszt a megadott kontextusból"
+                          class="chatAvatar noahAvatar quoteNoahFieldAvatar"/>
+                      </HBox>
+                    </HBox>
+                    <TextArea
+                      value="{jokers>value}"
+                      rows="4"
+                      growing="true"
+                      growingMaxLines="10"
+                      width="100%"
+                      change=".onQuoteFieldValueChange"/>
+                  </VBox>
+                </items>
+              </VBox>
+            </VBox>
+          </Panel>
+
           <Button
             text="Ajánlat generálása"
             icon="sap-icon://lightbulb"
             type="Emphasized"
             press=".onGenerateQuote"
             busy="{jokers>/quoteBusy}"
-            enabled="{= ${jokers>/quoteBusy} ? false : (${jokers>/quoteSessionId} ? true : false) }"
+            enabled="{= ${jokers>/quoteBusy} ? false : (${jokers>/quoteCanGenerate} ? true : false) }"
             class="quoteGenerateButton sapUiMediumMarginTop"/>
-
-          <Panel headerText="Azonosított placeholderek" expandable="true" expanded="false" class="quoteTemplateAccordion sapUiMediumMarginTop">
-            <VBox class="sapUiSmallMargin">
-              <Text text="A feltöltött Word sablonban automatikusan felismert placeholderek, kitöltött érték nélkül." wrapping="true" class="sapUiTinyMarginBottom"/>
-              <MessageStrip
-                text="Nem található placeholder a feltöltött sablonban."
-                type="Information"
-                showIcon="true"
-                showCloseButton="false"
-                visible="{= ${jokers>/quoteTemplatePlaceholders}.length === 0 }"/>
-              <FlexBox wrap="Wrap" class="quotePlaceholderChipRow" visible="{= ${jokers>/quoteTemplatePlaceholders}.length > 0 }" items="{jokers>/quoteTemplatePlaceholders}">
-                <items>
-                  <Text text="{jokers>}" class="quotePlaceholderChip"/>
-                </items>
-              </FlexBox>
-            </VBox>
-          </Panel>
         </VBox>
 
         <!-- Allapot 2: generalt ajanlat szerkesztese -->

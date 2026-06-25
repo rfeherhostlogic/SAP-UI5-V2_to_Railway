@@ -599,6 +599,8 @@ sap.ui.define([
 				quoteTemplateFileName: "",
 				quoteTemplatePreview: "",
 				quoteTemplatePlaceholders: [],
+				quoteTemplateFields: [],
+				quoteCanGenerate: false,
 				quoteMissingPlaceholders: [],
 				quotePlaceholderValues: {},
 				quoteContextText: "",
