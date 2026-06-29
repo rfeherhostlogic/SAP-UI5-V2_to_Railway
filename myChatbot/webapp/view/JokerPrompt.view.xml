@@ -226,6 +226,10 @@
                   <VBox class="quoteFieldRow">
                     <Label text="{jokers>label}" class="sapUiTinyMarginBottom"/>
                     <Input value="{jokers>value}" change=".onQuoteFieldValueChange" width="100%"/>
+                    <Text
+                      text="{jokers>documentContext}"
+                      visible="{= !!${jokers>documentContext} }"
+                      class="quoteFieldDocContext sapUiTinyMarginTop"/>
                   </VBox>
                 </items>
               </VBox>
@@ -252,6 +256,10 @@
                       growingMaxLines="10"
                       width="100%"
                       change=".onQuoteFieldValueChange"/>
+                    <Text
+                      text="{jokers>documentContext}"
+                      visible="{= !!${jokers>documentContext} }"
+                      class="quoteFieldDocContext sapUiTinyMarginTop"/>
                   </VBox>
                 </items>
               </VBox>

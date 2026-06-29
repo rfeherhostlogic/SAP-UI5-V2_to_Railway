@@ -5,7 +5,9 @@ const PizZip = require("pizzip");
 const {
   extractTemplatePlaceholders,
   extractDocxXmlPlainText,
+  extractDocxXmlParagraphs,
   readDocxTemplatePlaceholders,
+  buildPlaceholderContextMap,
   isQuoteGroupBPlaceholder,
   labelForPlaceholder,
   classifyQuotePlaceholders,
@@ -78,15 +80,68 @@ test("labelForPlaceholder falls back to a readable title for unknown fields", fu
   assert.equal(labelForPlaceholder("some_unknown_field"), "Some Unknown Field");
 });
 
-test("classifyQuotePlaceholders attaches name/label/group to every placeholder", function() {
+test("classifyQuotePlaceholders attaches name/label/group/documentContext to every placeholder", function() {
   const classified = classifyQuotePlaceholders(["customer_legal_name", "pricing_block"]);
   assert.deepEqual(classified, [
-    { name: "customer_legal_name", label: "Ügyfél teljes neve", group: "simple" },
-    { name: "pricing_block", label: "Árazási szakasz", group: "block" }
+    { name: "customer_legal_name", label: "Ügyfél teljes neve", group: "simple", documentContext: "" },
+    { name: "pricing_block", label: "Árazási szakasz", group: "block", documentContext: "" }
   ]);
 });
 
-test("generateQuotePlaceholderValues uses manual values directly with no AI call when all fields are provided", async function() {
+test("classifyQuotePlaceholders includes documentContext from contextMap when provided", function() {
+  const contextMap = { customer_legal_name: "Jelen ajánlat {{customer_legal_name}} részére készült." };
+  const classified = classifyQuotePlaceholders(["customer_legal_name", "pricing_block"], contextMap);
+  assert.equal(classified[0].documentContext, "Jelen ajánlat {{customer_legal_name}} részére készült.");
+  assert.equal(classified[1].documentContext, "");
+});
+
+test("extractDocxXmlParagraphs splits XML into paragraph text strings", function() {
+  const xml = [
+    "<w:p><w:r><w:t>Elso bekezdes.</w:t></w:r></w:p>",
+    "<w:p><w:r><w:t>Masodik bekezdes {{cegnev}} szoveggel.</w:t></w:r></w:p>",
+    "<w:p><w:r><w:t>Harmadik bekezdes.</w:t></w:r></w:p>"
+  ].join("");
+  const paras = extractDocxXmlParagraphs(xml);
+  assert.equal(paras.length, 3);
+  assert.equal(paras[1], "Masodik bekezdes {{cegnev}} szoveggel.");
+});
+
+test("buildPlaceholderContextMap returns the paragraph containing each placeholder", function() {
+  // Both sentences are >60 chars without their placeholder, so no neighbour expansion occurs.
+  const cegnev = "Jelen ajanlat kizarolag {{customer_legal_name}} szamara keszult es bizalmasan kezelendo.";
+  const ervenyesseg = "Az ajanlat {{validity_period}} napig ervenyes a kiallitas datumatol szamitott lejartaig.";
+  const documentXml = [
+    "<w:p><w:r><w:t>Bevezeto mondat elszigeteleshez.</w:t></w:r></w:p>",
+    "<w:p><w:r><w:t>" + cegnev + "</w:t></w:r></w:p>",
+    "<w:p><w:r><w:t>" + ervenyesseg + "</w:t></w:r></w:p>"
+  ].join("");
+  const buffer = buildDocxBuffer({ "word/document.xml": documentXml });
+  const contextMap = buildPlaceholderContextMap(buffer);
+  assert.equal(contextMap["customer_legal_name"], cegnev);
+  assert.equal(contextMap["validity_period"], ervenyesseg);
+});
+
+test("buildPlaceholderContextMap expands context for short paragraphs with adjacent sentences", function() {
+  const documentXml = [
+    "<w:p><w:r><w:t>Az ajanlat a kovetkező felek kozott jontre.</w:t></w:r></w:p>",
+    "<w:p><w:r><w:t>{{customer_legal_name}}</w:t></w:r></w:p>",
+    "<w:p><w:r><w:t>mint megrendelő reszere.</w:t></w:r></w:p>"
+  ].join("");
+  const buffer = buildDocxBuffer({ "word/document.xml": documentXml });
+  const contextMap = buildPlaceholderContextMap(buffer);
+  // Short paragraph → should include neighbors
+  assert.ok(contextMap["customer_legal_name"].includes("{{customer_legal_name}}"));
+  assert.ok(contextMap["customer_legal_name"].includes("Az ajanlat"));
+  assert.ok(contextMap["customer_legal_name"].includes("mint megrendelő"));
+});
+
+test("buildPlaceholderContextMap returns empty object for buffer with no placeholders", function() {
+  const buffer = buildDocxBuffer({ "word/document.xml": "<w:p><w:r><w:t>Nincs token.</w:t></w:r></w:p>" });
+  const contextMap = buildPlaceholderContextMap(buffer);
+  assert.deepEqual(contextMap, {});
+});
+
+test("generateQuotePlaceholderValues uses manual values when no placeholderContextMap in session", async function() {
   const session = {
     templatePlaceholders: ["customer_legal_name", "scope_block"]
   };
@@ -95,11 +150,12 @@ test("generateQuotePlaceholderValues uses manual values directly with no AI call
     scope_block: "A projekt 3 honapig tart."
   };
   const result = await generateQuotePlaceholderValues(session, "Context szoveg", manualValues);
-  assert.deepEqual(result.values, manualValues);
+  assert.equal(result.values["customer_legal_name"], "Acme Kft.");
+  assert.equal(result.values["scope_block"], "A projekt 3 honapig tart.");
   assert.deepEqual(result.missingPlaceholders, []);
 });
 
-test("generateQuotePlaceholderValues never sends a simple field to AI even if empty", async function() {
+test("generateQuotePlaceholderValues sets empty simple field as missing when no context map", async function() {
   const session = {
     templatePlaceholders: ["customer_legal_name"]
   };

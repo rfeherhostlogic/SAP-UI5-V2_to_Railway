@@ -1193,6 +1193,79 @@ function extractDocxXmlPlainText(xml) {
     .replace(/&amp;/g, "&");
 }
 
+// Paragraph-szintu szetvalasat vegzi a DOCX XML-ben: minden <w:p> elem szoveget
+// kulon elemkent adja vissza. Ezzel megoldhato a mondatkontextus kinyerese.
+function extractDocxXmlParagraphs(xml) {
+  const paragraphs = [];
+  String(xml || "").replace(/<w:p(?:\s[^>]*)?>([\s\S]*?)<\/w:p>/g, function(_match, inner) {
+    const parts = [];
+    inner.replace(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g, function(_m, t) {
+      parts.push(t);
+    });
+    const text = parts.join("")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, "\"")
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, "&");
+    if (text.trim()) {
+      paragraphs.push(text);
+    }
+  });
+  return paragraphs;
+}
+
+// Minden placeholder neve melle megkeresi a dokumentumban azt a mondatot /
+// bekezdespaart, amelybe a mezo bele fog kerulni. Az eredmeny egy map:
+// { placeholder_neve: "...a kontextus-mondat a {{placeholder_neve}} tokennel..." }
+// Csak a word/document.xml-t es a tobbi word/*.xml allomanyt vizsgalja (ugyanugy,
+// mint a readDocxTemplatePlaceholders), de a bekezdeshatarokat megorizve.
+function buildPlaceholderContextMap(buffer) {
+  const contextMap = {};
+  if (!buffer) {
+    return contextMap;
+  }
+  try {
+    const zip = new PizZip(buffer);
+    const files = zip.files || {};
+    Object.keys(files).forEach(function(name) {
+      if (!/^word\/.*\.xml$/i.test(name)) {
+        return;
+      }
+      const file = zip.file(name);
+      const xml = file ? file.asText() : "";
+      const paragraphs = extractDocxXmlParagraphs(xml);
+      paragraphs.forEach(function(para, idx) {
+        String(para).replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, function(_m, phName) {
+          const clean = String(phName || "").trim();
+          if (!clean || contextMap[clean]) {
+            return;
+          }
+          // Ha a bekezdes rovid (a placeholderen kivul kevesebb mint 60 karakter),
+          // hozzacsatoljuk a szomszedos bekezdeseket is, hogy a kontextus ertelmes legyen.
+          const paraWithout = para.replace(/\{\{[^}]*\}\}/g, "").trim();
+          let context = para;
+          if (paraWithout.length < 60) {
+            const parts = [];
+            if (idx > 0 && paragraphs[idx - 1]) {
+              parts.push(paragraphs[idx - 1]);
+            }
+            parts.push(para);
+            if (idx < paragraphs.length - 1 && paragraphs[idx + 1]) {
+              parts.push(paragraphs[idx + 1]);
+            }
+            context = parts.join(" ").trim();
+          }
+          contextMap[clean] = context;
+        });
+      });
+    });
+  } catch (err) {
+    console.warn("[quote] Placeholder context map extraction failed", err && err.message ? err.message : String(err));
+  }
+  return contextMap;
+}
+
 function readDocxTemplatePlaceholders(buffer, fallbackText) {
   const found = extractTemplatePlaceholders(fallbackText);
   if (!buffer) {
@@ -1277,12 +1350,13 @@ function labelForPlaceholder(name) {
     .replace(/\b\w/g, function(ch) { return ch.toUpperCase(); });
 }
 
-function classifyQuotePlaceholders(names) {
+function classifyQuotePlaceholders(names, contextMap) {
   return (names || []).map(function(name) {
     return {
       name: name,
       label: labelForPlaceholder(name),
-      group: isQuoteGroupBPlaceholder(name) ? "block" : "simple"
+      group: isQuoteGroupBPlaceholder(name) ? "block" : "simple",
+      documentContext: (contextMap && contextMap[name]) ? contextMap[name] : ""
     };
   });
 }
@@ -1558,28 +1632,114 @@ async function generateQuoteBlockFieldWithAi(placeholderName, contextText, known
 // product_introduction/pricing_block mezok a mar meglevo, vector store-alapu
 // visszakereseseket hasznaljak (nem parhuzamos adatforras-logika), minden mas
 // block mezo a szigoru, hallucinacio-mentes prompton megy at.
-async function generateSingleQuoteBlockField(placeholderName, contextText, knownValues) {
+// documentContext: a sablonban talalt mondatkontextus a placeholderrel egyutt.
+async function generateSingleQuoteBlockField(placeholderName, contextText, knownValues, documentContext) {
+  const docCtxLine = documentContext ? "Sablon-mondat, amelybe a generalt szoveg kerul:\n" + documentContext : "";
   if (placeholderName === "product_introduction") {
     return retrieveProductIntroduction(contextText);
   }
   if (placeholderName === "pricing_block") {
     const prices = await retrieveQuotePrices(contextText);
-    return generateQuoteBlockFieldWithAi(
-      placeholderName,
-      contextText,
-      knownValues,
+    const extraGrounding = [
+      docCtxLine,
       "Vector store areredmeny (csak ezekre az arakra tamaszkodhatsz, ne talalj ki arat):\n" + JSON.stringify(prices).slice(0, 6000)
-    );
+    ].filter(Boolean).join("\n\n");
+    return generateQuoteBlockFieldWithAi(placeholderName, contextText, knownValues, extraGrounding);
   }
-  return generateQuoteBlockFieldWithAi(placeholderName, contextText, knownValues, "");
+  return generateQuoteBlockFieldWithAi(placeholderName, contextText, knownValues, docCtxLine);
 }
 
-// Fazis 3a/3b: a "simple" mezok kizarolag a felhasznalo altal beirt ertekkel
-// toltodnek ki (nincs AI hivas), a "block" mezok pedig - ha a felhasznalo meg
-// nem irt/szerkesztett bele szoveget - egyenkent, a szigoru anti-hallucinacios
-// prompttal generalodnak.
+// Egyetlen OpenAI hivasban toltje ki az osszes "simple" mezot, felhasznalva a
+// dokumentumkontextust. A valasz JSON: { "mezo_neve": "ertek", ... }.
+// Ha a felhasznalo elore megadott erteket, az "elozetes erteknek" minositil es
+// az AI finomithatja; ha ures, az AI levezeti a kontextusbol.
+// Ha nincs OPENAI_API_KEY vagy nincs jelolendo mezo, ures objektumot ad vissza.
+async function generateAllSimpleFieldsWithAi(fields, contextText) {
+  if (!fields || fields.length === 0) {
+    return {};
+  }
+  if (!OPENAI_API_KEY) {
+    return {};
+  }
+
+  const systemPrompt = [
+    "Profi uzleti ajanlatiro vagy. Word sablon dokumentum rovid (egyszeru) placeholder",
+    "mezoinek erteket hatarozod meg egy menetben.",
+    "",
+    "SZABALYOK:",
+    "- Csak olyan tenyeket hasznalj, amelyek a megadott ajanlat-kontextusban szerepelnek.",
+    "- SOHA ne talalj ki, ne tegyel fel es ne hallucinaljfelo ugyfelneveket, cegneveket,",
+    "  arakat, datumokat, mennyisegeket vagy barmilyen tenyadatot.",
+    "- Ha az 'Elozetes ertek' mar helyesen illik a sablon-mondatba: add vissza valtozatlanul.",
+    "- Ha az 'Elozetes ertek' finomithato (pl. rovid alak, helyesiras): javitsd.",
+    "- Ha nincs 'Elozetes ertek': vezessuk le a kontextusbol a sablon-mondatra tamaszkodva.",
+    "- Ha a kontextus nem tartalmaz elegendo informaciot: add vissza ures stringet (\"\").",
+    "- Magyarul irj.",
+    "- A valaszt kizarolag ervenyes JSON objektumkent add vissza:",
+    "  {\"mezo_neve\": \"ertek\", ...}",
+    "- Semmi mas szoveg, semmi magyarazat a JSON-on kivul."
+  ].join("\n");
+
+  const fieldsText = fields.map(function(f) {
+    const lines = [
+      "MEZO: " + f.name + " | Felirat: " + labelForPlaceholder(f.name)
+    ];
+    if (f.documentContext) {
+      lines.push("Sablon-mondat: " + f.documentContext);
+    }
+    if (f.manualValue) {
+      lines.push("Elozetes ertek (finomitando ha szukseges): " + f.manualValue);
+    } else {
+      lines.push("(Ures - vezessuk le a kontextusbol)");
+    }
+    return lines.join("\n");
+  }).join("\n\n---\n\n");
+
+  const userPrompt = [
+    "Az alabbi egyszeru mezoket kell kitolteni az ajanlat kontextusa alapjan.",
+    "Minden mezohoz add vissza a vegleges erteket a kert JSON formatumban.",
+    "",
+    fieldsText,
+    "",
+    "Ajanlat kontextusa:",
+    String(contextText || "").slice(0, 8000)
+  ].join("\n");
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + OPENAI_API_KEY
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        instructions: systemPrompt,
+        input: userPrompt
+      })
+    });
+    const raw = await response.text();
+    const json = parseOpenAiReply(raw);
+    if (!response.ok) {
+      console.warn("[quote] Simple fields batch AI hiba", raw || response.status);
+      return {};
+    }
+    return parseJsonObjectFromText(extractResponsesOutputText(json)) || {};
+  } catch (err) {
+    console.warn("[quote] Simple fields batch AI kivetel", err && err.message ? err.message : String(err));
+    return {};
+  }
+}
+
+// 3a: "simple" mezok - ha van dokumentumkontextus: egyetlen AI hivassal toltodnek ki
+// (batchben), a sablon-mondatot figyelembe veve. Ha nincs dokumentumkontextus:
+// a felhasznalo altal beirt ertek marad, ures mezo eseteben missingPlaceholder lesz.
+// 3b: "block" mezok - ha a felhasznalo nem irt bele: a szigoru anti-hallucinacios
+// prompttal generalodnak, most mar a sablon-mondatkontextussal kiegeszitve.
 async function generateQuotePlaceholderValues(session, contextText, manualValues) {
   const placeholders = Array.isArray(session && session.templatePlaceholders) ? session.templatePlaceholders : [];
+  const contextMap = (session && session.placeholderContextMap && typeof session.placeholderContextMap === "object")
+    ? session.placeholderContextMap : {};
   const manual = normalizePlaceholderValues(manualValues);
   if (placeholders.length === 0) {
     return { values: manual, missingPlaceholders: [] };
@@ -1588,14 +1748,38 @@ async function generateQuotePlaceholderValues(session, contextText, manualValues
   const values = {};
   const missingReasons = {};
 
-  for (let i = 0; i < placeholders.length; i += 1) {
-    const name = placeholders[i];
-    const manualValue = manual[name] || "";
+  // --- Simple mezok: batch AI hivas, ha barmelyiknek van dokumentumkontextusa ---
+  const simpleNames = placeholders.filter(function(n) { return !isQuoteGroupBPlaceholder(n); });
+  const simpleFieldsForAi = simpleNames
+    .filter(function(n) { return !!contextMap[n]; })
+    .map(function(n) {
+      return { name: n, documentContext: contextMap[n], manualValue: manual[n] || "" };
+    });
 
-    if (!isQuoteGroupBPlaceholder(name)) {
-      values[name] = manualValue;
-      continue;
+  let aiSimpleValues = {};
+  if (simpleFieldsForAi.length > 0) {
+    try {
+      aiSimpleValues = await generateAllSimpleFieldsWithAi(simpleFieldsForAi, contextText);
+    } catch (err) {
+      console.warn("[quote] Simple fields batch generation exception", err && err.message ? err.message : String(err));
     }
+  }
+
+  simpleNames.forEach(function(name) {
+    const aiValue = String((aiSimpleValues && aiSimpleValues[name] != null) ? aiSimpleValues[name] : "").trim();
+    const manualValue = manual[name] || "";
+    values[name] = aiValue || manualValue;
+    if (!values[name]) {
+      missingReasons[name] = "Nem volt egyertelmuen megallapithato a kontextusbol.";
+    }
+  });
+
+  // --- Block mezok: egyenkent, dokumentumkontextussal kiegeszitve ---
+  const blockNames = placeholders.filter(function(n) { return isQuoteGroupBPlaceholder(n); });
+  for (let i = 0; i < blockNames.length; i += 1) {
+    const name = blockNames[i];
+    const manualValue = manual[name] || "";
+    const documentContext = contextMap[name] || "";
 
     if (manualValue) {
       values[name] = manualValue;
@@ -1603,7 +1787,7 @@ async function generateQuotePlaceholderValues(session, contextText, manualValues
     }
 
     try {
-      values[name] = await generateSingleQuoteBlockField(name, contextText, manual);
+      values[name] = await generateSingleQuoteBlockField(name, contextText, Object.assign({}, values, manual), documentContext);
     } catch (err) {
       console.warn("[quote] Block placeholder generalasi hiba (" + name + ")", err && err.message ? err.message : String(err));
       values[name] = "";
@@ -8654,6 +8838,7 @@ app.post("/api/jokers/quote-builder/upload-template", oQuoteTemplateUpload.singl
     const sessionId = quoteToken();
     const templateText = await extractWordTemplateText(file);
     const templatePlaceholders = readDocxTemplatePlaceholders(file.buffer, templateText);
+    const placeholderContextMap = buildPlaceholderContextMap(file.buffer);
     oQuoteSessions.set(sessionId, {
       sessionId: sessionId,
       templateFileName: name,
@@ -8661,6 +8846,7 @@ app.post("/api/jokers/quote-builder/upload-template", oQuoteTemplateUpload.singl
       templateBuffer: file.buffer,
       templateText: templateText,
       templatePlaceholders: templatePlaceholders,
+      placeholderContextMap: placeholderContextMap,
       placeholderValues: {},
       missingPlaceholders: createMissingPlaceholderItems(templatePlaceholders, {}, {}),
       contextText: "",
@@ -8676,7 +8862,7 @@ app.post("/api/jokers/quote-builder/upload-template", oQuoteTemplateUpload.singl
       templateFileName: name,
       templateTextPreview: templateText.slice(0, 1200),
       templatePlaceholders: templatePlaceholders,
-      templatePlaceholderFields: classifyQuotePlaceholders(templatePlaceholders),
+      templatePlaceholderFields: classifyQuotePlaceholders(templatePlaceholders, placeholderContextMap),
       missingPlaceholders: createMissingPlaceholderItems(templatePlaceholders, {}, {}),
       message: templateText ? "Sablon feltoltve es szoveges minta kinyerve." : "Sablon feltoltve. A .doc fajlbol nem keszult szoveges minta, de a dokumentum referenciakent megmarad."
     });
@@ -8708,7 +8894,9 @@ app.post("/api/jokers/quote-builder/generate-block-field", async function(req, r
       return;
     }
     const manual = normalizePlaceholderValues(manualValues);
-    const value = await generateSingleQuoteBlockField(placeholderName, contextText, manual);
+    const documentContext = (session.placeholderContextMap && session.placeholderContextMap[placeholderName])
+      ? session.placeholderContextMap[placeholderName] : "";
+    const value = await generateSingleQuoteBlockField(placeholderName, contextText, manual, documentContext);
     res.json({ placeholderName: placeholderName, value: value });
   } catch (err) {
     res.status(500).json({
@@ -10936,7 +11124,9 @@ module.exports = {
   convertDocxToPdfBuffer,
   extractTemplatePlaceholders,
   extractDocxXmlPlainText,
+  extractDocxXmlParagraphs,
   readDocxTemplatePlaceholders,
+  buildPlaceholderContextMap,
   isQuoteGroupBPlaceholder,
   labelForPlaceholder,
   classifyQuotePlaceholders,

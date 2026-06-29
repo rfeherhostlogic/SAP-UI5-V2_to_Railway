@@ -247,6 +247,7 @@ sap.ui.define([
             name: oField.name,
             label: oField.label || oField.name,
             group: oField.group === "block" ? "block" : "simple",
+            documentContext: oField.documentContext || "",
             value: "",
             busy: false
           };
@@ -254,7 +255,7 @@ sap.ui.define([
       }
       var aNames = Array.isArray(oUpload && oUpload.templatePlaceholders) ? oUpload.templatePlaceholders : [];
       return aNames.map(function(sName) {
-        return { name: sName, label: sName, group: "simple", value: "", busy: false };
+        return { name: sName, label: sName, group: "simple", documentContext: "", value: "", busy: false };
       });
     },
 
