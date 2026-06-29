@@ -5892,6 +5892,158 @@ async function ensureSeedData() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// KÉSZLETGAZDÁLKODÁS – ADATBÁZIS TÁBLÁK ÉS SEED ADATOK
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function ensureInventoryTables() {
+  const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
+  try {
+    await sqliteRun(db, [
+      "CREATE TABLE IF NOT EXISTS InventoryCategory (",
+      "  CategoryId   TEXT PRIMARY KEY,",
+      "  CategoryName TEXT NOT NULL",
+      ")"
+    ].join("\n"));
+    await sqliteRun(db, [
+      "CREATE TABLE IF NOT EXISTS InventorySupplier (",
+      "  SupplierId          TEXT PRIMARY KEY,",
+      "  SupplierName        TEXT NOT NULL,",
+      "  SupplierReliability REAL NOT NULL DEFAULT 80.0",
+      ")"
+    ].join("\n"));
+    await sqliteRun(db, [
+      "CREATE TABLE IF NOT EXISTS InventoryProduct (",
+      "  ProductId       TEXT PRIMARY KEY,",
+      "  ProductCode     TEXT NOT NULL,",
+      "  ProductName     TEXT NOT NULL,",
+      "  CategoryId      TEXT NOT NULL,",
+      "  Unit            TEXT NOT NULL DEFAULT 'db',",
+      "  CurrentQuantity REAL NOT NULL DEFAULT 0,",
+      "  MaxStockLevel   REAL NOT NULL DEFAULT 100,",
+      "  MinStockLevel   REAL NOT NULL DEFAULT 10,",
+      "  UnitPrice       REAL NOT NULL DEFAULT 0,",
+      "  LeadTimeDays    INTEGER NOT NULL DEFAULT 14,",
+      "  SupplierId      TEXT NOT NULL,",
+      "  FOREIGN KEY (CategoryId) REFERENCES InventoryCategory(CategoryId),",
+      "  FOREIGN KEY (SupplierId) REFERENCES InventorySupplier(SupplierId)",
+      ")"
+    ].join("\n"));
+    await sqliteRun(db, [
+      "CREATE TABLE IF NOT EXISTS InventoryDemandHistory (",
+      "  ProductId        TEXT NOT NULL,",
+      "  DemandDate       TEXT NOT NULL,",
+      "  QuantityDemanded REAL NOT NULL DEFAULT 0,",
+      "  PRIMARY KEY (ProductId, DemandDate),",
+      "  FOREIGN KEY (ProductId) REFERENCES InventoryProduct(ProductId)",
+      ")"
+    ].join("\n"));
+
+    // Idempotent: skip seeding if categories already exist
+    const catCountRow = await sqliteGet(db, "SELECT COUNT(*) AS cnt FROM InventoryCategory");
+    if (Number(catCountRow && catCountRow.cnt ? catCountRow.cnt : 0) > 0) {
+      return;
+    }
+
+    // Categories
+    const categories = [
+      ["CAT01", "Elektronikai alkatrészek"],
+      ["CAT02", "Mechanikai alkatrészek"],
+      ["CAT03", "Kábel és kábelszerelvények"],
+      ["CAT04", "Pneumatika és hidraulika"]
+    ];
+    for (const cat of categories) {
+      await sqliteRun(db, "INSERT INTO InventoryCategory (CategoryId, CategoryName) VALUES (?, ?)", cat);
+    }
+
+    // Suppliers
+    const suppliers = [
+      ["SUP01", "GlobalElec Trade Zrt.",    72.0],
+      ["SUP02", "Pneumax Hungary Kft.",     91.5],
+      ["SUP03", "Schaeffler Hungary Kft.",  88.0],
+      ["SUP04", "Lapp Kábel Kft.",          95.0],
+      ["SUP05", "RS Components Kft.",       83.0]
+    ];
+    for (const sup of suppliers) {
+      await sqliteRun(db, "INSERT INTO InventorySupplier (SupplierId, SupplierName, SupplierReliability) VALUES (?, ?, ?)", sup);
+    }
+
+    // Products: [id, code, name, catId, unit, qty, maxStock, minStock, unitPrice, leadDays, supId]
+    const products = [
+      ["PROD01", "KAB-REZ-225",  "Rézkábel 2x2.5mm²",          "CAT03", "m",   800, 2000, 400,  450,  14, "SUP04"],
+      ["PROD02", "EL-CSA-M12",   "Ipari csatlakozó M12 8p",     "CAT01", "db",   45,  200,  50, 2850,  21, "SUP01"],
+      ["PROD03", "EL-TAP-24V5A", "PLC tápegység 24V/5A",        "CAT01", "db",    8,   30,   5, 18500, 21, "SUP05"],
+      ["PROD04", "EL-VEZ-001",   "Siemens S7-1200 CPU modul",   "CAT01", "db",    1,    6,   2, 189500,21, "SUP01"],
+      ["PROD05", "PN-HEN-050",   "Pneumatikus henger Ø50mm",    "CAT04", "db",   12,   40,   8, 8900,  14, "SUP02"],
+      ["PROD06", "MEC-ORG-M10",  "O-gyűrű készlet M10",         "CAT02", "klt",   3,   20,   5, 1200,   7, "SUP03"],
+      ["PROD07", "MEC-TOM-001",  "Ipari tömítőgyanta",          "CAT02", "kg",   25,   50,  10, 3200,  10, "SUP05"],
+      ["PROD08", "EL-BIZ-10AT",  "Biztosíték 10A T",            "CAT01", "db",  145,   60,  20,  150,   7, "SUP05"],
+      ["PROD09", "MEC-CSA-6205", "Golyóscsapágy 6205",          "CAT02", "db",   22,   80,  15, 2100,  21, "SUP03"],
+      ["PROD10", "KAB-VEZ-4075", "Vezérlőkábel 4x0.75mm²",     "CAT03", "m",   320,  800, 100,  280,  14, "SUP04"],
+      ["PROD11", "EL-ENC-ABB01", "Encoder ABB 6000rpm",         "CAT01", "db",    2,   10,   3, 45000, 30, "SUP01"],
+      ["PROD12", "KAB-SZE-6M",   "Szervomotor kábel 6m",        "CAT03", "db",   35,   80,  20, 12000, 14, "SUP04"],
+      ["PROD13", "PN-NYO-010B",  "Nyomásmérő 0-10bar",          "CAT04", "db",    6,   25,   5, 15000, 14, "SUP02"],
+      ["PROD14", "PN-SZU-F40",   "Levegőszűrő elem F40",        "CAT04", "db",   18,   50,  10, 4500,   7, "SUP02"],
+      ["PROD15", "PN-SZE-52",    "Elektromágneses szelep 5/2",  "CAT04", "db",    9,   30,   8, 11000, 14, "SUP02"]
+    ];
+    for (const prod of products) {
+      await sqliteRun(db,
+        "INSERT INTO InventoryProduct (ProductId, ProductCode, ProductName, CategoryId, Unit, CurrentQuantity, MaxStockLevel, MinStockLevel, UnitPrice, LeadTimeDays, SupplierId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        prod
+      );
+    }
+
+    // Demand profiles: productId → [avgDailyDemand, trendFactor]
+    // trendFactor applied to last 30 days vs baseline older days:
+    //   >1.05 → generates INCREASING trend, <0.95 → DECREASING, ~1.0 → STABLE
+    const demandProfiles = {
+      "PROD01": [2.5,  1.0 ],
+      "PROD02": [1.8,  0.90],
+      "PROD03": [0.35, 1.0 ],
+      "PROD04": [0.14, 1.0 ],
+      "PROD05": [0.4,  1.10],
+      "PROD06": [0.5,  1.0 ],
+      "PROD07": [0.5,  1.0 ],
+      "PROD08": [2.0,  0.88],
+      "PROD09": [0.35, 1.0 ],
+      "PROD10": [3.5,  1.0 ],
+      "PROD11": [0.12, 1.0 ],
+      "PROD12": [0.8,  1.0 ],
+      "PROD13": [0.35, 0.92],
+      "PROD14": [0.8,  1.0 ],
+      "PROD15": [0.5,  1.0 ]
+    };
+
+    const rnd = seededRandomFactory(8765);
+    const seedToday = new Date();
+
+    // Batch inserts in a transaction for speed
+    await sqliteRun(db, "BEGIN TRANSACTION");
+    try {
+      for (const productId of Object.keys(demandProfiles)) {
+        const [avgDemand, trendFactor] = demandProfiles[productId];
+        for (let d = 90; d >= 1; d--) {
+          const demandDate = new Date(seedToday.getTime() - d * 86400000).toISOString().slice(0, 10);
+          // Apply trend only in last 30 days
+          const effectiveFactor = d <= 30 ? trendFactor : 1.0;
+          const variance = 0.7 + rnd() * 0.6;
+          const demand = Math.max(0, Math.round(avgDemand * effectiveFactor * variance * 10) / 10);
+          await sqliteRun(db,
+            "INSERT OR IGNORE INTO InventoryDemandHistory (ProductId, DemandDate, QuantityDemanded) VALUES (?, ?, ?)",
+            [productId, demandDate, demand]
+          );
+        }
+      }
+      await sqliteRun(db, "COMMIT");
+    } catch (txErr) {
+      await sqliteRun(db, "ROLLBACK").catch(function() {});
+      throw txErr;
+    }
+  } finally {
+    await closeSqlite(db);
+  }
+}
+
 function runDummy10RfmPython() {
   return new Promise(function(resolve, reject) {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "dummy10-"));
@@ -11090,6 +11242,296 @@ app.get("/api/ml-wizard/result/:sessionId/download.csv", function(req, res) {
 // ML WIZARD ROUTES END
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// KÉSZLETGAZDÁLKODÁS – KERESLETI ELŐREJELZÉS API
+// ═══════════════════════════════════════════════════════════════════════════════
+
+app.post("/api/inventory/forecast", async function(req, res) {
+  const horizonRaw = req.body && req.body.horizon_days !== undefined ? req.body.horizon_days : null;
+  const categoryId = req.body && req.body.category_id !== undefined ? req.body.category_id : null;
+  const dataSource = String(req.body && req.body.data_source ? req.body.data_source : "").trim();
+
+  // Validation
+  if (![30, 60, 90].includes(Number(horizonRaw))) {
+    res.status(400).json({ error: "Érvénytelen horizon_days érték. Megengedett értékek: 30, 60, 90." });
+    return;
+  }
+  if (dataSource !== "db" && dataSource !== "csv") {
+    res.status(400).json({ error: "Érvénytelen data_source érték. Megengedett értékek: 'db', 'csv'." });
+    return;
+  }
+  if (dataSource === "csv") {
+    res.status(400).json({ error: "CSV adatforrás kezelése ezen az endpointon nem elérhető." });
+    return;
+  }
+
+  const horizon = Number(horizonRaw);
+  const catFilter = (
+    categoryId !== null &&
+    categoryId !== undefined &&
+    String(categoryId).trim() !== "" &&
+    String(categoryId).trim().toLowerCase() !== "null"
+  ) ? String(categoryId).trim() : null;
+
+  let db = null;
+  try {
+    db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
+
+    // Verify inventory tables exist
+    const tableCheck = await sqliteGet(db, "SELECT name FROM sqlite_master WHERE type='table' AND name='InventoryProduct'");
+    if (!tableCheck) {
+      res.status(503).json({ error: "A készletgazdálkodás adatbázisa nem érhető el. Kérjük, próbálja újra." });
+      return;
+    }
+
+    // Load products with category and supplier info
+    const productQueryParts = [
+      "SELECT p.ProductId, p.ProductCode, p.ProductName, p.CategoryId, c.CategoryName,",
+      "       p.Unit, p.CurrentQuantity, p.MaxStockLevel, p.MinStockLevel, p.UnitPrice,",
+      "       p.LeadTimeDays, p.SupplierId, s.SupplierName, s.SupplierReliability",
+      "FROM InventoryProduct p",
+      "JOIN InventoryCategory c ON p.CategoryId = c.CategoryId",
+      "JOIN InventorySupplier s ON p.SupplierId = s.SupplierId"
+    ];
+    const productParams = [];
+    if (catFilter) {
+      productQueryParts.push("WHERE p.CategoryId = ?");
+      productParams.push(catFilter);
+    }
+    productQueryParts.push("ORDER BY p.ProductId");
+    const products = await sqliteAllParams(db, productQueryParts.join(" "), productParams);
+
+    const today = new Date();
+    const todayMs = today.getTime();
+
+    if (!products || products.length === 0) {
+      res.json({
+        generated_at: today.toISOString(),
+        horizon_days: horizon,
+        category_filter: catFilter,
+        summary: { total_products: 0, critical_count: 0, warning_count: 0, stable_count: 0, excess_count: 0, total_reorder_value_huf: 0 },
+        critical: [], warning: [], stable: [], excess: [],
+        forecast_chart_data: { labels: [], datasets: [], category_summary: [] }
+      });
+      return;
+    }
+
+    // Demand window covers enough history for trend + horizon analysis
+    const demandWindowDays = Math.max(horizon, 60) + 30;
+    const demandWindowStart = new Date(todayMs - demandWindowDays * 86400000).toISOString().slice(0, 10);
+    const last30Start    = new Date(todayMs -  30 * 86400000).toISOString().slice(0, 10);
+    const prev30Start    = new Date(todayMs -  60 * 86400000).toISOString().slice(0, 10);
+
+    const enriched = [];
+    for (let pi = 0; pi < products.length; pi++) {
+      const p = products[pi];
+      const productId = String(p.ProductId || "");
+
+      // Pull this product's demand history
+      const demandRows = await sqliteAllParams(db,
+        "SELECT DemandDate, QuantityDemanded FROM InventoryDemandHistory WHERE ProductId = ? AND DemandDate >= ? ORDER BY DemandDate",
+        [productId, demandWindowStart]
+      );
+
+      // Horizon avg_daily_demand
+      const horizonWindowStart = new Date(todayMs - horizon * 86400000).toISOString().slice(0, 10);
+      const horizonRows = demandRows.filter(function(r) { return String(r.DemandDate || "") >= horizonWindowStart; });
+      const horizonTotal = horizonRows.reduce(function(s, r) { return s + Number(r.QuantityDemanded || 0); }, 0);
+      const avgDailyDemand = Math.round((horizonRows.length > 0 ? horizonTotal / horizon : 0) * 1000) / 1000;
+
+      // Trend: last 30 days vs previous 30 days
+      const last30Rows = demandRows.filter(function(r) { return String(r.DemandDate || "") >= last30Start; });
+      const prev30Rows = demandRows.filter(function(r) {
+        const d = String(r.DemandDate || "");
+        return d >= prev30Start && d < last30Start;
+      });
+      const avg30     = last30Rows.length > 0 ? last30Rows.reduce(function(s, r) { return s + Number(r.QuantityDemanded || 0); }, 0) / 30 : avgDailyDemand;
+      const avgPrev30 = prev30Rows.length > 0 ? prev30Rows.reduce(function(s, r) { return s + Number(r.QuantityDemanded || 0); }, 0) / 30 : avgDailyDemand;
+
+      let trend = "STABLE";
+      if (avgPrev30 > 0.001) {
+        if (avg30 > avgPrev30 * 1.05)      { trend = "INCREASING"; }
+        else if (avg30 < avgPrev30 * 0.95) { trend = "DECREASING"; }
+      }
+
+      const currentQty   = Number(p.CurrentQuantity || 0);
+      const maxStockLevel = Number(p.MaxStockLevel || 0);
+      const minStockLevel = Number(p.MinStockLevel || 0);
+      const leadTimeDays  = Number(p.LeadTimeDays || 14);
+      const unitPrice     = Number(p.UnitPrice || 0);
+
+      // Days until stockout (999 when demand = 0 to avoid division by zero)
+      const daysUntilStockout = avgDailyDemand > 0 ? Math.floor(currentQty / avgDailyDemand) : 999;
+      const stockoutDate = new Date(todayMs + daysUntilStockout * 86400000).toISOString().slice(0, 10);
+
+      // Classification: EXCESS takes priority, then CRITICAL/WARNING/STABLE
+      let classification;
+      if (currentQty > maxStockLevel) {
+        classification = "EXCESS";
+      } else if (daysUntilStockout <= leadTimeDays) {
+        classification = "CRITICAL";
+      } else if (daysUntilStockout <= leadTimeDays + 7) {
+        classification = "WARNING";
+      } else {
+        classification = "STABLE";
+      }
+
+      // Reorder suggestion for actionable items
+      let reorderSuggestion = null;
+      if (classification === "CRITICAL" || classification === "WARNING") {
+        const suggestedQty = Math.max(0, maxStockLevel - currentQty);
+        const deadlineDays = Math.max(0, daysUntilStockout - leadTimeDays);
+        reorderSuggestion = {
+          suggested_quantity: Math.round(suggestedQty * 10) / 10,
+          latest_order_deadline: new Date(todayMs + deadlineDays * 86400000).toISOString().slice(0, 10),
+          estimated_value_huf: Math.round(suggestedQty * unitPrice),
+          supplier_name: String(p.SupplierName || ""),
+          supplier_reliability: Number(p.SupplierReliability || 0)
+        };
+      }
+
+      // Forecast data points (max 30 per product, trend-adjusted daily demand)
+      const forecastDays = Math.min(horizon, 30);
+      const trendFactorPerWeek = trend === "INCREASING" ? 1.05 : (trend === "DECREASING" ? 0.97 : 1.0);
+      const forecastPoints = [];
+      for (let fd = 1; fd <= forecastDays; fd++) {
+        const trendMult = Math.pow(trendFactorPerWeek, fd / 7);
+        forecastPoints.push(Math.round(avgDailyDemand * trendMult * 1000) / 1000);
+      }
+
+      enriched.push({
+        product_id: productId,
+        product_code: String(p.ProductCode || ""),
+        product_name: String(p.ProductName || ""),
+        category_id: String(p.CategoryId || ""),
+        category_name: String(p.CategoryName || ""),
+        unit: String(p.Unit || ""),
+        current_quantity: currentQty,
+        max_stock_level: maxStockLevel,
+        min_stock_level: minStockLevel,
+        avg_daily_demand: avgDailyDemand,
+        days_until_stockout: daysUntilStockout,
+        lead_time_days: leadTimeDays,
+        stockout_date: stockoutDate,
+        unit_price: unitPrice,
+        trend: trend,
+        classification: classification,
+        reorder_suggestion: reorderSuggestion,
+        forecast_points: forecastPoints,
+        supplier_name: String(p.SupplierName || ""),
+        supplier_reliability: Number(p.SupplierReliability || 0)
+      });
+    }
+
+    // Partition by classification
+    const criticalProducts = enriched.filter(function(item) { return item.classification === "CRITICAL"; });
+    const warningProducts  = enriched.filter(function(item) { return item.classification === "WARNING"; });
+    const stableProducts   = enriched.filter(function(item) { return item.classification === "STABLE"; });
+    const excessProducts   = enriched.filter(function(item) { return item.classification === "EXCESS"; });
+
+    const totalReorderValue = criticalProducts.concat(warningProducts).reduce(function(s, item) {
+      return s + (item.reorder_suggestion ? Number(item.reorder_suggestion.estimated_value_huf || 0) : 0);
+    }, 0);
+
+    // Chart: labels are the forecast dates, top 10 products by criticality
+    const forecastDaysCount = Math.min(horizon, 30);
+    const chartLabels = [];
+    for (let ld = 1; ld <= forecastDaysCount; ld++) {
+      chartLabels.push(new Date(todayMs + ld * 86400000).toISOString().slice(0, 10));
+    }
+    const chartItems = criticalProducts.concat(warningProducts, stableProducts).slice(0, 10);
+    const datasets = chartItems.map(function(item) {
+      return {
+        product_id: item.product_id,
+        product_name: item.product_name,
+        category: item.category_name,
+        projected_demand: item.forecast_points,
+        current_stock: item.current_quantity
+      };
+    });
+
+    // Per-category summary
+    const catMap = {};
+    enriched.forEach(function(item) {
+      const cn = String(item.category_name || "");
+      if (!catMap[cn]) { catMap[cn] = { projected: 0, historical: 0 }; }
+      const lastPoint = item.forecast_points.length > 0 ? item.forecast_points[item.forecast_points.length - 1] : item.avg_daily_demand;
+      catMap[cn].projected  += lastPoint * forecastDaysCount;
+      catMap[cn].historical += item.avg_daily_demand * forecastDaysCount;
+    });
+    const categorySummary = Object.keys(catMap).sort().map(function(cn) {
+      return {
+        category_name: cn,
+        total_projected_demand: Math.round(catMap[cn].projected  * 100) / 100,
+        historical_avg:         Math.round(catMap[cn].historical * 100) / 100
+      };
+    });
+
+    function fmtProduct(item) {
+      const out = {
+        product_id: item.product_id,
+        product_code: item.product_code,
+        product_name: item.product_name,
+        category_name: item.category_name,
+        unit: item.unit,
+        current_quantity: item.current_quantity,
+        avg_daily_demand: item.avg_daily_demand,
+        days_until_stockout: item.days_until_stockout,
+        lead_time_days: item.lead_time_days,
+        stockout_date: item.stockout_date,
+        trend: item.trend
+      };
+      if (item.reorder_suggestion) { out.reorder_suggestion = item.reorder_suggestion; }
+      return out;
+    }
+
+    function fmtExcess(item) {
+      const excessQty = item.current_quantity - item.max_stock_level;
+      return {
+        product_id: item.product_id,
+        product_name: item.product_name,
+        current_quantity: item.current_quantity,
+        max_stock_level: item.max_stock_level,
+        excess_quantity: excessQty,
+        excess_value_huf: Math.round(excessQty * item.unit_price),
+        avg_daily_demand: item.avg_daily_demand,
+        days_of_excess_stock: item.avg_daily_demand > 0 ? Math.floor(excessQty / item.avg_daily_demand) : 999
+      };
+    }
+
+    res.json({
+      generated_at: today.toISOString(),
+      horizon_days: horizon,
+      category_filter: catFilter,
+      summary: {
+        total_products: enriched.length,
+        critical_count: criticalProducts.length,
+        warning_count: warningProducts.length,
+        stable_count: stableProducts.length,
+        excess_count: excessProducts.length,
+        total_reorder_value_huf: Math.round(totalReorderValue)
+      },
+      critical: criticalProducts.map(fmtProduct),
+      warning:  warningProducts.map(fmtProduct),
+      stable:   stableProducts.map(fmtProduct),
+      excess:   excessProducts.map(fmtExcess),
+      forecast_chart_data: {
+        labels: chartLabels,
+        datasets: datasets,
+        category_summary: categorySummary
+      }
+    });
+
+  } catch (err) {
+    console.error("[inventory/forecast] hiba:", err && err.message ? err.message : String(err));
+    res.status(503).json({ error: "Adatbázis kapcsolati hiba a készletgazdálkodási előrejelzés lekérdezése során. Kérjük, próbálja újra." });
+  } finally {
+    if (db) { await closeSqlite(db).catch(function() {}); }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+
 app.use(express.static(UI_STATIC_DIR));
 
 app.get("*", function(req, res) {
@@ -11104,6 +11546,7 @@ async function bootstrapServer() {
   try {
     await ensureShieldTables();
     await ensureSeedData();
+    await ensureInventoryTables();
     await runDueShieldSchedulesOnce();
     startShieldScheduler();
   } catch (err) {
