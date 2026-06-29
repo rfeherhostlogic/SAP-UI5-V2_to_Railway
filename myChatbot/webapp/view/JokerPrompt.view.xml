@@ -211,7 +211,7 @@
             width="100%"
             placeholder="Pl.: Az ügyfél 50 darab terméket szeretne rendelni mennyiségi kedvezménnyel, 15 napos fizetési határidővel, a szállítást jövő hónap elejére kérik."/>
 
-          <Panel headerText="Azonosított mezők" expandable="true" expanded="true" class="quoteTemplateAccordion sapUiMediumMarginTop">
+          <Panel headerText="Azonosított mezők" expandable="true" expanded="false" class="quoteTemplateAccordion sapUiMediumMarginTop">
             <VBox class="sapUiSmallMargin">
               <Text text="A feltöltött Word sablonban automatikusan felismert mezők. Az egyszerű mezőket kézzel töltsd ki, a hosszabb szakaszokat a Noah gombbal generálhatod a megadott kontextusból." wrapping="true" class="sapUiTinyMarginBottom"/>
               <MessageStrip

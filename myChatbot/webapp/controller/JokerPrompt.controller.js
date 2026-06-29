@@ -301,16 +301,12 @@ sap.ui.define([
       }
     },
 
-    // A "simple" csoport minden mezojenek kell ertekkel rendelkeznie, hogy
-    // az "Arajanlat generalasa" gomb engedelyezve legyen.
+    // A gomb engedelyezeshez csak a feltoltott sablon (sessionId) szukseges;
+    // a mezoket opcionalis elotoltessel is el lehet hagyni.
     _updateQuoteGenerateButtonState: function() {
       var oModel = this.getView().getModel("jokers");
       var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
-      var aFields = oModel.getProperty("/quoteTemplateFields") || [];
-      var bAllSimpleFilled = aFields
-        .filter(function(oField) { return oField.group === "simple"; })
-        .every(function(oField) { return !!String(oField.value || "").trim(); });
-      oModel.setProperty("/quoteCanGenerate", !!sSessionId && bAllSimpleFilled);
+      oModel.setProperty("/quoteCanGenerate", !!sSessionId);
     },
 
     _collectQuotePlaceholderValues: function() {
@@ -362,10 +358,6 @@ sap.ui.define([
       }
       if (!sContext) {
         MessageToast.show("Az ajanlat kontextusat add meg.");
-        return;
-      }
-      if (!oModel.getProperty("/quoteCanGenerate")) {
-        MessageToast.show("Toltsd ki az osszes egyszeru mezot a generalas elott.");
         return;
       }
 
