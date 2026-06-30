@@ -25,7 +25,6 @@
             <tnt:NavigationListItem text="Jokerek" key="jokers" icon="sap-icon://favorite"/>
             <tnt:NavigationListItem text="Flow" key="flow" icon="sap-icon://process"/>
             <tnt:NavigationListItem text="Felfedezes" key="discovery" icon="sap-icon://search"/>
-            <tnt:NavigationListItem text="Készletgazdálkodás" key="keszletgazdalkodas" icon="sap-icon://inventory"/>
           </tnt:NavigationList>
         </tnt:item>
         <tnt:fixedItem>

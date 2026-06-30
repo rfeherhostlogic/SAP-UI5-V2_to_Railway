@@ -144,6 +144,12 @@ sap.ui.define([
         oJokersModel.setProperty("/kpiDiscoveryRows", []);
       }
 
+      // Készletgazdálkodás modul: saját dedikált nézetbe navigál, nem JokerPromptba
+      if (oJoker.id === "dummy-16") {
+        this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: "keszletgazdalkodas" });
+        return;
+      }
+
       this.getOwnerComponent().getRouter().navTo("jokerPrompt", {
         jokerId: oJoker.id
       });

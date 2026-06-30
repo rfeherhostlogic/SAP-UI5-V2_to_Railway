@@ -21,7 +21,7 @@ sap.ui.define([
         this.getOwnerComponent().getRouter().navTo("discoveryHome");
         return;
       }
-      if (sKey === "reports" || sKey === "jokers" || sKey === "noah" || sKey === "feed" || sKey === "flow" || sKey === "keszletgazdalkodas") {
+      if (sKey === "reports" || sKey === "jokers" || sKey === "noah" || sKey === "feed" || sKey === "flow") {
         this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: sKey });
       }
     },
@@ -59,7 +59,9 @@ sap.ui.define([
       if (sKey !== "reports" && sKey !== "jokers" && sKey !== "discovery" && sKey !== "noah" && sKey !== "feed" && sKey !== "flow" && sKey !== "keszletgazdalkodas") {
         sKey = "noah";
       }
-      this.getView().getModel("app").setProperty("/selectedMenuKey", sKey);
+      // Készletgazdálkodás a Jokerek egyik modulja — oldalmenüben a Jokerek marad aktív
+      var sMenuKey = sKey === "keszletgazdalkodas" ? "jokers" : sKey;
+      this.getView().getModel("app").setProperty("/selectedMenuKey", sMenuKey);
       if (sKey === "discovery") {
         this.getOwnerComponent().getRouter().navTo("discoveryHome", {}, true);
         return;

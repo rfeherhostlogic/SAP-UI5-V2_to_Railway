@@ -532,6 +532,10 @@ sap.ui.define([
       } catch(e) { return oDate.toISOString(); }
     },
 
+    onNavBack: function() {
+      this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: "jokers" });
+    },
+
     // ─── Noah Q&A integráció ──────────────────────────────────────────────────
 
     onNoahSummarize: function() {

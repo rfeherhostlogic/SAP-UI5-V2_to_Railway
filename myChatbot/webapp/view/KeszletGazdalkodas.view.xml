@@ -5,7 +5,11 @@
   xmlns:unif="sap.ui.unified"
   controllerName="sap.suite.ui.commons.demo.tutorial.controller.KeszletGazdalkodas">
 
-  <Page showHeader="false" class="invPage">
+  <Page
+    title="Készletgazdálkodás"
+    showNavButton="true"
+    navButtonPress=".onNavBack"
+    class="invPage">
 
     <VBox width="100%" class="invShell">
 

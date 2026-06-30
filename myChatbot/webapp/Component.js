@@ -296,13 +296,13 @@ sap.ui.define([
 					},
 					{
 						id: "dummy-16",
-						title: "Keszletgazdalkodas",
-						subtitle: "Ujrarendeles es keszletkockazat",
+						title: "Készletgazdálkodás",
+						subtitle: "Előrejelzés és rendelési javaslatok",
 						primaryTag: "Altalanos",
 						tags: ["Altalanos"],
 						footer: "AI Joker 16",
-						description: "Keszletszintek, fogyas, beszerzesi idok es ellatasi kockazatok alapjan ujrarendelesi es optimalizalasi javaslatokat ad.",
-						systemPrompt: "Elemezd a megadott keszletgazdalkodasi helyzetet. Azonositsd a hiany- es tulkeszlet-kockazatokat, majd adj rovid, priorizalt ujrarendelesi, atcsoportositasi es optimalizalasi javaslatokat uzletileg erthetoen."
+						description: "Adatbázis vagy CSV alapján kiszámítja a várható készlethiányokat, kritikus cikkeket és optimális rendelési mennyiségeket, Noah AI összefoglalóval.",
+						systemPrompt: ""
 					},
 					{
 						id: "dummy-17",
