@@ -12088,6 +12088,22 @@ app.post("/api/inventory/upload-csv", function(req, res) {
   });
 });
 
+// GET /api/inventory/categories
+// Visszaadja az INV_CATEGORIES tábla összes kategóriáját.
+app.get("/api/inventory/categories", async function(_req, res) {
+  let db;
+  try {
+    db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
+    const rows = await sqliteAllParams(db, "SELECT category_id, category_name FROM INV_CATEGORIES ORDER BY category_name ASC", []);
+    res.json({ categories: rows });
+  } catch (err) {
+    console.error("[inventory/categories] hiba:", err && err.message ? err.message : String(err));
+    res.status(500).json({ error: "A kategóriák lekérése során hiba lépett fel." });
+  } finally {
+    if (db) { closeSqlite(db); }
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 
 app.use(express.static(UI_STATIC_DIR));

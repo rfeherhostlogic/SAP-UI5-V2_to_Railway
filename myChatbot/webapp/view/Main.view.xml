@@ -25,6 +25,7 @@
             <tnt:NavigationListItem text="Jokerek" key="jokers" icon="sap-icon://favorite"/>
             <tnt:NavigationListItem text="Flow" key="flow" icon="sap-icon://process"/>
             <tnt:NavigationListItem text="Felfedezes" key="discovery" icon="sap-icon://search"/>
+            <tnt:NavigationListItem text="Készletgazdálkodás" key="keszletgazdalkodas" icon="sap-icon://inventory"/>
           </tnt:NavigationList>
         </tnt:item>
         <tnt:fixedItem>
@@ -44,6 +45,7 @@
         <mvc:XMLView id="feedView" viewName="sap.suite.ui.commons.demo.tutorial.view.Feed"/>
         <mvc:XMLView id="noah2View" viewName="sap.suite.ui.commons.demo.tutorial.view.Noah2"/>
         <mvc:XMLView id="jokerPromptView" viewName="sap.suite.ui.commons.demo.tutorial.view.JokerPrompt"/>
+        <mvc:XMLView id="keszletgazdalkodaView" viewName="sap.suite.ui.commons.demo.tutorial.view.KeszletGazdalkodas"/>
       </NavContainer>
     </tnt:mainContents>
   </tnt:ToolPage>

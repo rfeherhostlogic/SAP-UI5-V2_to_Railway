@@ -1,0 +1,231 @@
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:core="sap.ui.core"
+  xmlns:unif="sap.ui.unified"
+  controllerName="sap.suite.ui.commons.demo.tutorial.controller.KeszletGazdalkodas">
+
+  <Page showHeader="false" class="invPage">
+    <VBox width="100%" class="invShell">
+
+      <!-- Fejléc -->
+      <HBox alignItems="Center" justifyContent="SpaceBetween" class="invHeader">
+        <VBox>
+          <Title text="Készletgazdálkodás" level="H2" class="invTitle"/>
+          <Text text="Készletelőrejelzés és rendelési javaslatok" class="invSubtitle"/>
+        </VBox>
+      </HBox>
+
+      <!-- Fülek -->
+      <IconTabBar selectedKey="{inv>/selectedTab}" class="invTabBar" expandable="false">
+        <items>
+
+          <!-- Cél fül -->
+          <IconTabFilter key="cel" text="Cél" icon="sap-icon://target-group">
+            <VBox class="invInfoCard sapUiMediumMarginTop sapUiMediumMarginBottom">
+              <Title text="A modul célja" level="H4" class="sapUiSmallMarginBottom"/>
+              <Text text="A Készletgazdálkodás modul automatizált keresleti előrejelzést és rendelési javaslatokat nyújt. Az adatbázisban tárolt mozgásadatok vagy feltöltött CSV alapján azonosítja a kritikus, figyelendő és stabil készletszintű termékeket, majd egyedi rendelési javaslatokat generál a meghatározott előrejelzési időhorizontra." class="invInfoText"/>
+            </VBox>
+          </IconTabFilter>
+
+          <!-- Modul Építő fül -->
+          <IconTabFilter key="modulEpito" text="Modul Építő" icon="sap-icon://build">
+            <VBox class="invInfoCard sapUiMediumMarginTop sapUiMediumMarginBottom">
+              <Title text="Modul konfiguráció" level="H4" class="sapUiSmallMarginBottom"/>
+              <Text text="A modul beállításai az Elemzés fülön érhetők el. Válassza ki az adatforrást, az előrejelzési időhorizontot és a termékkategóriát, majd indítsa el az előrejelzést." class="invInfoText"/>
+            </VBox>
+          </IconTabFilter>
+
+          <!-- Elemzés fül (főtartalom) -->
+          <IconTabFilter key="forecast" text="Elemzés" icon="sap-icon://bar-chart">
+
+            <!-- HIBAÜZENET -->
+            <MessageStrip
+              id="invErrorStrip"
+              text="{inv>/errorMessage}"
+              type="Error"
+              showIcon="true"
+              visible="{= !!${inv>/errorMessage} }"
+              class="sapUiSmallMarginTop sapUiSmallMarginBottom"/>
+
+            <!-- ══════════════════════════════════════════ -->
+            <!-- STATE: setup                               -->
+            <!-- ══════════════════════════════════════════ -->
+            <VBox visible="{= ${inv>/state} === 'setup' }" class="invSetupShell">
+
+              <!-- SZEKCIÓ 1 — Adatforrás -->
+              <VBox class="invSectionCard">
+                <Title text="Adatforrás" level="H5" class="invSectionTitle"/>
+                <Text text="Válassza ki, honnan kerüljenek be a készletadatok az előrejelzéshez." class="invSectionDesc"/>
+                <SegmentedButton
+                  id="invDataSourceBtn"
+                  selectedKey="{inv>/dataSource}"
+                  selectionChange=".onDataSourceChange"
+                  class="invDataSourceToggle sapUiSmallMarginTop">
+                  <items>
+                    <SegmentedButtonItem key="db" icon="sap-icon://database" text="Adatbázis"/>
+                    <SegmentedButtonItem key="csv" icon="sap-icon://attachment" text="CSV feltöltés"/>
+                  </items>
+                </SegmentedButton>
+
+                <!-- CSV feltöltő zóna (csak CSV módban) -->
+                <VBox visible="{= ${inv>/dataSource} === 'csv' }" class="sapUiSmallMarginTop">
+
+                  <!-- Feltöltési zóna (ha még nincs fájl) -->
+                  <VBox
+                    id="invCsvDropZone"
+                    visible="{= !${inv>/csvFileName} }"
+                    class="invDropZone"
+                    press=".onCsvZonePress">
+                    <core:Icon src="sap-icon://upload" size="2rem" class="invDropZoneIcon"/>
+                    <Text text="Húzd ide a CSV fájlt, vagy kattints a tallózáshoz" class="invDropZoneText"/>
+                    <Text text="Elfogadott formátum: .csv  |  Max. 5 MB" class="invDropZoneHint"/>
+                  </VBox>
+
+                  <!-- Rejtett FileUploader -->
+                  <unif:FileUploader
+                    id="invCsvUploader"
+                    visible="false"
+                    fileType="csv"
+                    sameFilenameAllowed="true"
+                    multiple="false"
+                    uploadOnChange="false"
+                    change=".onCsvFileChange"/>
+
+                  <!-- Fájl chip (ha már van fájl kiválasztva) -->
+                  <HBox
+                    visible="{= !!${inv>/csvFileName} }"
+                    alignItems="Center"
+                    class="invFileChip sapUiSmallMarginTop">
+                    <core:Icon src="sap-icon://attachment-text-file" size="1rem" class="invFileChipIcon"/>
+                    <VBox class="sapUiTinyMarginBegin">
+                      <Text text="{inv>/csvFileName}" class="invFileChipName"/>
+                      <Text text="{inv>/csvFileSize}" class="invFileChipSize"/>
+                    </VBox>
+                    <Button
+                      icon="sap-icon://decline"
+                      type="Transparent"
+                      tooltip="Fájl eltávolítása"
+                      press=".onCsvRemove"
+                      class="invFileChipRemove"/>
+                  </HBox>
+
+                  <!-- Sablon letöltés link -->
+                  <Link
+                    text="Sablon letöltése (.csv)"
+                    press=".onDownloadTemplate"
+                    class="invTemplateLink sapUiTinyMarginTop"/>
+                </VBox>
+              </VBox>
+
+              <!-- SZEKCIÓ 2 — Előrejelzési horizont -->
+              <VBox class="invSectionCard">
+                <Title text="Előrejelzési időszak" level="H5" class="invSectionTitle"/>
+                <Text text="Hány napra előre számítson az előrejelzés?" class="invSectionDesc"/>
+                <SegmentedButton
+                  selectedKey="{inv>/horizonDays}"
+                  selectionChange=".onHorizonChange"
+                  class="sapUiSmallMarginTop">
+                  <items>
+                    <SegmentedButtonItem key="30" text="30 nap"/>
+                    <SegmentedButtonItem key="60" text="60 nap"/>
+                    <SegmentedButtonItem key="90" text="90 nap"/>
+                  </items>
+                </SegmentedButton>
+              </VBox>
+
+              <!-- SZEKCIÓ 3 — Kategória szűrő -->
+              <VBox class="invSectionCard">
+                <Title text="Termékkategória (opcionális)" level="H5" class="invSectionTitle"/>
+                <Text text="Ha üresen hagyja, az összes kategória szerepel az előrejelzésben." class="invSectionDesc"/>
+                <MultiComboBox
+                  id="invCategoryFilter"
+                  placeholder="Összes kategória"
+                  items="{inv>/categories}"
+                  selectionChange=".onCategoryChange"
+                  class="invCategoryCombo sapUiSmallMarginTop">
+                  <core:Item key="{inv>category_id}" text="{inv>category_name}"/>
+                </MultiComboBox>
+              </VBox>
+
+              <!-- SZEKCIÓ 4 — Noah pill trigger gomb -->
+              <VBox class="invNoahSection" alignItems="Center">
+                <HBox
+                  alignItems="Center"
+                  class="invNoahPill"
+                  press=".onRunForecast">
+                  <Avatar
+                    initials="N"
+                    displaySize="XS"
+                    press=".onRunForecast"
+                    class="chatAvatar noahAvatar invNoahPillAvatar"/>
+                  <Button
+                    text="Előrejelzés futtatása"
+                    type="Transparent"
+                    press=".onRunForecast"
+                    enabled="{= ${inv>/dataSource} !== 'csv' || !!${inv>/csvFileName} }"
+                    class="invNoahPillButton"/>
+                </HBox>
+              </VBox>
+
+            </VBox>
+            <!-- /STATE: setup -->
+
+
+            <!-- ══════════════════════════════════════════ -->
+            <!-- STATE: loading (skeleton)                  -->
+            <!-- ══════════════════════════════════════════ -->
+            <VBox visible="{= ${inv>/state} === 'loading' }" class="invLoadingShell sapUiMediumMarginTop">
+
+              <!-- KPI csontvázak (4 db) -->
+              <HBox wrap="Wrap" class="invSkeletonKpiRow sapUiSmallMarginBottom">
+                <VBox class="invSkeletonKpi invShimmer"/>
+                <VBox class="invSkeletonKpi invShimmer"/>
+                <VBox class="invSkeletonKpi invShimmer"/>
+                <VBox class="invSkeletonKpi invShimmer"/>
+              </HBox>
+
+              <!-- Lista sorok csontvázai (6 db) -->
+              <VBox class="invSkeletonListWrap">
+                <HBox class="invSkeletonRow invShimmer sapUiTinyMarginBottom"/>
+                <HBox class="invSkeletonRow invShimmer sapUiTinyMarginBottom"/>
+                <HBox class="invSkeletonRow invShimmer sapUiTinyMarginBottom"/>
+                <HBox class="invSkeletonRow invShimmer sapUiTinyMarginBottom"/>
+                <HBox class="invSkeletonRow invShimmer sapUiTinyMarginBottom"/>
+                <HBox class="invSkeletonRow invShimmer sapUiTinyMarginBottom"/>
+              </VBox>
+
+              <Text text="Az előrejelzés futtatása folyamatban..." class="invLoadingHint sapUiSmallMarginTop"/>
+            </VBox>
+            <!-- /STATE: loading -->
+
+
+            <!-- ══════════════════════════════════════════ -->
+            <!-- STATE: empty                               -->
+            <!-- ══════════════════════════════════════════ -->
+            <VBox
+              visible="{= ${inv>/state} === 'empty' }"
+              alignItems="Center"
+              class="invEmptyState sapUiLargeMarginTop">
+              <core:Icon src="sap-icon://product" size="4rem" class="invEmptyIcon"/>
+              <Title text="Nincsenek termékek" level="H4" class="sapUiSmallMarginTop"/>
+              <Text
+                text="Nem találhatók termékek a kiválasztott szűrőkkel."
+                textAlign="Center"
+                class="invEmptyText"/>
+              <Button
+                text="Vissza a beállításokhoz"
+                type="Emphasized"
+                press=".onBackToSetup"
+                class="sapUiSmallMarginTop"/>
+            </VBox>
+            <!-- /STATE: empty -->
+
+          </IconTabFilter>
+          <!-- /Elemzés fül -->
+
+        </items>
+      </IconTabBar>
+    </VBox>
+  </Page>
+</mvc:View>
