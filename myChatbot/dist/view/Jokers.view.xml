@@ -25,7 +25,7 @@
       <FlexBox items="{jokers>/filteredTiles}" wrap="Wrap" class="jokerTileGrid">
         <items>
           <VBox class="jokerTileWrap">
-            <GenericTile class="jokerTile" header="{jokers>title}" subheader="{= ${jokers>subtitle} + ' • ' + (${jokers>primaryTag} || 'Általános') }" frameType="OneByOne" press=".onTilePress">
+            <GenericTile class="{= ${jokers>developed} ? 'jokerTile jokerTileDevActive' : 'jokerTile' }" header="{jokers>title}" subheader="{= ${jokers>subtitle} + ' • ' + (${jokers>primaryTag} || 'Általános') }" frameType="OneByOne" press=".onTilePress">
               <tileContent>
                 <TileContent footer="{jokers>footer}">
                   <content>
