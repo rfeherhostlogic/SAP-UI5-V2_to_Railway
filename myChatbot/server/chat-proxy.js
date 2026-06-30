@@ -166,6 +166,10 @@ const oMLWizardUpload = multer({
     files: 5
   }
 });
+const oInventoryCsvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 }
+});
 
 const NOAH_LOW_CONFIDENCE_THRESHOLD = Number(process.env.NOAH_LOW_CONFIDENCE_THRESHOLD || 0.55);
 const NOAH_CARDS = [
@@ -6887,6 +6891,143 @@ function parseDiscoveryCsvHeader(buffer, fileName) {
   };
 }
 
+// ─── Készletgazdálkodás CSV parser ───────────────────────────────────────────
+
+// RFC 4180-kompatibilis CSV sor-parser (idézőjeles mezők támogatásával)
+function parseInventoryCsvRow(line, delimiter) {
+  const fields = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { current += '"'; i++; }
+        else { inQuotes = false; }
+      } else { current += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === delimiter) { fields.push(current.trim()); current = ""; }
+      else { current += ch; }
+    }
+  }
+  fields.push(current.trim());
+  return fields;
+}
+
+// Teljes CSV buffer feldolgozása: header-ellenőrzés, soronkénti validáció,
+// normálizálás a belső előrejelzési struktúrára.
+// Visszatér: { valid, errors, totalRows, delimiter } VAGY { error } (fatális hiba)
+function parseInventoryCsvBuffer(buffer) {
+  const CSV_COLS = [
+    "cikkszam", "megnevezes", "kategoria", "egyseg", "egysegar_huf",
+    "aktualis_keszlet", "atlag_napi_felhasznaltas", "lead_time_nap",
+    "min_keszlet", "max_keszlet", "ujrarendeles_menny", "szallito_nev"
+  ];
+  const REQUIRED_COLS = [
+    "cikkszam", "megnevezes", "aktualis_keszlet", "atlag_napi_felhasznaltas", "lead_time_nap"
+  ];
+
+  const raw = String(buffer || "").replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const nonEmpty = raw.split("\n").filter(function(l) { return !!String(l || "").trim(); });
+
+  if (nonEmpty.length === 0) {
+    return { error: "Az CSV fájl üres." };
+  }
+
+  // Elválasztó felismerése a fejlécből (vessző vs. pontosvessző)
+  const hdrLine = nonEmpty[0];
+  const commas = hdrLine.split(",").length - 1;
+  const semis  = hdrLine.split(";").length - 1;
+  const delim  = semis > commas ? ";" : ",";
+
+  // Fejléc feldolgozása (kis-nagybetű-független)
+  const hdrCols = parseInventoryCsvRow(hdrLine, delim).map(function(c) {
+    return String(c || "").toLowerCase().trim();
+  });
+
+  const missingReq = REQUIRED_COLS.filter(function(c) { return hdrCols.indexOf(c) < 0; });
+  if (missingReq.length > 0) {
+    return {
+      error: "Hiányzó kötelező fejlécoszlopok: " + missingReq.join(", ") +
+             ". Kérjük, töltse le a sablont az elvárt formátumhoz."
+    };
+  }
+
+  const colIdx = {};
+  CSV_COLS.forEach(function(col) {
+    const i = hdrCols.indexOf(col);
+    if (i >= 0) { colIdx[col] = i; }
+  });
+
+  const valid  = [];
+  const errors = [];
+  const dataLines = nonEmpty.slice(1);
+
+  dataLines.forEach(function(line, li) {
+    const rowNum = li + 2; // fejléccel együtt 1-alapú
+    const fields = parseInventoryCsvRow(line, delim);
+    const rowErrs = [];
+
+    function getF(col) {
+      const idx = colIdx[col];
+      return (idx !== undefined && idx < fields.length) ? String(fields[idx] || "").trim() : "";
+    }
+    function parseN(col, required) {
+      const v = getF(col);
+      if (!v) {
+        if (required) { rowErrs.push("hiányzó " + col + " mező"); }
+        return 0;
+      }
+      const n = Number(String(v).replace(",", "."));
+      if (isNaN(n) || n < 0) {
+        rowErrs.push("érvénytelen szám az " + col + " mezőben");
+        return 0;
+      }
+      return n;
+    }
+
+    const cikkszam  = getF("cikkszam");
+    const megnevezes = getF("megnevezes");
+    if (!cikkszam)   { rowErrs.push("hiányzó cikkszam mező"); }
+    if (!megnevezes) { rowErrs.push("hiányzó megnevezes mező"); }
+
+    const aktualisKeszlet = parseN("aktualis_keszlet",         true);
+    const atlagNapi       = parseN("atlag_napi_felhasznaltas", true);
+    const leadTime        = parseN("lead_time_nap",            true);
+    const egysegar        = parseN("egysegar_huf",             false);
+    const minKeszlet      = parseN("min_keszlet",              false);
+    const maxKeszletRaw   = parseN("max_keszlet",              false);
+    const maxKeszlet      = maxKeszletRaw > 0 ? maxKeszletRaw : 999999;
+    const ujrarendeles    = parseN("ujrarendeles_menny",       false);
+
+    if (rowErrs.length > 0) {
+      errors.push("Sor " + rowNum + ": " + rowErrs.join("; "));
+      return;
+    }
+
+    valid.push({
+      product_id:           cikkszam,
+      product_code:         cikkszam,
+      product_name:         megnevezes,
+      category_id:          getF("kategoria") || "Egyéb",
+      category_name:        getF("kategoria") || "Egyéb",
+      unit:                 getF("egyseg") || "db",
+      unit_price:           egysegar,
+      lead_time_days:       leadTime,
+      min_stock_level:      minKeszlet,
+      max_stock_level:      maxKeszlet,
+      reorder_quantity:     ujrarendeles,
+      current_quantity:     aktualisKeszlet,
+      avg_daily_demand:     atlagNapi,
+      supplier_name:        getF("szallito_nev") || "",
+      supplier_reliability: 0
+    });
+  });
+
+  return { valid: valid, errors: errors, totalRows: dataLines.length, delimiter: delim };
+}
+
 function normalizeDiscoveryText(value) {
   return String(value || "")
     .toLowerCase()
@@ -11684,6 +11825,267 @@ app.post("/api/inventory/forecast", async function(req, res) {
   } finally {
     if (db) { await closeSqlite(db).catch(function() {}); }
   }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// KÉSZLETGAZDÁLKODÁS – CSV SABLON ÉS FELTÖLTÉS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/inventory/csv-template
+// Letölthető CSV sablon a helyes feltöltési formátumhoz (UTF-8 BOM, Excel-kompatibilis)
+app.get("/api/inventory/csv-template", function(_req, res) {
+  const BOM = "﻿";
+  const headers = "cikkszam,megnevezes,kategoria,egyseg,egysegar_huf,aktualis_keszlet,atlag_napi_felhasznaltas,lead_time_nap,min_keszlet,max_keszlet,ujrarendeles_menny,szallito_nev";
+  const rows = [
+    'KAB-001,"Rézkábel 2x2.5mm² (100m)",Elektronikai,tekercs,28500,8,0.35,7,5,20,5,Elektro-Prima Kft.',
+    'CSA-001,"Nitriles kesztyű S (200db/dob)",Védőeszköz,doboz,3800,12,1.8,6,20,80,20,SafeWork Supply Kft.',
+    'KEM-001,"Ipari oldószer IPA 99.9% (5l)",Vegyi anyag,kanna,4200,3,0.6,14,10,40,10,ChemSource Kft.'
+  ];
+  const csvContent = BOM + [headers].concat(rows).join("\r\n") + "\r\n";
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", "attachment; filename=\"keszlet_sablon.csv\"");
+  res.send(Buffer.from(csvContent, "utf8"));
+});
+
+// POST /api/inventory/upload-csv
+// Multipart/form-data: field "file" = CSV fájl; form fields: horizon_days, category_filter
+app.post("/api/inventory/upload-csv", function(req, res) {
+  oInventoryCsvUpload.single("file")(req, res, function(uploadErr) {
+    if (uploadErr && uploadErr.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ error: "A feltöltött fájl mérete meghaladja az 5 MB-os korlátot." });
+    }
+    if (uploadErr) {
+      console.error("[inventory/upload-csv] multer hiba:", uploadErr.message);
+      return res.status(500).json({ error: "A fájl fogadása során hiba lépett fel. Kérjük, próbálja újra." });
+    }
+
+    // Fájl jelenlétének ellenőrzése
+    if (!req.file) {
+      return res.status(400).json({ error: "Nem érkezett feltöltött fájl. Kérjük, válasszon ki egy CSV fájlt." });
+    }
+    const originalName = String(req.file.originalname || "").toLowerCase().trim();
+    if (!originalName.endsWith(".csv")) {
+      return res.status(400).json({ error: "Csak .csv kiterjesztésű fájlok fogadhatók el." });
+    }
+
+    // Form mezők kiolvasása
+    const horizonRaw   = req.body && req.body.horizon_days   ? req.body.horizon_days   : 30;
+    const catFilterRaw = req.body && req.body.category_filter ? String(req.body.category_filter).trim() : "";
+    const horizon = [30, 60, 90].includes(Number(horizonRaw)) ? Number(horizonRaw) : 30;
+    const catFilter = (catFilterRaw && catFilterRaw.toLowerCase() !== "null") ? catFilterRaw : null;
+
+    // CSV feldolgozása
+    const parseResult = parseInventoryCsvBuffer(req.file.buffer);
+    if (parseResult.error) {
+      return res.status(400).json({ error: parseResult.error });
+    }
+
+    const { valid, errors, totalRows } = parseResult;
+
+    // 30%-os hibaküszöb: ha a sorok több mint 30%-a hibás, a teljes fájlt visszautasítjuk
+    const errorRatio = totalRows > 0 ? errors.length / totalRows : 0;
+    if (errorRatio > 0.30) {
+      return res.status(400).json({
+        error: "A fájl sorainak " + errors.length + "/" + totalRows + " (" +
+               Math.round(errorRatio * 100) + "%-a) hibás – ez meghaladja a 30%-os küszöböt. " +
+               "Kérjük, javítsa a hibákat és töltse fel újra.",
+        csv_stats: {
+          total_rows_in_file: totalRows,
+          valid_rows: valid.length,
+          skipped_rows: errors.length,
+          skipped_reasons: errors
+        }
+      });
+    }
+
+    if (valid.length === 0) {
+      return res.status(400).json({
+        error: "A CSV fájl nem tartalmaz érvényes adatsort.",
+        csv_stats: { total_rows_in_file: totalRows, valid_rows: 0, skipped_rows: errors.length, skipped_reasons: errors }
+      });
+    }
+
+    // Kategória szűrő alkalmazása (ha megadták)
+    let products = valid;
+    if (catFilter) {
+      const catLower = catFilter.toLowerCase();
+      products = products.filter(function(p) {
+        return String(p.category_name || "").toLowerCase().indexOf(catLower) >= 0;
+      });
+    }
+
+    // ── Előrejelzés és osztályozás (azonos logika mint /forecast DB módban) ──
+    const today       = new Date();
+    const todayMs     = today.getTime();
+    const forecastDaysCount = Math.min(horizon, 30);
+
+    const enriched = products.map(function(p) {
+      const currentQty    = Number(p.current_quantity  || 0);
+      const maxStockLevel = Number(p.max_stock_level   || 999999);
+      const minStockLevel = Number(p.min_stock_level   || 0);
+      const leadTimeDays  = Number(p.lead_time_days    || 14);
+      const unitPrice     = Number(p.unit_price        || 0);
+      const avgDailyDemand = Number(p.avg_daily_demand || 0);
+
+      const daysUntilStockout = avgDailyDemand > 0 ? Math.floor(currentQty / avgDailyDemand) : 999;
+      const stockoutDate = new Date(todayMs + daysUntilStockout * 86400000).toISOString().slice(0, 10);
+
+      let classification;
+      if (currentQty > maxStockLevel) {
+        classification = "EXCESS";
+      } else if (daysUntilStockout <= leadTimeDays) {
+        classification = "CRITICAL";
+      } else if (daysUntilStockout <= leadTimeDays + 7) {
+        classification = "WARNING";
+      } else {
+        classification = "STABLE";
+      }
+
+      let reorderSuggestion = null;
+      if (classification === "CRITICAL" || classification === "WARNING") {
+        const suggestedQty  = Math.max(0, maxStockLevel - currentQty);
+        const deadlineDays  = Math.max(0, daysUntilStockout - leadTimeDays);
+        reorderSuggestion = {
+          suggested_quantity:     Math.round(suggestedQty * 10) / 10,
+          latest_order_deadline:  new Date(todayMs + deadlineDays * 86400000).toISOString().slice(0, 10),
+          estimated_value_huf:    Math.round(suggestedQty * unitPrice),
+          supplier_name:          String(p.supplier_name || ""),
+          supplier_reliability:   Number(p.supplier_reliability || 0)
+        };
+      }
+
+      // CSV-ből nincs mozgástörténet → trend STABLE, lapos előrejelzés
+      const forecastPoints = [];
+      for (let fd = 1; fd <= forecastDaysCount; fd++) {
+        forecastPoints.push(Math.round(avgDailyDemand * 1000) / 1000);
+      }
+
+      return {
+        product_id:           String(p.product_id   || ""),
+        product_code:         String(p.product_code || ""),
+        product_name:         String(p.product_name || ""),
+        category_id:          String(p.category_id  || ""),
+        category_name:        String(p.category_name || ""),
+        unit:                 String(p.unit          || ""),
+        current_quantity:     currentQty,
+        max_stock_level:      maxStockLevel,
+        min_stock_level:      minStockLevel,
+        avg_daily_demand:     avgDailyDemand,
+        days_until_stockout:  daysUntilStockout,
+        lead_time_days:       leadTimeDays,
+        stockout_date:        stockoutDate,
+        unit_price:           unitPrice,
+        trend:                "STABLE",
+        classification:       classification,
+        reorder_suggestion:   reorderSuggestion,
+        forecast_points:      forecastPoints,
+        supplier_name:        String(p.supplier_name        || ""),
+        supplier_reliability: Number(p.supplier_reliability || 0)
+      };
+    });
+
+    const criticalProducts = enriched.filter(function(i) { return i.classification === "CRITICAL"; });
+    const warningProducts  = enriched.filter(function(i) { return i.classification === "WARNING";  });
+    const stableProducts   = enriched.filter(function(i) { return i.classification === "STABLE";   });
+    const excessProducts   = enriched.filter(function(i) { return i.classification === "EXCESS";   });
+
+    const totalReorderValue = criticalProducts.concat(warningProducts).reduce(function(s, item) {
+      return s + (item.reorder_suggestion ? Number(item.reorder_suggestion.estimated_value_huf || 0) : 0);
+    }, 0);
+
+    // Előrejelzés diagram adatok
+    const chartLabels = [];
+    for (let ld = 1; ld <= forecastDaysCount; ld++) {
+      chartLabels.push(new Date(todayMs + ld * 86400000).toISOString().slice(0, 10));
+    }
+    const chartItems = criticalProducts.concat(warningProducts, stableProducts).slice(0, 10);
+    const datasets = chartItems.map(function(item) {
+      return {
+        product_id:       item.product_id,
+        product_name:     item.product_name,
+        category:         item.category_name,
+        projected_demand: item.forecast_points,
+        current_stock:    item.current_quantity
+      };
+    });
+
+    const catMap = {};
+    enriched.forEach(function(item) {
+      const cn = String(item.category_name || "");
+      if (!catMap[cn]) { catMap[cn] = { projected: 0, historical: 0 }; }
+      catMap[cn].projected  += item.avg_daily_demand * forecastDaysCount;
+      catMap[cn].historical += item.avg_daily_demand * forecastDaysCount;
+    });
+    const categorySummary = Object.keys(catMap).sort().map(function(cn) {
+      return {
+        category_name:          cn,
+        total_projected_demand: Math.round(catMap[cn].projected  * 100) / 100,
+        historical_avg:         Math.round(catMap[cn].historical * 100) / 100
+      };
+    });
+
+    function fmtProduct(item) {
+      const out = {
+        product_id:          item.product_id,
+        product_code:        item.product_code,
+        product_name:        item.product_name,
+        category_name:       item.category_name,
+        unit:                item.unit,
+        current_quantity:    item.current_quantity,
+        avg_daily_demand:    item.avg_daily_demand,
+        days_until_stockout: item.days_until_stockout,
+        lead_time_days:      item.lead_time_days,
+        stockout_date:       item.stockout_date,
+        trend:               item.trend
+      };
+      if (item.reorder_suggestion) { out.reorder_suggestion = item.reorder_suggestion; }
+      return out;
+    }
+
+    function fmtExcess(item) {
+      const excessQty = item.current_quantity - item.max_stock_level;
+      return {
+        product_id:          item.product_id,
+        product_name:        item.product_name,
+        current_quantity:    item.current_quantity,
+        max_stock_level:     item.max_stock_level,
+        excess_quantity:     excessQty,
+        excess_value_huf:    Math.round(excessQty * item.unit_price),
+        avg_daily_demand:    item.avg_daily_demand,
+        days_of_excess_stock: item.avg_daily_demand > 0 ? Math.floor(excessQty / item.avg_daily_demand) : 999
+      };
+    }
+
+    res.json({
+      generated_at:   today.toISOString(),
+      horizon_days:   horizon,
+      category_filter: catFilter,
+      data_source:    "csv",
+      csv_stats: {
+        total_rows_in_file: totalRows,
+        valid_rows:         valid.length,
+        skipped_rows:       errors.length,
+        skipped_reasons:    errors
+      },
+      summary: {
+        total_products:          enriched.length,
+        critical_count:          criticalProducts.length,
+        warning_count:           warningProducts.length,
+        stable_count:            stableProducts.length,
+        excess_count:            excessProducts.length,
+        total_reorder_value_huf: Math.round(totalReorderValue)
+      },
+      critical: criticalProducts.map(fmtProduct),
+      warning:  warningProducts.map(fmtProduct),
+      stable:   stableProducts.map(fmtProduct),
+      excess:   excessProducts.map(fmtExcess),
+      forecast_chart_data: {
+        labels:           chartLabels,
+        datasets:         datasets,
+        category_summary: categorySummary
+      }
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
