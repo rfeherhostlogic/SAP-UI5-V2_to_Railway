@@ -34,7 +34,7 @@
                 </TileContent>
               </tileContent>
             </GenericTile>
-            <HBox visible="{jokers>developed}" justifyContent="Center" class="jokerDevBadge">
+            <HBox visible="{= !!${jokers>developed} }" justifyContent="Center" class="jokerDevBadge">
               <Text text="Fejlesztve" class="jokerDevBadgeText"/>
             </HBox>
           </VBox>
