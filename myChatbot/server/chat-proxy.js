@@ -12088,6 +12088,74 @@ app.post("/api/inventory/upload-csv", function(req, res) {
   });
 });
 
+// POST /api/inventory/export-csv
+// Fogadja a frontend-től az előrejelzés JSON-t, és letölthető CSV-t ad vissza.
+app.post("/api/inventory/export-csv", function(req, res) {
+  var oForecast = req.body && req.body.forecast ? req.body.forecast : null;
+  if (!oForecast) {
+    return res.status(400).json({ error: "Hiányzó előrejelzési adat az exportáláshoz." });
+  }
+
+  function fmtNum(n) {
+    return String(Math.round(Number(n || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  }
+  function fmtDate(s) {
+    if (!s) { return ""; }
+    try { return new Date(s).toLocaleDateString("hu-HU"); } catch(e) { return String(s); }
+  }
+  function esc(s) {
+    var str = String(s == null ? "" : s);
+    if (str.indexOf(";") >= 0 || str.indexOf('"') >= 0 || str.indexOf("\n") >= 0) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  }
+
+  var BOM    = "﻿";
+  var aLines = [
+    "Cikkszám;Megnevezés;Kategória;Státusz;Aktuális készlet;Egység;Napi felhasználás;Készlet elfogy;Szállító;Javasolt rendel. menny.;Legkés. rendel. dátum;Becsült érték (Ft)"
+  ];
+
+  function addRows(aProducts, sStatus) {
+    (aProducts || []).forEach(function(p) {
+      var rs = p.reorder_suggestion || {};
+      aLines.push([
+        esc(p.product_code      || ""),
+        esc(p.product_name      || ""),
+        esc(p.category_name     || ""),
+        esc(sStatus),
+        esc(fmtNum(p.current_quantity)),
+        esc(p.unit              || ""),
+        esc(fmtNum(p.avg_daily_demand)),
+        esc(fmtDate(p.stockout_date)),
+        esc(rs.supplier_name   || ""),
+        esc(fmtNum(rs.suggested_quantity)),
+        esc(fmtDate(rs.latest_order_deadline)),
+        esc(fmtNum(rs.estimated_value_huf))
+      ].join(";"));
+    });
+  }
+
+  addRows(oForecast.critical, "KRITIKUS");
+  addRows(oForecast.warning,  "FIGYELENDŐ");
+  addRows(oForecast.stable,   "STABIL");
+
+  (oForecast.excess || []).forEach(function(p) {
+    aLines.push([
+      esc(""), esc(p.product_name || ""), esc(""), esc("FELESLEGES"),
+      esc(fmtNum(p.current_quantity)), esc("db"),
+      esc(fmtNum(p.avg_daily_demand)), esc(""), esc(""),
+      esc(""), esc(""), esc(fmtNum(p.excess_value_huf))
+    ].join(";"));
+  });
+
+  var sDate     = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  var sFilename = "keszlet_elorejelzes_" + sDate + ".csv";
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", "attachment; filename=\"" + sFilename + "\"");
+  res.send(BOM + aLines.join("\r\n"));
+});
+
 // GET /api/inventory/categories
 // Visszaadja az INV_CATEGORIES tábla összes kategóriáját.
 app.get("/api/inventory/categories", async function(_req, res) {

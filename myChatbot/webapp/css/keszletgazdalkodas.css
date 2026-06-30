@@ -259,3 +259,279 @@
   line-height: 1.6;
   font-size: 0.9rem;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE 2 — Eredmény nézet
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Fejléc sor */
+.invResultsTopBar {
+  padding-top: 0.5rem;
+}
+
+.invBackButton .sapMBtnInner {
+  color: #185FA5;
+  font-weight: 600;
+}
+
+.invForecastMeta {
+  color: #7a95ae;
+  font-size: 0.8125rem;
+}
+
+/* ─── KPI sáv ─────────────────────────────────────────────────────── */
+
+.invKpiStrip {
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.invKpiCard {
+  flex: 1 1 11rem;
+  min-width: 10rem;
+  border-radius: 1rem;
+  padding: 1rem 1.1rem;
+  background: #ffffff;
+  border: 1px solid rgba(210, 222, 240, 0.8);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  border-left-width: 4px;
+}
+
+.invKpiCardCritical { border-left-color: #DC3545; }
+.invKpiCardWarning  { border-left-color: #FFC107; }
+.invKpiCardBlue     { border-left-color: #185FA5; }
+.invKpiCardGreen    { border-left-color: #28A745; }
+
+.invKpiCardHeader {
+  margin-bottom: 0.35rem;
+}
+
+.invKpiLabel {
+  color: #52697e;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.invKpiIconCritical { color: #DC3545; }
+.invKpiIconWarning  { color: #E09000; }
+.invKpiIconBlue     { color: #185FA5; }
+.invKpiIconGreen    { color: #28A745; }
+
+.invKpiValueCritical .sapMTitle { color: #DC3545; font-size: 1.75rem; }
+.invKpiValueWarning  .sapMTitle { color: #E09000; font-size: 1.75rem; }
+.invKpiValueBlue     .sapMTitle { color: #185FA5; font-size: 1.4rem;  }
+.invKpiValueGreen    .sapMTitle { color: #28A745; font-size: 1.75rem; }
+
+.invKpiSub {
+  color: #8a9faf;
+  font-size: 0.75rem;
+  margin-top: 0.2rem;
+}
+
+/* ─── Eredmény TabBar ──────────────────────────────────────────────── */
+
+.invResultsTabBar.sapMITB {
+  background: transparent;
+}
+
+/* ─── Termék lista ────────────────────────────────────────────────── */
+
+.invProductList.sapMList {
+  background: transparent;
+}
+
+.invProductList .sapMLIB {
+  background: #ffffff;
+  border: 1px solid rgba(210, 222, 240, 0.8);
+  border-radius: 0.85rem;
+  margin-bottom: 0.6rem;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+}
+
+/* Bal oldali színes sáv */
+.invLeftBarCritical {
+  width: 5px;
+  min-height: 100%;
+  background: #DC3545;
+  flex-shrink: 0;
+}
+
+.invLeftBarWarning {
+  width: 5px;
+  min-height: 100%;
+  background: #FFC107;
+  flex-shrink: 0;
+}
+
+.invLeftBarExcess {
+  width: 5px;
+  min-height: 100%;
+  background: #9E5E00;
+  flex-shrink: 0;
+}
+
+/* Kártya tartalom */
+.invCardContent {
+  padding: 0.75rem 1rem;
+}
+
+.invCardCode {
+  font-size: 0.8rem;
+  color: #7a95ae;
+  font-weight: 600;
+}
+
+.invCardSep {
+  color: #b0c4d8;
+  margin: 0 0.25rem;
+}
+
+.invCardName {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #0f2942;
+}
+
+/* SÜRGŐS jelvény */
+.invUrgentBadge {
+  background: #DC3545;
+  color: #ffffff !important;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+}
+
+/* Kategória pill */
+.invCategoryPill {
+  background: rgba(24, 95, 165, 0.1);
+  color: #185FA5 !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(24, 95, 165, 0.2);
+}
+
+/* 4-értékes mérőszám rács */
+.invCardMetaGrid {
+  gap: 0.75rem;
+}
+
+.invCardMetaItem {
+  min-width: 7rem;
+}
+
+.invCardMetaLabel {
+  color: #8a9faf;
+  font-size: 0.75rem;
+}
+
+.invCardMetaValue {
+  color: #1a3a5c;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.1rem;
+}
+
+.invCardMetaDanger {
+  color: #DC3545 !important;
+}
+
+/* Rendelési javaslat doboz */
+.invReorderBox {
+  background: #EBF4FF;
+  border: 1px solid rgba(24, 95, 165, 0.18);
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.invReorderBoxIcon {
+  color: #185FA5;
+  flex-shrink: 0;
+}
+
+.invReorderBoxText {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f2942;
+}
+
+.invReorderBoxSub {
+  font-size: 0.8rem;
+  color: #5a7a95;
+  margin-top: 0.1rem;
+}
+
+/* ─── Rendelési javaslatok tábla (Tab 2) ──────────────────────────── */
+
+.invOrderTable.sapMTable {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+}
+
+.invReliabilityBar.sapMPI {
+  height: 0.5rem;
+}
+
+.invStatusBadgeCritical {
+  background: #DC3545;
+  color: #ffffff !important;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+}
+
+.invStatusBadgeWarning {
+  background: #FFC107;
+  color: #333 !important;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+}
+
+.invDeadlineUrgent {
+  color: #DC3545 !important;
+  font-weight: 700;
+}
+
+.invOrderTableFooter {
+  border-top: 1px solid rgba(210, 222, 240, 0.7);
+  padding-top: 0.5rem;
+}
+
+.invOrderSummaryText {
+  color: #52697e;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* ─── Grafikon konténer (Tab 3) ───────────────────────────────────── */
+
+.invChartTitle .sapMTitle {
+  color: #0f2942;
+}
+
+.invChartContainer {
+  min-height: 220px;
+  background: #ffffff;
+  border: 1px solid rgba(210, 222, 240, 0.8);
+  border-radius: 0.85rem;
+  padding: 0.75rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+  position: relative;
+}
+
+/* ─── Lábléc akciósáv ─────────────────────────────────────────────── */
+
+.invResultsFooter.sapMTB {
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid rgba(210, 222, 240, 0.85);
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
+}
