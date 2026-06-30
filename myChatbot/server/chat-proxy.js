@@ -5893,145 +5893,299 @@ async function ensureSeedData() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// KÉSZLETGAZDÁLKODÁS – ADATBÁZIS TÁBLÁK ÉS SEED ADATOK
+// KÉSZLETGAZDÁLKODÁS – ADATBÁZIS TÁBLÁK ÉS SEED ADATOK (v2: 35 termék, 5 tábla)
+// Megfelel az inventory_schema.sql HANA-sémának.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 async function ensureInventoryTables() {
   const db = await openSqliteReadWrite(DISCOVERY_DB_PATH);
   try {
+    // --- Táblák létrehozása (SQLite, HANA-kompatibilis névkonvenció) ---
     await sqliteRun(db, [
-      "CREATE TABLE IF NOT EXISTS InventoryCategory (",
-      "  CategoryId   TEXT PRIMARY KEY,",
-      "  CategoryName TEXT NOT NULL",
+      "CREATE TABLE IF NOT EXISTS INV_CATEGORIES (",
+      "  category_id   TEXT PRIMARY KEY,",
+      "  category_name TEXT NOT NULL,",
+      "  description   TEXT",
       ")"
     ].join("\n"));
     await sqliteRun(db, [
-      "CREATE TABLE IF NOT EXISTS InventorySupplier (",
-      "  SupplierId          TEXT PRIMARY KEY,",
-      "  SupplierName        TEXT NOT NULL,",
-      "  SupplierReliability REAL NOT NULL DEFAULT 80.0",
+      "CREATE TABLE IF NOT EXISTS INV_SUPPLIERS (",
+      "  supplier_id       TEXT    PRIMARY KEY,",
+      "  supplier_name     TEXT    NOT NULL,",
+      "  contact_email     TEXT,",
+      "  default_lead_days INTEGER NOT NULL DEFAULT 14,",
+      "  reliability_score REAL    NOT NULL DEFAULT 80.0",
       ")"
     ].join("\n"));
     await sqliteRun(db, [
-      "CREATE TABLE IF NOT EXISTS InventoryProduct (",
-      "  ProductId       TEXT PRIMARY KEY,",
-      "  ProductCode     TEXT NOT NULL,",
-      "  ProductName     TEXT NOT NULL,",
-      "  CategoryId      TEXT NOT NULL,",
-      "  Unit            TEXT NOT NULL DEFAULT 'db',",
-      "  CurrentQuantity REAL NOT NULL DEFAULT 0,",
-      "  MaxStockLevel   REAL NOT NULL DEFAULT 100,",
-      "  MinStockLevel   REAL NOT NULL DEFAULT 10,",
-      "  UnitPrice       REAL NOT NULL DEFAULT 0,",
-      "  LeadTimeDays    INTEGER NOT NULL DEFAULT 14,",
-      "  SupplierId      TEXT NOT NULL,",
-      "  FOREIGN KEY (CategoryId) REFERENCES InventoryCategory(CategoryId),",
-      "  FOREIGN KEY (SupplierId) REFERENCES InventorySupplier(SupplierId)",
+      "CREATE TABLE IF NOT EXISTS INV_PRODUCTS (",
+      "  product_id       TEXT    PRIMARY KEY,",
+      "  product_code     TEXT    NOT NULL UNIQUE,",
+      "  product_name     TEXT    NOT NULL,",
+      "  category_id      TEXT    NOT NULL,",
+      "  unit             TEXT    NOT NULL DEFAULT 'db',",
+      "  unit_price       REAL    NOT NULL DEFAULT 0,",
+      "  supplier_id      TEXT    NOT NULL,",
+      "  lead_time_days   INTEGER NOT NULL DEFAULT 14,",
+      "  min_stock_level  REAL    NOT NULL DEFAULT 10,",
+      "  max_stock_level  REAL    NOT NULL DEFAULT 100,",
+      "  reorder_quantity REAL    NOT NULL DEFAULT 10,",
+      "  active           INTEGER NOT NULL DEFAULT 1,",
+      "  FOREIGN KEY (category_id) REFERENCES INV_CATEGORIES(category_id),",
+      "  FOREIGN KEY (supplier_id) REFERENCES INV_SUPPLIERS(supplier_id)",
       ")"
     ].join("\n"));
     await sqliteRun(db, [
-      "CREATE TABLE IF NOT EXISTS InventoryDemandHistory (",
-      "  ProductId        TEXT NOT NULL,",
-      "  DemandDate       TEXT NOT NULL,",
-      "  QuantityDemanded REAL NOT NULL DEFAULT 0,",
-      "  PRIMARY KEY (ProductId, DemandDate),",
-      "  FOREIGN KEY (ProductId) REFERENCES InventoryProduct(ProductId)",
+      "CREATE TABLE IF NOT EXISTS INV_STOCK_MOVEMENTS (",
+      "  movement_id   INTEGER PRIMARY KEY AUTOINCREMENT,",
+      "  product_id    TEXT    NOT NULL,",
+      "  movement_date TEXT    NOT NULL,",
+      "  quantity      REAL    NOT NULL,",
+      "  movement_type TEXT    NOT NULL CHECK(movement_type IN ('IN','OUT','RETURN','ADJUSTMENT')),",
+      "  reference_doc TEXT,",
+      "  created_at    TEXT    DEFAULT (datetime('now')),",
+      "  FOREIGN KEY (product_id) REFERENCES INV_PRODUCTS(product_id)",
+      ")"
+    ].join("\n"));
+    await sqliteRun(db,
+      "CREATE INDEX IF NOT EXISTS idx_inv_mov_prod_date ON INV_STOCK_MOVEMENTS (product_id, movement_date)"
+    );
+    await sqliteRun(db, [
+      "CREATE TABLE IF NOT EXISTS INV_CURRENT_STOCK (",
+      "  product_id       TEXT PRIMARY KEY,",
+      "  current_quantity REAL NOT NULL DEFAULT 0,",
+      "  warehouse_zone   TEXT,",
+      "  last_updated     TEXT DEFAULT (datetime('now')),",
+      "  FOREIGN KEY (product_id) REFERENCES INV_PRODUCTS(product_id)",
       ")"
     ].join("\n"));
 
-    // Idempotent: skip seeding if categories already exist
-    const catCountRow = await sqliteGet(db, "SELECT COUNT(*) AS cnt FROM InventoryCategory");
+    // Idempotent: skip seeding if INV_CATEGORIES already populated
+    const catCountRow = await sqliteGet(db, "SELECT COUNT(*) AS cnt FROM INV_CATEGORIES");
     if (Number(catCountRow && catCountRow.cnt ? catCountRow.cnt : 0) > 0) {
       return;
     }
 
-    // Categories
+    // --- Kategóriák (6 db) ---
     const categories = [
-      ["CAT01", "Elektronikai alkatrészek"],
-      ["CAT02", "Mechanikai alkatrészek"],
-      ["CAT03", "Kábel és kábelszerelvények"],
-      ["CAT04", "Pneumatika és hidraulika"]
+      ["CAT01", "Elektronikai alkatrészek",       "Kábelek, csatlakozók, PLC és villamos alkatrészek"],
+      ["CAT02", "Csomagolóanyagok",               "Dobozok, fóliák, ragasztószalagok és burkolóanyagok"],
+      ["CAT03", "Vegyszerek és kenőanyagok",      "Oldószerek, kenőzsírok, olajok és tisztítószerek"],
+      ["CAT04", "Mechanikai alkatrészek",         "Csavarok, csapágyak, tömítések és szerszámok"],
+      ["CAT05", "Egyéni védőeszközök (EPE)",      "Kesztyűk, szemüvegek, mellények és egyéb védőfelszerelések"],
+      ["CAT06", "Irodaszerek",                    "Papíráru, nyomtatási kellékek, irodai fogyóeszközök"]
     ];
-    for (const cat of categories) {
-      await sqliteRun(db, "INSERT INTO InventoryCategory (CategoryId, CategoryName) VALUES (?, ?)", cat);
-    }
-
-    // Suppliers
-    const suppliers = [
-      ["SUP01", "GlobalElec Trade Zrt.",    72.0],
-      ["SUP02", "Pneumax Hungary Kft.",     91.5],
-      ["SUP03", "Schaeffler Hungary Kft.",  88.0],
-      ["SUP04", "Lapp Kábel Kft.",          95.0],
-      ["SUP05", "RS Components Kft.",       83.0]
-    ];
-    for (const sup of suppliers) {
-      await sqliteRun(db, "INSERT INTO InventorySupplier (SupplierId, SupplierName, SupplierReliability) VALUES (?, ?, ?)", sup);
-    }
-
-    // Products: [id, code, name, catId, unit, qty, maxStock, minStock, unitPrice, leadDays, supId]
-    const products = [
-      ["PROD01", "KAB-REZ-225",  "Rézkábel 2x2.5mm²",          "CAT03", "m",   800, 2000, 400,  450,  14, "SUP04"],
-      ["PROD02", "EL-CSA-M12",   "Ipari csatlakozó M12 8p",     "CAT01", "db",   45,  200,  50, 2850,  21, "SUP01"],
-      ["PROD03", "EL-TAP-24V5A", "PLC tápegység 24V/5A",        "CAT01", "db",    8,   30,   5, 18500, 21, "SUP05"],
-      ["PROD04", "EL-VEZ-001",   "Siemens S7-1200 CPU modul",   "CAT01", "db",    1,    6,   2, 189500,21, "SUP01"],
-      ["PROD05", "PN-HEN-050",   "Pneumatikus henger Ø50mm",    "CAT04", "db",   12,   40,   8, 8900,  14, "SUP02"],
-      ["PROD06", "MEC-ORG-M10",  "O-gyűrű készlet M10",         "CAT02", "klt",   3,   20,   5, 1200,   7, "SUP03"],
-      ["PROD07", "MEC-TOM-001",  "Ipari tömítőgyanta",          "CAT02", "kg",   25,   50,  10, 3200,  10, "SUP05"],
-      ["PROD08", "EL-BIZ-10AT",  "Biztosíték 10A T",            "CAT01", "db",  145,   60,  20,  150,   7, "SUP05"],
-      ["PROD09", "MEC-CSA-6205", "Golyóscsapágy 6205",          "CAT02", "db",   22,   80,  15, 2100,  21, "SUP03"],
-      ["PROD10", "KAB-VEZ-4075", "Vezérlőkábel 4x0.75mm²",     "CAT03", "m",   320,  800, 100,  280,  14, "SUP04"],
-      ["PROD11", "EL-ENC-ABB01", "Encoder ABB 6000rpm",         "CAT01", "db",    2,   10,   3, 45000, 30, "SUP01"],
-      ["PROD12", "KAB-SZE-6M",   "Szervomotor kábel 6m",        "CAT03", "db",   35,   80,  20, 12000, 14, "SUP04"],
-      ["PROD13", "PN-NYO-010B",  "Nyomásmérő 0-10bar",          "CAT04", "db",    6,   25,   5, 15000, 14, "SUP02"],
-      ["PROD14", "PN-SZU-F40",   "Levegőszűrő elem F40",        "CAT04", "db",   18,   50,  10, 4500,   7, "SUP02"],
-      ["PROD15", "PN-SZE-52",    "Elektromágneses szelep 5/2",  "CAT04", "db",    9,   30,   8, 11000, 14, "SUP02"]
-    ];
-    for (const prod of products) {
+    for (const [cid, cname, cdesc] of categories) {
       await sqliteRun(db,
-        "INSERT INTO InventoryProduct (ProductId, ProductCode, ProductName, CategoryId, Unit, CurrentQuantity, MaxStockLevel, MinStockLevel, UnitPrice, LeadTimeDays, SupplierId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        prod
+        "INSERT INTO INV_CATEGORIES (category_id, category_name, description) VALUES (?, ?, ?)",
+        [cid, cname, cdesc]
       );
     }
 
-    // Demand profiles: productId → [avgDailyDemand, trendFactor]
-    // trendFactor applied to last 30 days vs baseline older days:
-    //   >1.05 → generates INCREASING trend, <0.95 → DECREASING, ~1.0 → STABLE
-    const demandProfiles = {
-      "PROD01": [2.5,  1.0 ],
-      "PROD02": [1.8,  0.90],
-      "PROD03": [0.35, 1.0 ],
-      "PROD04": [0.14, 1.0 ],
-      "PROD05": [0.4,  1.10],
-      "PROD06": [0.5,  1.0 ],
-      "PROD07": [0.5,  1.0 ],
-      "PROD08": [2.0,  0.88],
-      "PROD09": [0.35, 1.0 ],
-      "PROD10": [3.5,  1.0 ],
-      "PROD11": [0.12, 1.0 ],
-      "PROD12": [0.8,  1.0 ],
-      "PROD13": [0.35, 0.92],
-      "PROD14": [0.8,  1.0 ],
-      "PROD15": [0.5,  1.0 ]
-    };
+    // --- Szállítók (8 db) ---
+    // [id, name, email, lead_days, reliability]
+    const suppliers = [
+      ["SUP01", "GlobalElec Trade Zrt.",   "ertekesites@globalelec.hu",    7, 72.0],
+      ["SUP02", "PaperPack Hungary Kft.",  "megrendeles@paperpack.hu",     5, 88.0],
+      ["SUP03", "ChemSolutions Kft.",      "rendeles@chemsolutions.hu",   14, 85.0],
+      ["SUP04", "MetalFix Ipari Kft.",     "info@metalfix.hu",            10, 91.0],
+      ["SUP05", "SafetyFirst Kft.",        "webshop@safetyfirst.hu",       6, 89.0],
+      ["SUP06", "OfficeDirect Kft.",       "megrendeles@officedirect.hu",  3, 95.0],
+      ["SUP07", "Siemens AG",              "siemens.hu@siemens.com",      21, 97.0],
+      ["SUP08", "FlexoPack Kft.",          "flex@flexopack.hu",            4, 83.0]
+    ];
+    for (const [sid, sname, email, lead, rel] of suppliers) {
+      await sqliteRun(db,
+        "INSERT INTO INV_SUPPLIERS (supplier_id, supplier_name, contact_email, default_lead_days, reliability_score) VALUES (?, ?, ?, ?, ?)",
+        [sid, sname, email, lead, rel]
+      );
+    }
 
-    const rnd = seededRandomFactory(8765);
+    // --- Termékek (35 db) ---
+    // [id, code, name, catId, unit, price, supId, lead, minS, maxS, reorder, avgDemand, trendFactor, seasonal]
+    const INV_PROD_MASTER = [
+      // CAT01 – Elektronikai alkatrészek
+      ["PROD01","EL-KAB-225",   "Rézkábel 2x2.5mm² (100m tekercs)",      "CAT01","tekercs",   8500,"SUP01", 7,  3, 15,  5, 0.30, 1.00,"normal"],
+      ["PROD02","EL-KAB-466",   "Rézkábel 4x6mm² (100m tekercs)",         "CAT01","tekercs",  19800,"SUP01", 7,  2, 10,  3, 0.15, 1.00,"normal"],
+      ["PROD03","EL-RJ45-C6",   "RJ45 csatlakozó Cat6 (100db/csomag)",    "CAT01","csomag",    4800,"SUP01", 7,  8, 40, 10, 0.80, 1.00,"normal"],
+      ["PROD04","EL-CPU-S7120", "Siemens S7-1200 CPU modul",              "CAT01","db",      189500,"SUP07",21,  2,  6,  2, 0.07, 1.00,"normal"],
+      ["PROD05","EL-LED-E2710", "LED izzó E27 10W (10db/csomag)",         "CAT01","csomag",    3200,"SUP01", 7, 15, 60, 15, 0.50, 1.00,"normal"],
+      ["PROD06","EL-BIZ-16AT",  "16A biztosíték betét (50db/csomag)",     "CAT01","csomag",    2100,"SUP01", 7, 12, 50, 12, 0.60, 1.00,"normal"],
+      // CAT02 – Csomagolóanyagok
+      ["PROD07","CS-DOB-A4100", "Kartondoboz A4 méret (100db/köteg)",     "CAT02","köteg",     8900,"SUP02", 5, 25,100, 25, 2.00, 1.00,"packaging"],
+      ["PROD08","CS-BUB-12050", "Buborékfólia 1.2m×50m (tekercs)",       "CAT02","tekercs",  12400,"SUP08", 5,  5, 20,  5, 0.30, 0.90,"packaging"],
+      ["PROD09","CS-RAG-486",   "Ragasztószalag barna 48mm (6 tekercs)", "CAT02","csomag",    1850,"SUP08", 4, 15, 70, 15, 1.50, 1.00,"packaging"],
+      ["PROD10","CS-STR-500",   "Stretch fólia 500mm×250m (tekercs)",    "CAT02","tekercs",   6700,"SUP02", 5,  8, 40,  8, 0.80, 1.00,"packaging"],
+      ["PROD11","CS-HOZ-40100", "Hőzsugor fólia 40cm (100m)",            "CAT02","tekercs",   9800,"SUP08", 4,  4, 18,  4, 0.20, 1.00,"packaging"],
+      ["PROD12","CS-DOB-604040","Kartondoboz 60x40x40cm (50db/köteg)",   "CAT02","köteg",    18500,"SUP02", 5, 12, 50, 12, 1.00, 1.00,"packaging"],
+      // CAT03 – Vegyszerek és kenőanyagok
+      ["PROD13","VE-ACE-1L",    "Aceton oldószer (1L)",                   "CAT03","liter",     2800,"SUP03",14, 15, 70, 20, 3.50, 1.00,"chemical"],
+      ["PROD14","VE-KEN-5KG",   "Ipari kenőzsír (5kg vödör)",             "CAT03","kg",        8900,"SUP03",14,  4, 18,  5, 0.40, 1.00,"chemical"],
+      ["PROD15","VE-GEP-500",   "Géptisztító spray (500ml)",              "CAT03","db",        3400,"SUP03",14, 12, 55, 15, 1.50, 1.05,"chemical"],
+      ["PROD16","VE-HYD-2046",  "Hydraulikaolaj ISO 46 (20L kanna)",     "CAT03","kanna",    18500,"SUP03",14,  3, 12,  3, 0.20, 1.00,"chemical"],
+      ["PROD17","VE-ROZ-400",   "Rozsdaoldó spray 400ml",                "CAT03","db",        2200,"SUP03",14, 12, 60, 15, 1.20, 1.00,"chemical"],
+      // CAT04 – Mechanikai alkatrészek
+      ["PROD18","ME-CSA-M830",  "M8×30 csavar (100db/csomag)",           "CAT04","csomag",    1400,"SUP04",10, 40,180, 40, 5.00, 1.00,"normal"],
+      ["PROD19","ME-CSA-M1040", "M10×40 csavar (100db/csomag)",          "CAT04","csomag",    1800,"SUP04",10, 25,110, 30, 3.00, 1.00,"normal"],
+      ["PROD20","ME-CSA-6205",  "6205-ZZ golyóscsapágy",                 "CAT04","db",        3200,"SUP04",10, 12, 55, 15, 1.50, 1.00,"normal"],
+      ["PROD21","ME-CSA-6305",  "6305-ZZ golyóscsapágy",                 "CAT04","db",        4100,"SUP04",10,  8, 38, 10, 1.00, 1.00,"normal"],
+      ["PROD22","ME-TEF-12M",   "Teflon tömítőszalag 12mm (12m/tekercs)","CAT04","tekercs",    380,"SUP04",10, 16, 75, 20, 2.00, 1.00,"normal"],
+      ["PROD23","ME-ORG-503",   "O-gyűrű 50×3mm (100db/csomag)",         "CAT04","csomag",    1900,"SUP04",10, 32,145, 40, 4.00, 1.00,"normal"],
+      ["PROD24","ME-LAT-20M1",  "Lánctengely 20mm×1m",                   "CAT04","db",       12800,"SUP04",10,  2,  8,  2, 0.10, 1.00,"normal"],
+      ["PROD25","ME-KUL-819",   "Lapos kulcs készlet 8-19mm",            "CAT04","készlet",   8400,"SUP04",10,  2,  8,  2, 0.05, 1.00,"normal"],
+      // CAT05 – Egyéni védőeszközök
+      ["PROD26","EV-KEZ-L12",   "Védőkesztyű L méret (12 pár/csomag)",  "CAT05","csomag",    3600,"SUP05", 6, 16, 70, 20, 2.00, 1.00,"ppe"],
+      ["PROD27","EV-SZE-UV5",   "Védőszemüveg UV szűrős (5db)",         "CAT05","csomag",    4200,"SUP05", 6, 12, 55, 15, 1.50, 1.00,"ppe"],
+      ["PROD28","EV-MEL-L5",    "Jólláthatósági mellény L (5db)",        "CAT05","csomag",    7800,"SUP05", 6,  4, 18,  5, 0.30, 1.00,"ppe"],
+      ["PROD29","EV-SIS-EN397", "Védősisak fehér EN397",                 "CAT05","db",        6500,"SUP05", 6,  3, 12,  3, 0.20, 1.00,"ppe"],
+      ["PROD30","EV-FUL-30DB",  "Fülvédő tokos 30dB (5db/csomag)",      "CAT05","csomag",    9200,"SUP05", 6,  4, 18,  5, 0.40, 1.00,"ppe"],
+      ["PROD31","EV-FFP-2M20",  "FFP2 szűrős maszk (20db/doboz)",       "CAT05","doboz",     4800,"SUP05", 6, 22, 95, 30, 3.00, 1.05,"ppe"],
+      // CAT06 – Irodaszerek
+      ["PROD32","IR-A4-80G",    "A4 nyomtatópapír 80g (5×500 lap)",     "CAT06","csomag",    3900,"SUP06", 3,  8, 35, 10, 0.50, 1.00,"normal"],
+      ["PROD33","IR-TON-HPB",   "Toner HP LaserJet fekete",              "CAT06","db",       22500,"SUP06", 3,  4, 18,  5, 0.50, 0.90,"normal"],
+      ["PROD34","IR-GOL-K50",   "Golyóstoll kék (50db/doboz)",           "CAT06","doboz",     2800,"SUP06", 3,  4, 18,  5, 0.30, 0.90,"normal"],
+      ["PROD35","IR-FOL-100",   "Csomagoló műanyagfólia (100 lap)",      "CAT06","csomag",    1200,"SUP06", 3,  4, 18,  5, 0.40, 1.00,"normal"]
+    ];
+    for (const [pid, pcode, pname, catId, unit, price, supId, lead, minS, maxS, reorder] of INV_PROD_MASTER) {
+      await sqliteRun(db,
+        "INSERT INTO INV_PRODUCTS (product_id, product_code, product_name, category_id, unit, unit_price, supplier_id, lead_time_days, min_stock_level, max_stock_level, reorder_quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [pid, pcode, pname, catId, unit, price, supId, lead, minS, maxS, reorder]
+      );
+    }
+
+    // --- Aktuális készletszintek (INV_CURRENT_STOCK) ---
+    // 5 CRITICAL + 4 WARNING + 6 EXCESS + 20 STABLE
+    const INV_CURRENT = [
+      // CRITICAL: days_until_stockout <= lead_time_days
+      ["PROD03",  5.0, "A-01"],  // avg=0.80 → days=6  ≤ lead=7
+      ["PROD04",  1.0, "A-02"],  // avg=0.07 → days=14 ≤ lead=21
+      ["PROD13", 10.0, "B-01"],  // avg=3.50 → days=2  ≤ lead=14
+      ["PROD20",  8.0, "C-01"],  // avg=1.50 → days=5  ≤ lead=10
+      ["PROD26",  8.0, "C-03"],  // avg=2.00 → days=4  ≤ lead=6
+      // WARNING: lead < days <= lead+7
+      ["PROD01",  4.0, "A-01"],  // avg=0.30 → days=13, 7<13≤14
+      ["PROD15", 28.0, "B-01"],  // avg=1.50 → days=18, 14<18≤21
+      ["PROD22", 24.0, "C-02"],  // avg=2.00 → days=12, 10<12≤17
+      ["PROD31", 24.0, "C-04"],  // avg=3.00 → days=8,  6<8≤13
+      // EXCESS: current_quantity > max_stock_level
+      ["PROD08", 28.0, "B-02"],  // max=20
+      ["PROD10", 58.0, "B-02"],  // max=40
+      ["PROD17", 80.0, "B-01"],  // max=60
+      ["PROD29", 18.0, "C-04"],  // max=12
+      ["PROD33", 28.0, "D-01"],  // max=18
+      ["PROD34", 30.0, "D-01"],  // max=18
+      // STABLE
+      ["PROD02",  6.0, "A-01"],
+      ["PROD05", 45.0, "A-02"],
+      ["PROD06", 35.0, "A-02"],
+      ["PROD07", 60.0, "B-02"],
+      ["PROD09", 50.0, "B-02"],
+      ["PROD11", 10.0, "B-02"],
+      ["PROD12", 30.0, "B-02"],
+      ["PROD14", 12.0, "B-01"],
+      ["PROD16",  7.0, "B-01"],
+      ["PROD18",120.0, "C-01"],
+      ["PROD19", 70.0, "C-01"],
+      ["PROD21", 25.0, "C-01"],
+      ["PROD23",100.0, "C-02"],
+      ["PROD24",  4.0, "C-01"],
+      ["PROD25",  5.0, "C-01"],
+      ["PROD27", 35.0, "C-03"],
+      ["PROD28", 12.0, "C-04"],
+      ["PROD30", 12.0, "C-04"],
+      ["PROD32", 25.0, "D-01"],
+      ["PROD35", 12.0, "D-01"]
+    ];
+    for (const [pid, qty, zone] of INV_CURRENT) {
+      await sqliteRun(db,
+        "INSERT INTO INV_CURRENT_STOCK (product_id, current_quantity, warehouse_zone) VALUES (?, ?, ?)",
+        [pid, qty, zone]
+      );
+    }
+
+    // --- Készletmozgások (~6 300 sor, 18 hónap, 35 termék) ---
+    // Szezónális szorzó (pattern → month 1-12 → multiplier)
+    function invSeasonMult(pattern, month) {
+      if (pattern === "ppe")       { return (month >= 4 && month <= 9) ? 1.4 : 0.75; }
+      if (pattern === "chemical")  { return (month <= 3 || month >= 10) ? 1.3 : 0.85; }
+      if (pattern === "packaging") {
+        if (month === 10 || month === 11) { return 1.8; }
+        if (month === 9  || month === 12) { return 1.3; }
+        return 0.85;
+      }
+      return 1.0;
+    }
+
+    const rnd = seededRandomFactory(20250601);
     const seedToday = new Date();
 
-    // Batch inserts in a transaction for speed
+    function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+
     await sqliteRun(db, "BEGIN TRANSACTION");
     try {
-      for (const productId of Object.keys(demandProfiles)) {
-        const [avgDemand, trendFactor] = demandProfiles[productId];
+      for (const prodRow of INV_PROD_MASTER) {
+        const [prodId,,,,,,,,,,,avgDemand, trendFactor, seasonal] = prodRow;
+
+        // Elmúlt 90 nap: napi egyedi OUT mozgások (trendFactor az utolsó 30 napban)
         for (let d = 90; d >= 1; d--) {
-          const demandDate = new Date(seedToday.getTime() - d * 86400000).toISOString().slice(0, 10);
-          // Apply trend only in last 30 days
-          const effectiveFactor = d <= 30 ? trendFactor : 1.0;
-          const variance = 0.7 + rnd() * 0.6;
-          const demand = Math.max(0, Math.round(avgDemand * effectiveFactor * variance * 10) / 10);
+          const movDate = new Date(seedToday.getTime() - d * 86400000).toISOString().slice(0, 10);
+          const mo = Number(movDate.slice(5, 7));
+          const sm = invSeasonMult(seasonal, mo);
+          const ef = d <= 30 ? trendFactor : 1.0;
+          const variance = 0.65 + rnd() * 0.70;
+          const qty = Math.max(0.1, Math.round(avgDemand * ef * sm * variance * 10) / 10);
+          const ref = "SZ-" + movDate.replace(/-/g, "");
           await sqliteRun(db,
-            "INSERT OR IGNORE INTO InventoryDemandHistory (ProductId, DemandDate, QuantityDemanded) VALUES (?, ?, ?)",
-            [productId, demandDate, demand]
+            "INSERT INTO INV_STOCK_MOVEMENTS (product_id, movement_date, quantity, movement_type, reference_doc) VALUES (?, ?, ?, 'OUT', ?)",
+            [prodId, movDate, -qty, ref]
           );
+        }
+
+        // Bevételezések az elmúlt 90 napban (30, 60, 90 napja)
+        for (const dAgo of [89, 59, 29]) {
+          const movDate = new Date(seedToday.getTime() - dAgo * 86400000).toISOString().slice(0, 10);
+          const inQty = Math.round(avgDemand * 30 * 1.3 * 10) / 10;
+          const ref = "PO-" + movDate.replace(/-/g, "");
+          await sqliteRun(db,
+            "INSERT INTO INV_STOCK_MOVEMENTS (product_id, movement_date, quantity, movement_type, reference_doc) VALUES (?, ?, ?, 'IN', ?)",
+            [prodId, movDate, inQty, ref]
+          );
+        }
+
+        // 3–18 hónap: havi batch OUT + kéthavonkénti IN
+        for (let mAgo = 3; mAgo <= 18; mAgo++) {
+          const baseDate = new Date(seedToday.getFullYear(), seedToday.getMonth() - mAgo, 1);
+          const y = baseDate.getFullYear();
+          const mo = baseDate.getMonth() + 1;
+          const maxDay = daysInMonth(y, mo);
+          const sm = invSeasonMult(seasonal, mo);
+          const monthlyTotal = avgDemand * 30 * sm;
+
+          const numOut = 4 + Math.floor(rnd() * 3); // 4-6 OUT/hó
+          let remaining = monthlyTotal;
+          for (let i = 0; i < numOut; i++) {
+            const frac = i < numOut - 1 ? (0.1 + rnd() * 0.25) : 1.0;
+            const qty = Math.max(0.1, Math.round(remaining * (i < numOut - 1 ? frac : 1.0) * 10) / 10);
+            if (i < numOut - 1) { remaining = Math.max(0.1, remaining - qty); }
+            const dy = 1 + Math.floor(rnd() * maxDay);
+            const ds = y + "-" + String(mo).padStart(2, "0") + "-" + String(dy).padStart(2, "0");
+            const ref = "SZ-" + ds.replace(/-/g, "");
+            await sqliteRun(db,
+              "INSERT INTO INV_STOCK_MOVEMENTS (product_id, movement_date, quantity, movement_type, reference_doc) VALUES (?, ?, ?, 'OUT', ?)",
+              [prodId, ds, -qty, ref]
+            );
+          }
+
+          if (mAgo % 2 === 0) {
+            const inQty = Math.round(monthlyTotal * (1.8 + rnd() * 0.7) * 10) / 10;
+            const dy = 2 + Math.floor(rnd() * Math.min(7, maxDay - 1));
+            const ds = y + "-" + String(mo).padStart(2, "0") + "-" + String(dy).padStart(2, "0");
+            const ref = "PO-" + ds.replace(/-/g, "");
+            await sqliteRun(db,
+              "INSERT INTO INV_STOCK_MOVEMENTS (product_id, movement_date, quantity, movement_type, reference_doc) VALUES (?, ?, ?, 'IN', ?)",
+              [prodId, ds, inQty, ref]
+            );
+          }
         }
       }
       await sqliteRun(db, "COMMIT");
@@ -11278,24 +11432,26 @@ app.post("/api/inventory/forecast", async function(req, res) {
     db = await openSqliteReadOnly(DISCOVERY_DB_PATH);
 
     // Verify inventory tables exist
-    const tableCheck = await sqliteGet(db, "SELECT name FROM sqlite_master WHERE type='table' AND name='InventoryProduct'");
+    const tableCheck = await sqliteGet(db, "SELECT name FROM sqlite_master WHERE type='table' AND name='INV_PRODUCTS'");
     if (!tableCheck) {
       res.status(503).json({ error: "A készletgazdálkodás adatbázisa nem érhető el. Kérjük, próbálja újra." });
       return;
     }
 
-    // Load products with category and supplier info
+    // Load products with category, supplier and current stock
     const productQueryParts = [
-      "SELECT p.ProductId, p.ProductCode, p.ProductName, p.CategoryId, c.CategoryName,",
-      "       p.Unit, p.CurrentQuantity, p.MaxStockLevel, p.MinStockLevel, p.UnitPrice,",
-      "       p.LeadTimeDays, p.SupplierId, s.SupplierName, s.SupplierReliability",
-      "FROM InventoryProduct p",
-      "JOIN InventoryCategory c ON p.CategoryId = c.CategoryId",
-      "JOIN InventorySupplier s ON p.SupplierId = s.SupplierId"
+      "SELECT p.product_id, p.product_code, p.product_name, p.category_id, c.category_name,",
+      "       p.unit, p.unit_price, p.lead_time_days, p.min_stock_level, p.max_stock_level, p.reorder_quantity,",
+      "       p.supplier_id, s.supplier_name, s.reliability_score,",
+      "       cs.current_quantity, cs.warehouse_zone",
+      "FROM INV_PRODUCTS p",
+      "JOIN INV_CATEGORIES c ON p.category_id = c.category_id",
+      "JOIN INV_SUPPLIERS s ON p.supplier_id = s.supplier_id",
+      "JOIN INV_CURRENT_STOCK cs ON p.product_id = cs.product_id"
     ];
     const productParams = [];
     if (catFilter) {
-      productQueryParts.push("WHERE p.CategoryId = ?");
+      productQueryParts.push("WHERE p.category_id = ?");
       productParams.push(catFilter);
     }
     productQueryParts.push("ORDER BY p.ProductId");
@@ -11325,28 +11481,28 @@ app.post("/api/inventory/forecast", async function(req, res) {
     const enriched = [];
     for (let pi = 0; pi < products.length; pi++) {
       const p = products[pi];
-      const productId = String(p.ProductId || "");
+      const productId = String(p.product_id || "");
 
-      // Pull this product's demand history
-      const demandRows = await sqliteAllParams(db,
-        "SELECT DemandDate, QuantityDemanded FROM InventoryDemandHistory WHERE ProductId = ? AND DemandDate >= ? ORDER BY DemandDate",
+      // Kiadási mozgások (OUT) az elemzési időablakban
+      const movRows = await sqliteAllParams(db,
+        "SELECT movement_date, ABS(quantity) AS qty FROM INV_STOCK_MOVEMENTS WHERE product_id = ? AND movement_type = 'OUT' AND movement_date >= ? ORDER BY movement_date",
         [productId, demandWindowStart]
       );
 
       // Horizon avg_daily_demand
       const horizonWindowStart = new Date(todayMs - horizon * 86400000).toISOString().slice(0, 10);
-      const horizonRows = demandRows.filter(function(r) { return String(r.DemandDate || "") >= horizonWindowStart; });
-      const horizonTotal = horizonRows.reduce(function(s, r) { return s + Number(r.QuantityDemanded || 0); }, 0);
-      const avgDailyDemand = Math.round((horizonRows.length > 0 ? horizonTotal / horizon : 0) * 1000) / 1000;
+      const horizonRows = movRows.filter(function(r) { return String(r.movement_date || "") >= horizonWindowStart; });
+      const horizonTotal = horizonRows.reduce(function(s, r) { return s + Number(r.qty || 0); }, 0);
+      const avgDailyDemand = Math.round((horizonTotal / horizon) * 1000) / 1000;
 
       // Trend: last 30 days vs previous 30 days
-      const last30Rows = demandRows.filter(function(r) { return String(r.DemandDate || "") >= last30Start; });
-      const prev30Rows = demandRows.filter(function(r) {
-        const d = String(r.DemandDate || "");
+      const last30Rows = movRows.filter(function(r) { return String(r.movement_date || "") >= last30Start; });
+      const prev30Rows = movRows.filter(function(r) {
+        const d = String(r.movement_date || "");
         return d >= prev30Start && d < last30Start;
       });
-      const avg30     = last30Rows.length > 0 ? last30Rows.reduce(function(s, r) { return s + Number(r.QuantityDemanded || 0); }, 0) / 30 : avgDailyDemand;
-      const avgPrev30 = prev30Rows.length > 0 ? prev30Rows.reduce(function(s, r) { return s + Number(r.QuantityDemanded || 0); }, 0) / 30 : avgDailyDemand;
+      const avg30     = last30Rows.length > 0 ? last30Rows.reduce(function(s, r) { return s + Number(r.qty || 0); }, 0) / 30 : avgDailyDemand;
+      const avgPrev30 = prev30Rows.length > 0 ? prev30Rows.reduce(function(s, r) { return s + Number(r.qty || 0); }, 0) / 30 : avgDailyDemand;
 
       let trend = "STABLE";
       if (avgPrev30 > 0.001) {
@@ -11354,11 +11510,11 @@ app.post("/api/inventory/forecast", async function(req, res) {
         else if (avg30 < avgPrev30 * 0.95) { trend = "DECREASING"; }
       }
 
-      const currentQty   = Number(p.CurrentQuantity || 0);
-      const maxStockLevel = Number(p.MaxStockLevel || 0);
-      const minStockLevel = Number(p.MinStockLevel || 0);
-      const leadTimeDays  = Number(p.LeadTimeDays || 14);
-      const unitPrice     = Number(p.UnitPrice || 0);
+      const currentQty    = Number(p.current_quantity || 0);
+      const maxStockLevel = Number(p.max_stock_level || 0);
+      const minStockLevel = Number(p.min_stock_level || 0);
+      const leadTimeDays  = Number(p.lead_time_days || 14);
+      const unitPrice     = Number(p.unit_price || 0);
 
       // Days until stockout (999 when demand = 0 to avoid division by zero)
       const daysUntilStockout = avgDailyDemand > 0 ? Math.floor(currentQty / avgDailyDemand) : 999;
@@ -11385,8 +11541,8 @@ app.post("/api/inventory/forecast", async function(req, res) {
           suggested_quantity: Math.round(suggestedQty * 10) / 10,
           latest_order_deadline: new Date(todayMs + deadlineDays * 86400000).toISOString().slice(0, 10),
           estimated_value_huf: Math.round(suggestedQty * unitPrice),
-          supplier_name: String(p.SupplierName || ""),
-          supplier_reliability: Number(p.SupplierReliability || 0)
+          supplier_name: String(p.supplier_name || ""),
+          supplier_reliability: Number(p.reliability_score || 0)
         };
       }
 
@@ -11401,11 +11557,11 @@ app.post("/api/inventory/forecast", async function(req, res) {
 
       enriched.push({
         product_id: productId,
-        product_code: String(p.ProductCode || ""),
-        product_name: String(p.ProductName || ""),
-        category_id: String(p.CategoryId || ""),
-        category_name: String(p.CategoryName || ""),
-        unit: String(p.Unit || ""),
+        product_code: String(p.product_code || ""),
+        product_name: String(p.product_name || ""),
+        category_id: String(p.category_id || ""),
+        category_name: String(p.category_name || ""),
+        unit: String(p.unit || ""),
         current_quantity: currentQty,
         max_stock_level: maxStockLevel,
         min_stock_level: minStockLevel,
@@ -11418,8 +11574,8 @@ app.post("/api/inventory/forecast", async function(req, res) {
         classification: classification,
         reorder_suggestion: reorderSuggestion,
         forecast_points: forecastPoints,
-        supplier_name: String(p.SupplierName || ""),
-        supplier_reliability: Number(p.SupplierReliability || 0)
+        supplier_name: String(p.supplier_name || ""),
+        supplier_reliability: Number(p.reliability_score || 0)
       });
     }
 
