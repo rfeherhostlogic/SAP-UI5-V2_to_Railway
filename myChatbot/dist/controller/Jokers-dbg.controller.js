@@ -144,6 +144,12 @@ sap.ui.define([
         oJokersModel.setProperty("/kpiDiscoveryRows", []);
       }
 
+      // Készletgazdálkodás modul: saját dedikált nézetbe navigál, nem JokerPromptba
+      if (oJoker.id === "dummy-16") {
+        this.getOwnerComponent().getRouter().navTo("mainMenu", { menuKey: "keszletgazdalkodas" });
+        return;
+      }
+
       this.getOwnerComponent().getRouter().navTo("jokerPrompt", {
         jokerId: oJoker.id
       });
@@ -174,6 +180,12 @@ sap.ui.define([
         return aActiveTags.some(function(sTag) {
           return aTags.indexOf(sTag) >= 0;
         });
+      });
+      // Aktívan fejlesztett csempék kerülnek a lista elejére
+      aFiltered.sort(function(a, b) {
+        var aWip = (a && a.inDevelopment) ? 0 : 1;
+        var bWip = (b && b.inDevelopment) ? 0 : 1;
+        return aWip - bWip;
       });
       oModel.setProperty("/filteredTiles", aFiltered);
     }

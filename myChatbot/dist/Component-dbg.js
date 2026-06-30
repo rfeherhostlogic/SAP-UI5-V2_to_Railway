@@ -191,6 +191,7 @@ sap.ui.define([
 						primaryTag: "Altalanos",
 						tags: ["Altalanos"],
 						footer: "AI Joker Quote",
+						inDevelopment: true,
 						description: "Word sablon, szoveges kontextus es Vector Store arak alapjan letoltheto Word/PDF arajanlatot keszit PDF preview-val es chat-alapu modositassal.",
 						systemPrompt: "Keszits strukturalt, arakkal alatamasztott arajanlatot."
 					},
@@ -241,6 +242,7 @@ sap.ui.define([
 						primaryTag: "Altalanos",
 						tags: ["Altalanos"],
 						footer: "AI Joker KPI",
+						inDevelopment: true,
 						description: "Az adatbazis tablait atnezve hasznos KPI-okat javasol, majd a kivalasztott KPI-t Python alapu szamitassal futtatja es diagramon is megjeleniti.",
 						systemPrompt: "KPI felfedezes es determinisztikus Python KPI futtatas."
 					},
@@ -301,6 +303,7 @@ sap.ui.define([
 						primaryTag: "Altalanos",
 						tags: ["Altalanos"],
 						footer: "AI Joker 16",
+						inDevelopment: true,
 						description: "Adatbázis vagy CSV alapján kiszámítja a várható készlethiányokat, kritikus cikkeket és optimális rendelési mennyiségeket, Noah AI összefoglalóval.",
 						systemPrompt: ""
 					},

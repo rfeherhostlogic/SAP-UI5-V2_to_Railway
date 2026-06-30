@@ -24,15 +24,20 @@
 
       <FlexBox items="{jokers>/filteredTiles}" wrap="Wrap" class="jokerTileGrid">
         <items>
-          <GenericTile class="jokerTile" header="{jokers>title}" subheader="{= ${jokers>subtitle} + ' • ' + (${jokers>primaryTag} || 'Általános') }" frameType="OneByOne" press=".onTilePress">
-            <tileContent>
-              <TileContent footer="{jokers>footer}">
-                <content>
-                  <ImageContent src="sap-icon://ai"/>
-                </content>
-              </TileContent>
-            </tileContent>
-          </GenericTile>
+          <VBox class="{= ${jokers>inDevelopment} ? 'jokerTileWrap jokerTileWrapActive' : 'jokerTileWrap' }">
+            <GenericTile class="{= ${jokers>inDevelopment} ? 'jokerTile jokerTileActive' : 'jokerTile' }" header="{jokers>title}" subheader="{= ${jokers>subtitle} + ' • ' + (${jokers>primaryTag} || 'Általános') }" frameType="OneByOne" press=".onTilePress">
+              <tileContent>
+                <TileContent footer="{jokers>footer}">
+                  <content>
+                    <ImageContent src="sap-icon://ai"/>
+                  </content>
+                </TileContent>
+              </tileContent>
+            </GenericTile>
+            <HBox visible="{jokers>inDevelopment}" justifyContent="Center" class="jokerDevBadge">
+              <Text text="Fejlesztés alatt" class="jokerDevBadgeText"/>
+            </HBox>
+          </VBox>
         </items>
       </FlexBox>
     </VBox>

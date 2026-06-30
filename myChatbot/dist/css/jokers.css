@@ -19,11 +19,37 @@
   gap: 0.9rem;
 }
 
+.jokerTileWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .jokerTile {
   width: 13rem;
   min-height: 11rem;
   border-radius: 0.9rem;
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+.jokerTileActive {
+  border: 2px solid #1a9a55 !important;
+  box-shadow: 0 0 0 3px rgba(26, 154, 85, 0.14), 0 10px 22px rgba(15, 23, 42, 0.08) !important;
+}
+
+.jokerDevBadge {
+  margin-top: 0.3rem;
+  background: #e8f8ef;
+  border: 1px solid rgba(26, 154, 85, 0.35);
+  border-radius: 999px;
+  padding: 0.1rem 0.65rem;
+}
+
+.jokerDevBadgeText {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #1a7a44;
+  letter-spacing: 0.01em;
 }
 
 .jokerTile .sapMGTHeaderText,
@@ -162,6 +188,14 @@
 
 .quoteNoahFieldAvatar {
   cursor: pointer;
+}
+
+.quoteFieldDocContext {
+  font-size: 0.75rem;
+  color: #6e7a8a;
+  font-style: italic;
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .quoteResultBackLink {
