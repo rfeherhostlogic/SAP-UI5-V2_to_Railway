@@ -11595,7 +11595,7 @@ app.post("/api/inventory/forecast", async function(req, res) {
       productQueryParts.push("WHERE p.category_id = ?");
       productParams.push(catFilter);
     }
-    productQueryParts.push("ORDER BY p.ProductId");
+    productQueryParts.push("ORDER BY p.product_id");
     const products = await sqliteAllParams(db, productQueryParts.join(" "), productParams);
 
     const today = new Date();
