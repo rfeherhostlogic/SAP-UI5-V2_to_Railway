@@ -19,7 +19,11 @@ sap.ui.define([
         errorMessage:      "",
         forecastTimestamp: "",
         resultsTab:        "critical",
-        results:           {}
+        results:           {},
+        noahZoneState:     "idle",
+        noahMessages:      [],
+        noahInput:         "",
+        noahTurnCount:     0
       });
       this._csvFileBuffer        = null;
       this._lastForecastResult   = null;
@@ -123,6 +127,7 @@ sap.ui.define([
       var oModel = this.getOwnerComponent().getModel("inv");
       oModel.setProperty("/state",        "setup");
       oModel.setProperty("/errorMessage", "");
+      this._resetNoahZone(oModel);
       if (this._chartA) { try { this._chartA.destroy(); } catch(e) {} this._chartA = null; }
       if (this._chartB) { try { this._chartB.destroy(); } catch(e) {} this._chartB = null; }
     },
@@ -330,6 +335,7 @@ sap.ui.define([
       }, 0);
       var sOrderSummary = "Összesen: " + aOrders.length + " tétel  |  Teljes becsült érték: " + this._fmtHuf(totalOrderVal);
 
+      this._resetNoahZone(oModel);
       oModel.setProperty("/forecastTimestamp",   sTimestamp);
       oModel.setProperty("/resultsTab",          "critical");
       oModel.setProperty("/results", {
@@ -524,6 +530,83 @@ sap.ui.define([
         var m = String(oDate.getMinutes()).padStart(2, "0");
         return sDate + " " + h + ":" + m;
       } catch(e) { return oDate.toISOString(); }
+    },
+
+    // ─── Noah Q&A integráció ──────────────────────────────────────────────────
+
+    onNoahSummarize: function() {
+      var oModel = this.getOwnerComponent().getModel("inv");
+      if (!this._lastForecastResult) { return; }
+      oModel.setProperty("/noahZoneState", "typing");
+      this._callInventorySummarize([], "");
+    },
+
+    onNoahFollowUp: function() {
+      var oModel  = this.getOwnerComponent().getModel("inv");
+      var sInput  = (oModel.getProperty("/noahInput") || "").trim();
+      if (!sInput) { return; }
+
+      var iTurns = Number(oModel.getProperty("/noahTurnCount") || 0);
+      // After 5 answered turns, lock the zone
+      if (iTurns >= 5) {
+        oModel.setProperty("/noahZoneState", "limit");
+        return;
+      }
+
+      // Snapshot history BEFORE adding the new user message
+      var aHistory      = (oModel.getProperty("/noahMessages") || []).slice();
+      var aWithUserMsg  = aHistory.concat([{ role: "user", content: sInput }]);
+
+      oModel.setProperty("/noahMessages",  aWithUserMsg);
+      oModel.setProperty("/noahInput",     "");
+      oModel.setProperty("/noahZoneState", "typing");
+      oModel.setProperty("/noahTurnCount", iTurns + 1);
+
+      this._callInventorySummarize(aHistory, sInput);
+    },
+
+    _callInventorySummarize: function(aHistory, sUserMessage) {
+      var oModel = this.getOwnerComponent().getModel("inv");
+      var that   = this;
+
+      fetch("/api/inventory/summarize", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          forecast_data: this._lastForecastResult,
+          horizon_days:  this._lastHorizon,
+          history:       aHistory,
+          user_message:  sUserMessage
+        })
+      })
+        .then(function(res) {
+          return res.json().then(function(d) { return { ok: res.ok, data: d }; });
+        })
+        .then(function(result) {
+          if (!result.ok) {
+            oModel.setProperty("/errorMessage", result.data.error || "Az AI összefoglaló generálása sikertelen.");
+            oModel.setProperty("/noahZoneState", "idle");
+            return;
+          }
+          var sReply   = result.data.summary_text || "";
+          var aUpdated = (oModel.getProperty("/noahMessages") || []).concat([{ role: "assistant", content: sReply }]);
+          oModel.setProperty("/noahMessages", aUpdated);
+
+          // Lock after 5 answered follow-up turns
+          var iTurns = Number(oModel.getProperty("/noahTurnCount") || 0);
+          oModel.setProperty("/noahZoneState", iTurns >= 5 ? "limit" : "chat");
+        })
+        .catch(function() {
+          oModel.setProperty("/errorMessage", "Hálózati hiba. Az AI összefoglaló nem érhető el.");
+          oModel.setProperty("/noahZoneState", "idle");
+        });
+    },
+
+    _resetNoahZone: function(oModel) {
+      oModel.setProperty("/noahZoneState", "idle");
+      oModel.setProperty("/noahMessages",  []);
+      oModel.setProperty("/noahInput",     "");
+      oModel.setProperty("/noahTurnCount", 0);
     },
 
     // ─── Drag-and-drop ────────────────────────────────────────────────────────

@@ -369,6 +369,87 @@
                 </items>
               </IconTabBar>
 
+              <!-- ══ NOAH Q&A ZÓna ══════════════════════════════════ -->
+              <VBox class="invNoahZone sapUiMediumMarginTop">
+
+                <!-- Sub-state A: trigger pill (idle) -->
+                <HBox
+                  visible="{= ${inv>/noahZoneState} === 'idle' }"
+                  alignItems="Center"
+                  class="invNoahPill"
+                  press=".onNoahSummarize">
+                  <Avatar src="img/Noah_transparent.png" displaySize="XS" class="chatAvatar noahAvatar"/>
+                  <Button
+                    text="Elemzés magyarázata"
+                    type="Transparent"
+                    press=".onNoahSummarize"
+                    class="invNoahPillButton"/>
+                </HBox>
+
+                <!-- Sub-state B/C: chat terület -->
+                <VBox visible="{= ${inv>/noahZoneState} !== 'idle' }" class="invNoahChatArea">
+
+                  <!-- Üzenet buborékok -->
+                  <List items="{inv>/noahMessages}" showSeparators="None" class="invNoahMsgList">
+                    <CustomListItem class="invNoahMsgItem">
+                      <!-- Noah buborék -->
+                      <HBox width="100%" justifyContent="Start" visible="{= ${inv>role} === 'assistant' }">
+                        <Avatar src="img/Noah_transparent.png" displaySize="XS" class="chatAvatar noahAvatar"/>
+                        <VBox class="chatBubble chatBubbleAi noahBubbleAi invNoahBubble">
+                          <Text text="Noah" class="chatBubbleMeta"/>
+                          <Text text="{inv>content}" wrapping="true" width="100%"/>
+                        </VBox>
+                      </HBox>
+                      <!-- Felhasználó buborék -->
+                      <HBox width="100%" justifyContent="End" visible="{= ${inv>role} === 'user' }">
+                        <VBox class="chatBubble chatBubbleUser noahBubbleUser invNoahBubble">
+                          <Text text="{inv>content}" wrapping="true" width="100%"/>
+                        </VBox>
+                      </HBox>
+                    </CustomListItem>
+                  </List>
+
+                  <!-- Gépelési jelző (3 pont) -->
+                  <HBox visible="{= ${inv>/noahZoneState} === 'typing' }" alignItems="Center" class="sapUiTinyMarginTop">
+                    <Avatar src="img/Noah_transparent.png" displaySize="XS" class="chatAvatar noahAvatar"/>
+                    <VBox class="chatBubble chatBubbleAi noahBubbleAi invNoahBubble invNoahTypingBubble">
+                      <HBox alignItems="Center" class="invNoahTypingDots">
+                        <VBox class="invNoahDot invNoahDot1"/>
+                        <VBox class="invNoahDot invNoahDot2"/>
+                        <VBox class="invNoahDot invNoahDot3"/>
+                      </HBox>
+                    </VBox>
+                  </HBox>
+
+                  <!-- Kérdezz tovább (chat állapot) -->
+                  <HBox visible="{= ${inv>/noahZoneState} === 'chat' }" alignItems="Center" class="invNoahInputRow sapUiSmallMarginTop">
+                    <Input
+                      id="invNoahInput"
+                      placeholder="Kérdezz rá az elemzésre..."
+                      value="{inv>/noahInput}"
+                      submit=".onNoahFollowUp"
+                      class="invNoahInputField"/>
+                    <Button
+                      icon="sap-icon://paper-plane"
+                      type="Emphasized"
+                      tooltip="Küldés"
+                      press=".onNoahFollowUp"
+                      class="sapUiTinyMarginBegin"/>
+                  </HBox>
+
+                  <!-- Munkamenet vége (limit állapot) -->
+                  <MessageStrip
+                    text="Az elemzési munkamenet véget ért. Új elemzéshez kattints az Előrejelzés futtatása gombra."
+                    type="Information"
+                    showIcon="true"
+                    visible="{= ${inv>/noahZoneState} === 'limit' }"
+                    class="sapUiSmallMarginTop"/>
+
+                </VBox>
+
+              </VBox>
+              <!-- /NOAH Q&A ZÓna -->
+
             </VBox>
             <!-- /STATE: results -->
 

@@ -535,3 +535,79 @@
   border-top: 1px solid rgba(210, 222, 240, 0.85);
   box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   NOAH Q&A ZÓna
+   ═══════════════════════════════════════════════════════════════════ */
+
+.invNoahZone {
+  padding-bottom: 1.5rem;
+}
+
+/* Üzenetlista */
+.invNoahMsgList.sapMList {
+  background: transparent;
+}
+
+.invNoahMsgList .sapMLIB {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  margin-bottom: 0;
+  padding: 0.2rem 0;
+  min-height: 0;
+}
+
+.invNoahMsgList .sapMLIB::after {
+  display: none;
+}
+
+/* Buborék módosítók (a chat.css alap stílusok felett) */
+.invNoahBubble {
+  max-width: 85%;
+}
+
+/* ─── Gépelési jelző (3 pont) ─────────────────────────────────────── */
+
+.invNoahTypingBubble {
+  padding: 0.5rem 0.75rem;
+  min-width: 3.5rem;
+}
+
+.invNoahTypingDots {
+  gap: 5px;
+}
+
+.invNoahDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #8a9faf;
+  animation: invDotBounce 1.2s infinite ease-in-out;
+}
+
+.invNoahDot1 { animation-delay: 0s;    }
+.invNoahDot2 { animation-delay: 0.2s;  }
+.invNoahDot3 { animation-delay: 0.4s;  }
+
+@keyframes invDotBounce {
+  0%, 60%, 100% { transform: translateY(0);    opacity: 0.45; }
+  30%            { transform: translateY(-5px); opacity: 1;    }
+}
+
+/* ─── Kérdezz tovább sor ──────────────────────────────────────────── */
+
+.invNoahInputRow {
+  width: 100%;
+}
+
+.invNoahInputField {
+  flex: 1;
+}
+
+/* Chat terület szeparátor */
+.invNoahChatArea {
+  border-top: 1px solid rgba(210, 222, 240, 0.7);
+  padding-top: 1rem;
+}

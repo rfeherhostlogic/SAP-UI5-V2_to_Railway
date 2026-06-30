@@ -12156,6 +12156,83 @@ app.post("/api/inventory/export-csv", function(req, res) {
   res.send(BOM + aLines.join("\r\n"));
 });
 
+// POST /api/inventory/summarize
+// LLM-alapú készletjelentés és Q&A munkamenet.
+// Body: { forecast_data, horizon_days, history: [{role,content}], user_message }
+app.post("/api/inventory/summarize", async function(req, res) {
+  var oForecast  = req.body && req.body.forecast_data ? req.body.forecast_data : null;
+  var iHorizon   = Number(req.body && req.body.horizon_days ? req.body.horizon_days : 30);
+  var aHistory   = Array.isArray(req.body && req.body.history) ? req.body.history : [];
+  var sUserMsg   = req.body && req.body.user_message ? String(req.body.user_message).trim() : "";
+
+  if (!oForecast) {
+    return res.status(400).json({ error: "Hiányzó előrejelzési adat az összefoglalóhoz." });
+  }
+
+  // Rendszer prompt (anti-hallucináció szabály)
+  var sSystem = "Te egy készletgazdálkodási AI asszisztens vagy. A felhasználó vállalat készletelőrejelzési adatait kaptad meg. Csak a megkapott adatokra hivatkozhatsz — soha ne találj ki számokat, dátumokat vagy termékneveket. Válaszolj magyarul, tömören, üzleti hangnemben.";
+
+  // Kontextus felhasználói üzenet (mindig az előrejelzés adataiból épül)
+  var oSummary  = oForecast.summary  || {};
+  var aCritical = oForecast.critical || [];
+  var aExcess   = oForecast.excess   || [];
+
+  var sTop3 = aCritical.slice(0, 3).map(function(p) {
+    var sSupplier = p.reorder_suggestion && p.reorder_suggestion.supplier_name ? p.reorder_suggestion.supplier_name : "—";
+    return "- " + p.product_name + " — " + p.days_until_stockout + " nap, szállító: " + sSupplier;
+  }).join("\n") || "Nincs kritikus cikk.";
+
+  var sTop2Excess = aExcess.slice(0, 2).map(function(p) {
+    return "- " + p.product_name + " — " + p.excess_quantity + " egység felesleg, " + p.excess_value_huf + " Ft lekötött tőke";
+  }).join("\n") || "Nincs felesleges készlet.";
+
+  var sContextPrompt = [
+    "Az alábbi előrejelzési adatok alapján készíts egy rövid, strukturált készletjelentést.",
+    "Az elemzés a következő " + iHorizon + " napra vonatkozik.",
+    "",
+    "Összefoglaló:",
+    "- Kritikus cikkek: " + (oSummary.critical_count || 0) + " db",
+    "- Figyelendő cikkek: " + (oSummary.warning_count || 0) + " db",
+    "- Stabil cikkek: " + (oSummary.stable_count || 0) + " db",
+    "- Felesleges készletű cikkek: " + (oSummary.excess_count || 0) + " db",
+    "- Javasolt rendelések összértéke: " + (oSummary.total_reorder_value_huf || 0) + " Ft",
+    "",
+    "TOP 3 legkritikusabb cikk (kifutásig hátralévő napok):",
+    sTop3,
+    "",
+    "TOP 2 felesleges készlet:",
+    sTop2Excess,
+    "",
+    "Kérés: Írj egy 4-6 mondatos üzleti összefoglalót, majd adj 2-3 konkrét cselekvési javaslatot. Csak a fenti adatokra hivatkozz."
+  ].join("\n");
+
+  // Üzenetlánc összeállítása
+  var aMessages = [{ role: "system", content: sSystem }];
+  // A kontextus prompt mindig az első felhasználói üzenet
+  aMessages.push({ role: "user", content: sContextPrompt });
+  // Korábbi fordulók (history) — a frontend a kontextus nélküli exchange-eket küldi
+  aHistory.forEach(function(turn) {
+    if (turn.role === "user" || turn.role === "assistant") {
+      aMessages.push({ role: turn.role, content: String(turn.content || "") });
+    }
+  });
+  // Új felhasználói üzenet (follow-up esetén)
+  if (sUserMsg) {
+    aMessages.push({ role: "user", content: sUserMsg });
+  }
+
+  try {
+    var sReply = await callOpenAiText(aMessages, 0.3);
+    res.json({
+      summary_text: sReply,
+      generated_at: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error("[inventory/summarize] hiba:", err && err.message ? err.message : String(err));
+    res.status(500).json({ error: "Az AI összefoglaló generálása sikertelen. Kérjük, próbálja újra." });
+  }
+});
+
 // GET /api/inventory/categories
 // Visszaadja az INV_CATEGORIES tábla összes kategóriáját.
 app.get("/api/inventory/categories", async function(_req, res) {
