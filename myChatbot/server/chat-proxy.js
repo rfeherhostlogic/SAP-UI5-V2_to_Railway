@@ -11543,7 +11543,6 @@ app.get("/api/ml-wizard/result/:sessionId/download.csv", function(req, res) {
 
 app.post("/api/inventory/forecast", async function(req, res) {
   const horizonRaw = req.body && req.body.horizon_days !== undefined ? req.body.horizon_days : null;
-  const categoryId = req.body && req.body.category_id !== undefined ? req.body.category_id : null;
   const dataSource = String(req.body && req.body.data_source ? req.body.data_source : "").trim();
 
   // Validation
@@ -11561,12 +11560,15 @@ app.post("/api/inventory/forecast", async function(req, res) {
   }
 
   const horizon = Number(horizonRaw);
-  const catFilter = (
-    categoryId !== null &&
-    categoryId !== undefined &&
-    String(categoryId).trim() !== "" &&
-    String(categoryId).trim().toLowerCase() !== "null"
-  ) ? String(categoryId).trim() : null;
+
+  // Accept category_ids array (multi-select) or legacy single category_id
+  let catIds = [];
+  if (req.body && Array.isArray(req.body.category_ids) && req.body.category_ids.length > 0) {
+    catIds = req.body.category_ids.map(function(id) { return String(id).trim(); }).filter(Boolean);
+  } else if (req.body && req.body.category_id !== undefined && req.body.category_id !== null) {
+    const single = String(req.body.category_id).trim();
+    if (single && single.toLowerCase() !== "null") { catIds = [single]; }
+  }
 
   let db = null;
   try {
@@ -11591,9 +11593,9 @@ app.post("/api/inventory/forecast", async function(req, res) {
       "JOIN INV_CURRENT_STOCK cs ON p.product_id = cs.product_id"
     ];
     const productParams = [];
-    if (catFilter) {
-      productQueryParts.push("WHERE p.category_id = ?");
-      productParams.push(catFilter);
+    if (catIds.length > 0) {
+      productQueryParts.push("WHERE p.category_id IN (" + catIds.map(function() { return "?"; }).join(",") + ")");
+      catIds.forEach(function(id) { productParams.push(id); });
     }
     productQueryParts.push("ORDER BY p.product_id");
     const products = await sqliteAllParams(db, productQueryParts.join(" "), productParams);
@@ -11605,7 +11607,7 @@ app.post("/api/inventory/forecast", async function(req, res) {
       res.json({
         generated_at: today.toISOString(),
         horizon_days: horizon,
-        category_filter: catFilter,
+        category_filter: catIds.length > 0 ? catIds : null,
         summary: { total_products: 0, critical_count: 0, warning_count: 0, stable_count: 0, excess_count: 0, total_reorder_value_huf: 0 },
         critical: [], warning: [], stable: [], excess: [],
         forecast_chart_data: { labels: [], datasets: [], category_summary: [] }
@@ -11799,7 +11801,7 @@ app.post("/api/inventory/forecast", async function(req, res) {
     res.json({
       generated_at: today.toISOString(),
       horizon_days: horizon,
-      category_filter: catFilter,
+      category_filter: catIds.length > 0 ? catIds : null,
       summary: {
         total_products: enriched.length,
         critical_count: criticalProducts.length,
@@ -11869,10 +11871,22 @@ app.post("/api/inventory/upload-csv", function(req, res) {
     }
 
     // Form mezők kiolvasása
-    const horizonRaw   = req.body && req.body.horizon_days   ? req.body.horizon_days   : 30;
-    const catFilterRaw = req.body && req.body.category_filter ? String(req.body.category_filter).trim() : "";
+    const horizonRaw = req.body && req.body.horizon_days ? req.body.horizon_days : 30;
     const horizon = [30, 60, 90].includes(Number(horizonRaw)) ? Number(horizonRaw) : 30;
-    const catFilter = (catFilterRaw && catFilterRaw.toLowerCase() !== "null") ? catFilterRaw : null;
+
+    // Accept category_ids JSON array from multi-select
+    let csvCatIds = [];
+    const catIdsRaw = req.body && req.body.category_ids ? String(req.body.category_ids).trim() : "";
+    if (catIdsRaw && catIdsRaw.toLowerCase() !== "null") {
+      try {
+        const parsed = JSON.parse(catIdsRaw);
+        if (Array.isArray(parsed)) {
+          csvCatIds = parsed.map(function(id) { return String(id).trim(); }).filter(Boolean);
+        }
+      } catch (e) {
+        if (catIdsRaw) { csvCatIds = [catIdsRaw]; }
+      }
+    }
 
     // CSV feldolgozása
     const parseResult = parseInventoryCsvBuffer(req.file.buffer);
@@ -11907,10 +11921,11 @@ app.post("/api/inventory/upload-csv", function(req, res) {
 
     // Kategória szűrő alkalmazása (ha megadták)
     let products = valid;
-    if (catFilter) {
-      const catLower = catFilter.toLowerCase();
+    if (csvCatIds.length > 0) {
+      const catLowerSet = csvCatIds.map(function(id) { return id.toLowerCase(); });
       products = products.filter(function(p) {
-        return String(p.category_name || "").toLowerCase().indexOf(catLower) >= 0;
+        const pCat = String(p.category_name || "").toLowerCase();
+        return catLowerSet.some(function(c) { return pCat.indexOf(c) >= 0; });
       });
     }
 
@@ -12059,7 +12074,7 @@ app.post("/api/inventory/upload-csv", function(req, res) {
     res.json({
       generated_at:   today.toISOString(),
       horizon_days:   horizon,
-      category_filter: catFilter,
+      category_filter: csvCatIds.length > 0 ? csvCatIds : null,
       data_source:    "csv",
       csv_stats: {
         total_rows_in_file: totalRows,
