@@ -11564,7 +11564,7 @@ app.post("/api/inventory/forecast", async function(req, res) {
   // Accept category_ids array (multi-select) or legacy single category_id
   let catIds = [];
   if (req.body && Array.isArray(req.body.category_ids) && req.body.category_ids.length > 0) {
-    catIds = req.body.category_ids.map(function(id) { return String(id).trim(); }).filter(Boolean);
+    catIds = req.body.category_ids.map(function(id) { return String(id).trim(); }).filter(function(id) { return id && id.toLowerCase() !== "null"; });
   } else if (req.body && req.body.category_id !== undefined && req.body.category_id !== null) {
     const single = String(req.body.category_id).trim();
     if (single && single.toLowerCase() !== "null") { catIds = [single]; }

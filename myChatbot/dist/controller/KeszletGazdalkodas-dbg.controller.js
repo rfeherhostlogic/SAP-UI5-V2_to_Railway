@@ -112,7 +112,7 @@ sap.ui.define([
 
       var oCombo       = this.byId("invCategoryFilter");
       var aSelItems    = oCombo ? oCombo.getSelectedItems() : [];
-      var aCategoryIds = aSelItems.map(function(oItem) { return Number(oItem.getKey()); });
+      var aCategoryIds = aSelItems.map(function(oItem) { return oItem.getKey(); });
       var iHorizon     = Number(sHorizon);
 
       if (sDataSource === "db") {
