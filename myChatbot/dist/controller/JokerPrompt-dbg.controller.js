@@ -247,6 +247,7 @@ sap.ui.define([
             name: oField.name,
             label: oField.label || oField.name,
             group: oField.group === "block" ? "block" : "simple",
+            documentContext: oField.documentContext || "",
             value: "",
             busy: false
           };
@@ -254,7 +255,7 @@ sap.ui.define([
       }
       var aNames = Array.isArray(oUpload && oUpload.templatePlaceholders) ? oUpload.templatePlaceholders : [];
       return aNames.map(function(sName) {
-        return { name: sName, label: sName, group: "simple", value: "", busy: false };
+        return { name: sName, label: sName, group: "simple", documentContext: "", value: "", busy: false };
       });
     },
 
@@ -301,16 +302,12 @@ sap.ui.define([
       }
     },
 
-    // A "simple" csoport minden mezojenek kell ertekkel rendelkeznie, hogy
-    // az "Arajanlat generalasa" gomb engedelyezve legyen.
+    // A gomb engedelyezeshez csak a feltoltott sablon (sessionId) szukseges;
+    // a mezoket opcionalis elotoltessel is el lehet hagyni.
     _updateQuoteGenerateButtonState: function() {
       var oModel = this.getView().getModel("jokers");
       var sSessionId = (oModel.getProperty("/quoteSessionId") || "").trim();
-      var aFields = oModel.getProperty("/quoteTemplateFields") || [];
-      var bAllSimpleFilled = aFields
-        .filter(function(oField) { return oField.group === "simple"; })
-        .every(function(oField) { return !!String(oField.value || "").trim(); });
-      oModel.setProperty("/quoteCanGenerate", !!sSessionId && bAllSimpleFilled);
+      oModel.setProperty("/quoteCanGenerate", !!sSessionId);
     },
 
     _collectQuotePlaceholderValues: function() {
@@ -362,10 +359,6 @@ sap.ui.define([
       }
       if (!sContext) {
         MessageToast.show("Az ajanlat kontextusat add meg.");
-        return;
-      }
-      if (!oModel.getProperty("/quoteCanGenerate")) {
-        MessageToast.show("Toltsd ki az osszes egyszeru mezot a generalas elott.");
         return;
       }
 
@@ -2266,8 +2259,22 @@ sap.ui.define([
       };
     },
 
+    onDummy12StepChange: function(oEvent) {
+      var oModel = this.getView().getModel("jokers");
+      var oCheckBox = oEvent.getSource();
+      var oCtx = oCheckBox.getBindingContext("jokers");
+      if (!oCtx) { return; }
+      oModel.setProperty(oCtx.getPath() + "/selected", oCheckBox.getSelected());
+    },
+
     _resetDummy12State: function() {
       var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy12AnalysisSteps", [
+        { key: "adatkinyeres",     label: "Adatkinyerés",       description: "Pénzügyi és cégadatok kinyerése a feltöltött beszámolókból és online forrásokból.", selected: true, enabled: false },
+        { key: "kpi-szamitas",     label: "KPI-számítás",       description: "Pénzügyi és piaci KPI-k kiszámítása és összehasonlítása a megadott cégek között.", selected: true, enabled: true  },
+        { key: "cfo-osszefoglalo", label: "CFO összefoglaló",   description: "Vezetői szintű, döntéshozatalra alkalmas összefoglaló generálása az eredményekből.", selected: true, enabled: true  },
+        { key: "sajtomegjelenesek",label: "Sajtómegjelenések",  description: "A megadott cégekhez kapcsolódó releváns sajtóhírek és médiamegjelenések összegyűjtése.", selected: true, enabled: true  }
+      ]);
       oModel.setProperty("/dummy12Companies", [this._createDummy12Company(true, 0)]);
       oModel.setProperty("/dummy12Busy", false);
       oModel.setProperty("/dummy12Error", "");

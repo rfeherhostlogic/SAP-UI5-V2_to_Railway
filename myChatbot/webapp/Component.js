@@ -467,6 +467,12 @@ sap.ui.define([
 				dummy11AttachmentsEnabled: false,
 				dummy11Files: [],
 				dummy12Companies: [],
+				dummy12AnalysisSteps: [
+					{ key: "adatkinyeres",    label: "Adatkinyerés",      description: "Pénzügyi és cégadatok kinyerése a feltöltött beszámolókból és online forrásokból.", selected: true, enabled: false },
+					{ key: "kpi-szamitas",    label: "KPI-számítás",      description: "Pénzügyi és piaci KPI-k kiszámítása és összehasonlítása a megadott cégek között.", selected: true, enabled: true  },
+					{ key: "cfo-osszefoglalo",label: "CFO összefoglaló",  description: "Vezetői szintű, döntéshozatalra alkalmas összefoglaló generálása az eredményekből.", selected: true, enabled: true  },
+					{ key: "sajtomegjelenesek",label: "Sajtómegjelenések",description: "A megadott cégekhez kapcsolódó releváns sajtóhírek és médiamegjelenések összegyűjtése.", selected: true, enabled: true  }
+				],
 				dummy12Busy: false,
 				dummy12Error: "",
 				dummy12ProgressText: "",

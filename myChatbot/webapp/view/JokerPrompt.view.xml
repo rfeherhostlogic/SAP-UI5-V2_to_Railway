@@ -1383,6 +1383,12 @@
               </VBox>
             </HBox>
 
+            <!-- Mit elemzünk? — leírás blokk -->
+            <VBox class="sapUiSmallMarginTop">
+              <Title text="Mit elemzünk?" level="H5"/>
+              <Text text="A Konkurencia elemzés modul a megadott saját és versenytárs cégek adatait dolgozza fel: a feltöltött éves beszámolók PDF-jeiből pénzügyi mutatókat (árbevétel, eredmény, mérlegfőösszeg) nyer ki, a weboldal és LinkedIn adatok alapján piaci pozíciót becsül, ezekből KPI-kat számol és hasonlít össze, majd a kiválasztott elemzéstípusok alapján vezetői (CFO-szintű) összefoglalót és/vagy sajtómegjelenés-listát állít össze." wrapping="true" class="sapUiTinyMarginTop"/>
+            </VBox>
+
             <HBox wrap="Wrap" class="sapUiSmallMarginTop" renderType="Bare">
               <Panel headerText="Sajat ceg" width="18rem" class="sapUiTinyMarginEnd sapUiTinyMarginBottom">
                 <VBox class="sapUiSmallMargin">
@@ -1396,13 +1402,17 @@
                   <Text text="A versenytarsakhoz weboldal, LinkedIn es opcionális PDF-ek adhatoak meg benchmark celra." wrapping="true" class="sapUiTinyMarginTop"/>
                 </VBox>
               </Panel>
-              <Panel headerText="Feldolgozasi lepesek" width="18rem" class="sapUiTinyMarginBottom">
-                <VBox class="sapUiSmallMargin">
-                  <Text text="1. Adatkinyeres" wrapping="true"/>
-                  <Text text="2. KPI-szamitás" wrapping="true"/>
-                  <Text text="3. CFO osszefoglalo" wrapping="true"/>
-                  <Text text="4. Sajtomegjelenesek" wrapping="true"/>
-                </VBox>
+              <Panel headerText="Elemzéstípusok" width="22rem" class="sapUiTinyMarginBottom">
+                <List items="{jokers>/dummy12AnalysisSteps}" showSeparators="None" class="sapUiTinyMarginTop sapUiTinyMarginBottom">
+                  <items>
+                    <CustomListItem>
+                      <VBox class="sapUiTinyMarginBegin sapUiTinyMarginTop sapUiTinyMarginBottom">
+                        <CheckBox text="{jokers>label}" selected="{jokers>selected}" enabled="{jokers>enabled}" select=".onDummy12StepChange"/>
+                        <Text text="{jokers>description}" wrapping="true" class="sapUiTinyMarginBegin"/>
+                      </VBox>
+                    </CustomListItem>
+                  </items>
+                </List>
               </Panel>
             </HBox>
 

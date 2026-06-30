@@ -2259,8 +2259,22 @@ sap.ui.define([
       };
     },
 
+    onDummy12StepChange: function(oEvent) {
+      var oModel = this.getView().getModel("jokers");
+      var oCheckBox = oEvent.getSource();
+      var oCtx = oCheckBox.getBindingContext("jokers");
+      if (!oCtx) { return; }
+      oModel.setProperty(oCtx.getPath() + "/selected", oCheckBox.getSelected());
+    },
+
     _resetDummy12State: function() {
       var oModel = this.getView().getModel("jokers");
+      oModel.setProperty("/dummy12AnalysisSteps", [
+        { key: "adatkinyeres",     label: "Adatkinyerés",       description: "Pénzügyi és cégadatok kinyerése a feltöltött beszámolókból és online forrásokból.", selected: true, enabled: false },
+        { key: "kpi-szamitas",     label: "KPI-számítás",       description: "Pénzügyi és piaci KPI-k kiszámítása és összehasonlítása a megadott cégek között.", selected: true, enabled: true  },
+        { key: "cfo-osszefoglalo", label: "CFO összefoglaló",   description: "Vezetői szintű, döntéshozatalra alkalmas összefoglaló generálása az eredményekből.", selected: true, enabled: true  },
+        { key: "sajtomegjelenesek",label: "Sajtómegjelenések",  description: "A megadott cégekhez kapcsolódó releváns sajtóhírek és médiamegjelenések összegyűjtése.", selected: true, enabled: true  }
+      ]);
       oModel.setProperty("/dummy12Companies", [this._createDummy12Company(true, 0)]);
       oModel.setProperty("/dummy12Busy", false);
       oModel.setProperty("/dummy12Error", "");
