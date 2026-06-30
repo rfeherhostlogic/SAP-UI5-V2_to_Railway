@@ -24,8 +24,8 @@
 
       <FlexBox items="{jokers>/filteredTiles}" wrap="Wrap" class="jokerTileGrid">
         <items>
-          <VBox class="{= ${jokers>inDevelopment} ? 'jokerTileWrap jokerTileWrapActive' : 'jokerTileWrap' }">
-            <GenericTile class="{= ${jokers>inDevelopment} ? 'jokerTile jokerTileActive' : 'jokerTile' }" header="{jokers>title}" subheader="{= ${jokers>subtitle} + ' • ' + (${jokers>primaryTag} || 'Általános') }" frameType="OneByOne" press=".onTilePress">
+          <VBox class="jokerTileWrap">
+            <GenericTile class="jokerTile" header="{jokers>title}" subheader="{= ${jokers>subtitle} + ' • ' + (${jokers>primaryTag} || 'Általános') }" frameType="OneByOne" press=".onTilePress">
               <tileContent>
                 <TileContent footer="{jokers>footer}">
                   <content>
@@ -34,8 +34,8 @@
                 </TileContent>
               </tileContent>
             </GenericTile>
-            <HBox visible="{jokers>inDevelopment}" justifyContent="Center" class="jokerDevBadge">
-              <Text text="Fejlesztés alatt" class="jokerDevBadgeText"/>
+            <HBox visible="{jokers>developed}" justifyContent="Center" class="jokerDevBadge">
+              <Text text="Fejlesztve" class="jokerDevBadgeText"/>
             </HBox>
           </VBox>
         </items>

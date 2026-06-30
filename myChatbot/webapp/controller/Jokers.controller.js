@@ -181,12 +181,6 @@ sap.ui.define([
           return aTags.indexOf(sTag) >= 0;
         });
       });
-      // Aktívan fejlesztett csempék kerülnek a lista elejére
-      aFiltered.sort(function(a, b) {
-        var aWip = (a && a.inDevelopment) ? 0 : 1;
-        var bWip = (b && b.inDevelopment) ? 0 : 1;
-        return aWip - bWip;
-      });
       oModel.setProperty("/filteredTiles", aFiltered);
     }
   });
