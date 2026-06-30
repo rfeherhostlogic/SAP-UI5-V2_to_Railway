@@ -9,7 +9,6 @@ sap.ui.define([
     onInit: function() {
       var oModel = this.getOwnerComponent().getModel("inv");
       oModel.setData({
-        selectedTab:       "forecast",
         dataSource:        "db",
         horizonDays:       "30",
         csvFileName:       "",

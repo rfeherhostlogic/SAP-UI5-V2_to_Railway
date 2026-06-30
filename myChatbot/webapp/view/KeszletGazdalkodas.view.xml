@@ -21,28 +21,13 @@
         </VBox>
       </HBox>
 
-      <!-- Fő fülek -->
-      <IconTabBar selectedKey="{inv>/selectedTab}" class="invTabBar" expandable="false">
-        <items>
+      <!-- Modul leírás -->
+      <VBox class="invInfoCard sapUiSmallMarginBottom">
+        <Text text="Automatizált keresleti előrejelzés és rendelési javaslatok adatbázis vagy CSV adatok alapján. Azonosítja a kritikus, figyelendő és stabil készletszintű termékeket, és egyedi rendelési javaslatokat generál a kiválasztott időhorizontra." class="invInfoText"/>
+      </VBox>
 
-          <!-- Cél fül -->
-          <IconTabFilter key="cel" text="Cél" icon="sap-icon://target-group">
-            <VBox class="invInfoCard sapUiMediumMarginTop sapUiMediumMarginBottom">
-              <Title text="A modul célja" level="H4" class="sapUiSmallMarginBottom"/>
-              <Text text="A Készletgazdálkodás modul automatizált keresleti előrejelzést és rendelési javaslatokat nyújt. Az adatbázisban tárolt mozgásadatok vagy feltöltött CSV alapján azonosítja a kritikus, figyelendő és stabil készletszintű termékeket, majd egyedi rendelési javaslatokat generál a meghatározott előrejelzési időhorizontra." class="invInfoText"/>
-            </VBox>
-          </IconTabFilter>
-
-          <!-- Modul Építő fül -->
-          <IconTabFilter key="modulEpito" text="Modul Építő" icon="sap-icon://build">
-            <VBox class="invInfoCard sapUiMediumMarginTop sapUiMediumMarginBottom">
-              <Title text="Modul konfiguráció" level="H4" class="sapUiSmallMarginBottom"/>
-              <Text text="A modul beállításai az Elemzés fülön érhetők el. Válassza ki az adatforrást, az előrejelzési időhorizontot és a termékkategóriát, majd indítsa el az előrejelzést." class="invInfoText"/>
-            </VBox>
-          </IconTabFilter>
-
-          <!-- Elemzés fül (főtartalom) -->
-          <IconTabFilter key="forecast" text="Elemzés" icon="sap-icon://bar-chart">
+      <!-- Elemzés tartalom -->
+      <VBox class="invAnalysisShell">
 
             <!-- Hibaüzenet -->
             <MessageStrip
@@ -457,11 +442,8 @@
             </VBox>
             <!-- /STATE: results -->
 
-          </IconTabFilter>
-          <!-- /Elemzés fül -->
-
-        </items>
-      </IconTabBar>
+      </VBox>
+      <!-- /Elemzés tartalom -->
     </VBox>
 
     <!-- Ragasztott akciósáv (csak eredmény nézetben) -->
