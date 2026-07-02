@@ -1,0 +1,463 @@
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:core="sap.ui.core"
+  xmlns:unif="sap.ui.unified"
+  controllerName="sap.suite.ui.commons.demo.tutorial.controller.KeszletGazdalkodas">
+
+  <Page
+    title="Készletgazdálkodás"
+    showNavButton="true"
+    navButtonPress=".onNavBack"
+    class="invPage">
+
+    <VBox width="100%" class="invShell">
+
+      <!-- Fejléc -->
+      <HBox alignItems="Center" justifyContent="SpaceBetween" class="invHeader">
+        <VBox>
+          <Title text="Készletgazdálkodás" level="H2" class="invTitle"/>
+          <Text text="Készletelőrejelzés és rendelési javaslatok" class="invSubtitle"/>
+        </VBox>
+      </HBox>
+
+      <!-- Modul leírás -->
+      <VBox class="invInfoCard sapUiSmallMarginBottom">
+        <Text text="Automatizált keresleti előrejelzés és rendelési javaslatok adatbázis vagy CSV adatok alapján. Azonosítja a kritikus, figyelendő és stabil készletszintű termékeket, és egyedi rendelési javaslatokat generál a kiválasztott időhorizontra." class="invInfoText"/>
+      </VBox>
+
+      <!-- Elemzés tartalom -->
+      <VBox class="invAnalysisShell">
+
+            <!-- Hibaüzenet -->
+            <MessageStrip
+              text="{inv>/errorMessage}"
+              type="Error"
+              showIcon="true"
+              visible="{= !!${inv>/errorMessage} }"
+              class="sapUiSmallMarginTop sapUiSmallMarginBottom"/>
+
+            <!-- ══════════════════════════════════════════════════════ -->
+            <!-- STATE: setup                                           -->
+            <!-- ══════════════════════════════════════════════════════ -->
+            <VBox visible="{= ${inv>/state} === 'setup' }" class="invSetupShell">
+
+              <!-- Adatforrás -->
+              <VBox class="invSectionCard">
+                <Title text="Adatforrás" level="H5" class="invSectionTitle"/>
+                <Text text="Válassza ki, honnan kerüljenek be a készletadatok az előrejelzéshez." class="invSectionDesc"/>
+                <SegmentedButton
+                  id="invDataSourceBtn"
+                  selectedKey="{inv>/dataSource}"
+                  selectionChange=".onDataSourceChange"
+                  class="invDataSourceToggle sapUiSmallMarginTop">
+                  <items>
+                    <SegmentedButtonItem key="db" icon="sap-icon://database" text="Adatbázis"/>
+                    <SegmentedButtonItem key="csv" icon="sap-icon://attachment" text="CSV feltöltés"/>
+                  </items>
+                </SegmentedButton>
+
+                <VBox visible="{= ${inv>/dataSource} === 'csv' }" class="sapUiSmallMarginTop">
+                  <VBox id="invCsvDropZone" visible="{= !${inv>/csvFileName} }" class="invDropZone" press=".onCsvZonePress">
+                    <core:Icon src="sap-icon://upload" size="2rem" class="invDropZoneIcon"/>
+                    <Text text="Húzd ide a CSV fájlt, vagy kattints a tallózáshoz" class="invDropZoneText"/>
+                    <Text text="Elfogadott formátum: .csv  |  Max. 5 MB" class="invDropZoneHint"/>
+                  </VBox>
+                  <unif:FileUploader
+                    id="invCsvUploader"
+                    visible="false"
+                    fileType="csv"
+                    sameFilenameAllowed="true"
+                    multiple="false"
+                    uploadOnChange="false"
+                    change=".onCsvFileChange"/>
+                  <HBox visible="{= !!${inv>/csvFileName} }" alignItems="Center" class="invFileChip sapUiSmallMarginTop">
+                    <core:Icon src="sap-icon://attachment-text-file" size="1rem" class="invFileChipIcon"/>
+                    <VBox class="sapUiTinyMarginBegin">
+                      <Text text="{inv>/csvFileName}" class="invFileChipName"/>
+                      <Text text="{inv>/csvFileSize}" class="invFileChipSize"/>
+                    </VBox>
+                    <Button icon="sap-icon://decline" type="Transparent" tooltip="Fájl eltávolítása" press=".onCsvRemove" class="invFileChipRemove"/>
+                  </HBox>
+                  <Link text="Sablon letöltése (.csv)" press=".onDownloadTemplate" class="invTemplateLink sapUiTinyMarginTop"/>
+                </VBox>
+              </VBox>
+
+              <!-- Előrejelzési horizont -->
+              <VBox class="invSectionCard">
+                <Title text="Előrejelzési időszak" level="H5" class="invSectionTitle"/>
+                <Text text="Hány napra előre számítson az előrejelzés?" class="invSectionDesc"/>
+                <SegmentedButton selectedKey="{inv>/horizonDays}" selectionChange=".onHorizonChange" class="sapUiSmallMarginTop">
+                  <items>
+                    <SegmentedButtonItem key="30" text="30 nap"/>
+                    <SegmentedButtonItem key="60" text="60 nap"/>
+                    <SegmentedButtonItem key="90" text="90 nap"/>
+                  </items>
+                </SegmentedButton>
+              </VBox>
+
+              <!-- Kategória szűrő -->
+              <VBox class="invSectionCard">
+                <Title text="Termékkategória (opcionális)" level="H5" class="invSectionTitle"/>
+                <Text text="Ha üresen hagyja, az összes kategória szerepel az előrejelzésben." class="invSectionDesc"/>
+                <MultiComboBox
+                  id="invCategoryFilter"
+                  placeholder="Összes kategória"
+                  items="{inv>/categories}"
+                  selectionChange=".onCategoryChange"
+                  class="invCategoryCombo sapUiSmallMarginTop">
+                  <core:Item key="{inv>category_id}" text="{inv>category_name}"/>
+                </MultiComboBox>
+              </VBox>
+
+              <!-- Noah pill -->
+              <VBox class="invNoahSection" alignItems="Center">
+                <HBox alignItems="Center" class="invNoahPill" press=".onRunForecast">
+                  <Avatar initials="N" displaySize="XS" press=".onRunForecast" class="chatAvatar noahAvatar invNoahPillAvatar"/>
+                  <Button
+                    text="Előrejelzés futtatása"
+                    type="Transparent"
+                    press=".onRunForecast"
+                    enabled="{= ${inv>/dataSource} !== 'csv' || !!${inv>/csvFileName} }"
+                    class="invNoahPillButton"/>
+                </HBox>
+              </VBox>
+
+            </VBox>
+            <!-- /STATE: setup -->
+
+            <!-- ══════════════════════════════════════════════════════ -->
+            <!-- STATE: loading                                         -->
+            <!-- ══════════════════════════════════════════════════════ -->
+            <VBox visible="{= ${inv>/state} === 'loading' }" class="invLoadingShell sapUiMediumMarginTop">
+              <HBox wrap="Wrap" class="invSkeletonKpiRow sapUiSmallMarginBottom">
+                <VBox class="invSkeletonKpi invShimmer"/>
+                <VBox class="invSkeletonKpi invShimmer"/>
+                <VBox class="invSkeletonKpi invShimmer"/>
+                <VBox class="invSkeletonKpi invShimmer"/>
+              </HBox>
+              <VBox class="invSkeletonListWrap">
+                <HBox class="invSkeletonRow invShimmer sapUiTinyMarginBottom"/>
+                <HBox class="invSkeletonRow invShimmer sapUiTinyMarginBottom"/>
+                <HBox class="invSkeletonRow invShimmer sapUiTinyMarginBottom"/>
+                <HBox class="invSkeletonRow invShimmer sapUiTinyMarginBottom"/>
+                <HBox class="invSkeletonRow invShimmer sapUiTinyMarginBottom"/>
+                <HBox class="invSkeletonRow invShimmer sapUiTinyMarginBottom"/>
+              </VBox>
+              <Text text="Az előrejelzés futtatása folyamatban..." class="invLoadingHint sapUiSmallMarginTop"/>
+            </VBox>
+            <!-- /STATE: loading -->
+
+            <!-- ══════════════════════════════════════════════════════ -->
+            <!-- STATE: empty                                           -->
+            <!-- ══════════════════════════════════════════════════════ -->
+            <VBox visible="{= ${inv>/state} === 'empty' }" alignItems="Center" class="invEmptyState sapUiLargeMarginTop">
+              <core:Icon src="sap-icon://product" size="4rem" class="invEmptyIcon"/>
+              <Title text="Nincsenek termékek" level="H4" class="sapUiSmallMarginTop"/>
+              <Text text="Nem találhatók termékek a kiválasztott szűrőkkel." textAlign="Center" class="invEmptyText"/>
+              <Button text="Vissza a beállításokhoz" type="Emphasized" press=".onBackToSetup" class="sapUiSmallMarginTop"/>
+            </VBox>
+            <!-- /STATE: empty -->
+
+            <!-- ══════════════════════════════════════════════════════ -->
+            <!-- STATE: results                                         -->
+            <!-- ══════════════════════════════════════════════════════ -->
+            <VBox visible="{= ${inv>/state} === 'results' }" class="invResultsShell">
+
+              <!-- Fejléc sor: vissza + meta -->
+              <HBox alignItems="Center" justifyContent="SpaceBetween" class="invResultsTopBar sapUiSmallMarginBottom">
+                <Button text="← Új elemzés" type="Transparent" press=".onBackToSetup" class="invBackButton"/>
+                <Text text="{inv>/forecastTimestamp}" class="invForecastMeta"/>
+              </HBox>
+
+              <!-- KPI sáv -->
+              <HBox wrap="Wrap" class="invKpiStrip sapUiSmallMarginBottom">
+                <VBox class="invKpiCard invKpiCardCritical">
+                  <HBox alignItems="Center" class="invKpiCardHeader">
+                    <core:Icon src="sap-icon://status-critical" class="invKpiIconCritical sapUiTinyMarginEnd"/>
+                    <Text text="Kritikus cikkek" class="invKpiLabel"/>
+                  </HBox>
+                  <Title text="{inv>/results/summary/critical_count}" level="H2" class="invKpiValueCritical"/>
+                  <Text text="Azonnali beavatkozás szükséges" class="invKpiSub"/>
+                </VBox>
+                <VBox class="invKpiCard invKpiCardWarning">
+                  <HBox alignItems="Center" class="invKpiCardHeader">
+                    <core:Icon src="sap-icon://status-in-process" class="invKpiIconWarning sapUiTinyMarginEnd"/>
+                    <Text text="Figyelendő cikkek" class="invKpiLabel"/>
+                  </HBox>
+                  <Title text="{inv>/results/summary/warning_count}" level="H2" class="invKpiValueWarning"/>
+                  <Text text="Rendelés szükséges rövidesen" class="invKpiSub"/>
+                </VBox>
+                <VBox class="invKpiCard invKpiCardBlue">
+                  <HBox alignItems="Center" class="invKpiCardHeader">
+                    <core:Icon src="sap-icon://cart" class="invKpiIconBlue sapUiTinyMarginEnd"/>
+                    <Text text="Rendelési javaslatok értéke" class="invKpiLabel"/>
+                  </HBox>
+                  <Title text="{inv>/results/summary/total_reorder_value_formatted}" level="H2" class="invKpiValueBlue"/>
+                  <Text text="Javasolt rendelések összértéke" class="invKpiSub"/>
+                </VBox>
+                <VBox class="invKpiCard invKpiCardGreen">
+                  <HBox alignItems="Center" class="invKpiCardHeader">
+                    <core:Icon src="sap-icon://status-completed" class="invKpiIconGreen sapUiTinyMarginEnd"/>
+                    <Text text="Stabil cikkek" class="invKpiLabel"/>
+                  </HBox>
+                  <Title text="{inv>/results/summary/stable_count}" level="H2" class="invKpiValueGreen"/>
+                  <Text text="Nincs azonnali teendő" class="invKpiSub"/>
+                </VBox>
+              </HBox>
+
+              <!-- Eredmény fülek -->
+              <IconTabBar
+                id="invResultsTabBar"
+                selectedKey="{inv>/resultsTab}"
+                select=".onResultsTabSelect"
+                class="invResultsTabBar">
+                <items>
+
+                  <!-- TAB 1: Kritikus készletek -->
+                  <IconTabFilter key="critical" text="Kritikus készletek" icon="sap-icon://status-critical" count="{inv>/results/criticalWarningCount}">
+                    <VBox class="sapUiSmallMarginTop">
+
+                      <!-- Kritikus + figyelendő kártyák -->
+                      <List items="{inv>/results/criticalAndWarning}" showSeparators="None" class="invProductList">
+                        <CustomListItem class="{inv>productCardClass}">
+                          <HBox width="100%" alignItems="Stretch">
+                            <VBox class="{inv>leftBarClass}"/>
+                            <VBox class="invCardContent" width="100%">
+                              <HBox alignItems="Center" justifyContent="SpaceBetween" wrap="Wrap">
+                                <HBox alignItems="Center">
+                                  <Text text="{inv>product_code}" class="invCardCode"/>
+                                  <Text text=" — " class="invCardSep"/>
+                                  <Text text="{inv>product_name}" class="invCardName"/>
+                                </HBox>
+                                <HBox alignItems="Center">
+                                  <Text text="SÜRGŐS" visible="{inv>urgentBadge}" class="invUrgentBadge"/>
+                                  <Text text="{inv>category_name}" class="invCategoryPill sapUiTinyMarginBegin"/>
+                                </HBox>
+                              </HBox>
+                              <HBox wrap="Wrap" class="invCardMetaGrid sapUiTinyMarginTop">
+                                <VBox class="invCardMetaItem">
+                                  <Text text="Aktuális készlet" class="invCardMetaLabel"/>
+                                  <Text text="{= ${inv>current_quantity} + ' ' + ${inv>unit} }" class="invCardMetaValue"/>
+                                </VBox>
+                                <VBox class="invCardMetaItem">
+                                  <Text text="Napi felhasználás" class="invCardMetaLabel"/>
+                                  <Text text="{= ${inv>avg_daily_demand_fmt} + ' ' + ${inv>unit} + '/nap' }" class="invCardMetaValue"/>
+                                </VBox>
+                                <VBox class="invCardMetaItem">
+                                  <Text text="Készlet elfogy" class="invCardMetaLabel"/>
+                                  <Text text="{inv>stockout_date_fmt}" class="invCardMetaValue invCardMetaDanger"/>
+                                </VBox>
+                                <VBox class="invCardMetaItem">
+                                  <Text text="Szállítási idő" class="invCardMetaLabel"/>
+                                  <Text text="{= ${inv>lead_time_days} + ' nap' }" class="invCardMetaValue"/>
+                                </VBox>
+                              </HBox>
+                              <HBox visible="{= !!${inv>reorder_suggestion} }" class="invReorderBox sapUiTinyMarginTop" alignItems="Center">
+                                <core:Icon src="sap-icon://shipping-status" class="invReorderBoxIcon sapUiTinyMarginEnd"/>
+                                <VBox>
+                                  <Text text="{= 'Javasolt rendelés: ' + ${inv>reorder_suggestion/suggested_quantity} + ' db' }" class="invReorderBoxText"/>
+                                  <Text text="{= 'Legkésőbb: ' + ${inv>reorder_suggestion/latest_order_deadline_fmt} + '  |  Szállító: ' + ${inv>reorder_suggestion/supplier_name} }" class="invReorderBoxSub"/>
+                                </VBox>
+                              </HBox>
+                            </VBox>
+                          </HBox>
+                        </CustomListItem>
+                      </List>
+
+                      <!-- Felesleges készlet szekció -->
+                      <VBox visible="{inv>/results/hasExcess}" class="sapUiMediumMarginTop">
+                        <HBox alignItems="Center" class="sapUiSmallMarginBottom">
+                          <core:Icon src="sap-icon://hint" color="#9E5E00" class="sapUiTinyMarginEnd"/>
+                          <Title text="Felesleges készlet" level="H5" class="invSectionTitle"/>
+                        </HBox>
+                        <List items="{inv>/results/excess}" showSeparators="None" class="invProductList">
+                          <CustomListItem>
+                            <HBox width="100%" alignItems="Stretch">
+                              <VBox class="invLeftBarExcess"/>
+                              <VBox class="invCardContent" width="100%">
+                                <Text text="{inv>product_name}" class="invCardName"/>
+                                <HBox wrap="Wrap" class="invCardMetaGrid sapUiTinyMarginTop">
+                                  <VBox class="invCardMetaItem">
+                                    <Text text="Aktuális készlet" class="invCardMetaLabel"/>
+                                    <Text text="{= ${inv>current_quantity} + ' db' }" class="invCardMetaValue"/>
+                                  </VBox>
+                                  <VBox class="invCardMetaItem">
+                                    <Text text="Felesleg (db)" class="invCardMetaLabel"/>
+                                    <Text text="{inv>excess_quantity}" class="invCardMetaValue"/>
+                                  </VBox>
+                                  <VBox class="invCardMetaItem">
+                                    <Text text="Felesleg értéke" class="invCardMetaLabel"/>
+                                    <Text text="{inv>excess_value_formatted}" class="invCardMetaValue"/>
+                                  </VBox>
+                                  <VBox class="invCardMetaItem">
+                                    <Text text="Fogyási napok" class="invCardMetaLabel"/>
+                                    <Text text="{= ${inv>days_of_excess_stock} + ' nap' }" class="invCardMetaValue"/>
+                                  </VBox>
+                                </HBox>
+                              </VBox>
+                            </HBox>
+                          </CustomListItem>
+                        </List>
+                      </VBox>
+
+                    </VBox>
+                  </IconTabFilter>
+
+                  <!-- TAB 2: Rendelési javaslatok -->
+                  <IconTabFilter key="orders" text="Rendelési javaslatok" icon="sap-icon://shipping-status">
+                    <VBox class="sapUiSmallMarginTop">
+                      <Table items="{inv>/results/orderSuggestions}" inset="false" class="invOrderTable">
+                        <columns>
+                          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="Cikkszám"/></Column>
+                          <Column><Text text="Megnevezés"/></Column>
+                          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="Szállító"/></Column>
+                          <Column minScreenWidth="Desktop" demandPopin="true" width="7rem"><Text text="Megbízhatóság"/></Column>
+                          <Column minScreenWidth="Tablet" demandPopin="true" hAlign="End"><Text text="Jav. menny."/></Column>
+                          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="Egység"/></Column>
+                          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="Legk. rendel."/></Column>
+                          <Column minScreenWidth="Tablet" demandPopin="true" hAlign="End"><Text text="Becsült érték (Ft)"/></Column>
+                          <Column><Text text="Státusz"/></Column>
+                        </columns>
+                        <items>
+                          <ColumnListItem>
+                            <cells>
+                              <Text text="{inv>product_code}"/>
+                              <Text text="{inv>product_name}"/>
+                              <Text text="{inv>reorder_suggestion/supplier_name}"/>
+                              <ProgressIndicator
+                                percentValue="{inv>reorder_suggestion/supplier_reliability}"
+                                showValue="false"
+                                state="Information"
+                                width="6rem"/>
+                              <Text text="{inv>reorder_suggestion/suggested_quantity}" wrapping="false"/>
+                              <Text text="{inv>unit}"/>
+                              <Text text="{inv>reorder_suggestion/latest_order_deadline_fmt}" class="{inv>deadlineClass}"/>
+                              <Text text="{inv>reorder_suggestion/estimated_value_formatted}" wrapping="false"/>
+                              <Text text="{inv>statusLabel}" class="{inv>statusBadgeClass}"/>
+                            </cells>
+                          </ColumnListItem>
+                        </items>
+                      </Table>
+                      <HBox justifyContent="End" class="invOrderTableFooter sapUiSmallMarginTop">
+                        <Text text="{inv>/results/orderSummaryText}" class="invOrderSummaryText"/>
+                      </HBox>
+                    </VBox>
+                  </IconTabFilter>
+
+                  <!-- TAB 3: Kereslet előrejelzés (Chart.js) -->
+                  <IconTabFilter key="charts" text="Kereslet előrejelzés" icon="sap-icon://bar-chart">
+                    <VBox class="sapUiSmallMarginTop">
+                      <Title text="Előrejelzett napi igény kategóriánként" level="H5" class="invChartTitle sapUiTinyMarginBottom"/>
+                      <VBox id="invChartAHost" class="invChartContainer sapUiSmallMarginBottom"/>
+                      <Title text="Top termékek: készlet- és feleslegkockázat" level="H5" class="invChartTitle sapUiSmallMarginTop sapUiTinyMarginBottom"/>
+                      <VBox id="invChartBHost" class="invChartContainer"/>
+                    </VBox>
+                  </IconTabFilter>
+
+                </items>
+              </IconTabBar>
+
+              <!-- ══ NOAH Q&A ZÓna ══════════════════════════════════ -->
+              <VBox class="invNoahZone sapUiMediumMarginTop">
+
+                <!-- Sub-state A: trigger pill (idle) -->
+                <HBox
+                  visible="{= ${inv>/noahZoneState} === 'idle' }"
+                  alignItems="Center"
+                  class="invNoahPill"
+                  press=".onNoahSummarize">
+                  <Avatar src="img/Noah_transparent.png" displaySize="XS" class="chatAvatar noahAvatar"/>
+                  <Button
+                    text="Elemzés magyarázata"
+                    type="Transparent"
+                    press=".onNoahSummarize"
+                    class="invNoahPillButton"/>
+                </HBox>
+
+                <!-- Sub-state B/C: chat terület -->
+                <VBox visible="{= ${inv>/noahZoneState} !== 'idle' }" class="invNoahChatArea">
+
+                  <!-- Üzenet buborékok -->
+                  <List items="{inv>/noahMessages}" showSeparators="None" class="invNoahMsgList">
+                    <CustomListItem class="invNoahMsgItem">
+                      <!-- Noah buborék -->
+                      <HBox width="100%" justifyContent="Start" visible="{= ${inv>role} === 'assistant' }">
+                        <Avatar src="img/Noah_transparent.png" displaySize="XS" class="chatAvatar noahAvatar"/>
+                        <VBox class="chatBubble chatBubbleAi noahBubbleAi invNoahBubble">
+                          <Text text="Noah" class="chatBubbleMeta"/>
+                          <Text text="{inv>content}" wrapping="true" width="100%"/>
+                        </VBox>
+                      </HBox>
+                      <!-- Felhasználó buborék -->
+                      <HBox width="100%" justifyContent="End" visible="{= ${inv>role} === 'user' }">
+                        <VBox class="chatBubble chatBubbleUser noahBubbleUser invNoahBubble">
+                          <Text text="{inv>content}" wrapping="true" width="100%"/>
+                        </VBox>
+                      </HBox>
+                    </CustomListItem>
+                  </List>
+
+                  <!-- Gépelési jelző (3 pont) -->
+                  <HBox visible="{= ${inv>/noahZoneState} === 'typing' }" alignItems="Center" class="sapUiTinyMarginTop">
+                    <Avatar src="img/Noah_transparent.png" displaySize="XS" class="chatAvatar noahAvatar"/>
+                    <VBox class="chatBubble chatBubbleAi noahBubbleAi invNoahBubble invNoahTypingBubble">
+                      <HBox alignItems="Center" class="invNoahTypingDots">
+                        <VBox class="invNoahDot invNoahDot1"/>
+                        <VBox class="invNoahDot invNoahDot2"/>
+                        <VBox class="invNoahDot invNoahDot3"/>
+                      </HBox>
+                    </VBox>
+                  </HBox>
+
+                  <!-- Kérdezz tovább (chat állapot) -->
+                  <HBox visible="{= ${inv>/noahZoneState} === 'chat' }" alignItems="Center" class="invNoahInputRow sapUiSmallMarginTop">
+                    <Input
+                      id="invNoahInput"
+                      placeholder="Kérdezz rá az elemzésre..."
+                      value="{inv>/noahInput}"
+                      submit=".onNoahFollowUp"
+                      class="invNoahInputField"/>
+                    <Button
+                      icon="sap-icon://paper-plane"
+                      type="Emphasized"
+                      tooltip="Küldés"
+                      press=".onNoahFollowUp"
+                      class="sapUiTinyMarginBegin"/>
+                  </HBox>
+
+                  <!-- Munkamenet vége (limit állapot) -->
+                  <MessageStrip
+                    text="Az elemzési munkamenet véget ért. Új elemzéshez kattints az Előrejelzés futtatása gombra."
+                    type="Information"
+                    showIcon="true"
+                    visible="{= ${inv>/noahZoneState} === 'limit' }"
+                    class="sapUiSmallMarginTop"/>
+
+                </VBox>
+
+              </VBox>
+              <!-- /NOAH Q&A ZÓna -->
+
+            </VBox>
+            <!-- /STATE: results -->
+
+      </VBox>
+      <!-- /Elemzés tartalom -->
+    </VBox>
+
+    <!-- Ragasztott akciósáv (csak eredmény nézetben) -->
+    <footer>
+      <Toolbar visible="{= ${inv>/state} === 'results' }" class="invResultsFooter">
+        <Button text="← Új elemzés" type="Transparent" press=".onBackToSetup"/>
+        <ToolbarSpacer/>
+        <Button text="Exportálás CSV" icon="sap-icon://download" press=".onExportCsv"/>
+        <HBox alignItems="Center" class="invNoahPill sapUiTinyMarginBegin">
+          <Avatar initials="N" displaySize="XS" class="chatAvatar noahAvatar invNoahPillAvatar"/>
+          <Button text="Összefoglalás küldése Hírfolyamba" type="Transparent" press=".onSendToFeed" class="invNoahPillButton"/>
+        </HBox>
+      </Toolbar>
+    </footer>
+
+  </Page>
+</mvc:View>

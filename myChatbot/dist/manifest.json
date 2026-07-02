@@ -90,6 +90,9 @@
         },
         {
           "uri": "css/flow.css"
+        },
+        {
+          "uri": "css/keszletgazdalkodas.css"
         }
       ]
     },
@@ -129,6 +132,9 @@
         "type": "sap.ui.model.json.JSONModel"
       },
       "flow": {
+        "type": "sap.ui.model.json.JSONModel"
+      },
+      "inv": {
         "type": "sap.ui.model.json.JSONModel"
       }
     },

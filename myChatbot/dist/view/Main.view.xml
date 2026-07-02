@@ -44,6 +44,7 @@
         <mvc:XMLView id="feedView" viewName="sap.suite.ui.commons.demo.tutorial.view.Feed"/>
         <mvc:XMLView id="noah2View" viewName="sap.suite.ui.commons.demo.tutorial.view.Noah2"/>
         <mvc:XMLView id="jokerPromptView" viewName="sap.suite.ui.commons.demo.tutorial.view.JokerPrompt"/>
+        <mvc:XMLView id="keszletgazdalkodaView" viewName="sap.suite.ui.commons.demo.tutorial.view.KeszletGazdalkodas"/>
       </NavContainer>
     </tnt:mainContents>
   </tnt:ToolPage>

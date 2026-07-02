@@ -56,10 +56,12 @@ sap.ui.define([
 
     _onMainMenuMatched: function(oEvent) {
       var sKey = oEvent.getParameter("arguments").menuKey || "noah";
-      if (sKey !== "reports" && sKey !== "jokers" && sKey !== "discovery" && sKey !== "noah" && sKey !== "feed" && sKey !== "flow") {
+      if (sKey !== "reports" && sKey !== "jokers" && sKey !== "discovery" && sKey !== "noah" && sKey !== "feed" && sKey !== "flow" && sKey !== "keszletgazdalkodas") {
         sKey = "noah";
       }
-      this.getView().getModel("app").setProperty("/selectedMenuKey", sKey);
+      // Készletgazdálkodás a Jokerek egyik modulja — oldalmenüben a Jokerek marad aktív
+      var sMenuKey = sKey === "keszletgazdalkodas" ? "jokers" : sKey;
+      this.getView().getModel("app").setProperty("/selectedMenuKey", sMenuKey);
       if (sKey === "discovery") {
         this.getOwnerComponent().getRouter().navTo("discoveryHome", {}, true);
         return;
@@ -95,7 +97,8 @@ sap.ui.define([
         discoveryClassic: this.byId("discoveryClassicView"),
         feed: this.byId("feedView"),
         noah: this.byId("noah2View"),
-        jokerPrompt: this.byId("jokerPromptView")
+        jokerPrompt: this.byId("jokerPromptView"),
+        keszletgazdalkodas: this.byId("keszletgazdalkodaView")
       };
       var oPage = oPageMap[sKey] || oPageMap.noah;
       if (oPage) {
