@@ -1366,8 +1366,7 @@
             <HBox justifyContent="SpaceBetween" wrap="Wrap" alignItems="Center">
               <VBox>
                 <Title text="Elemzesi setup" level="H4"/>
-                <Text text="{= 'Ceghelyek szama: ' + ${jokers>/dummy12Companies}.length + ' / 5' }" wrapping="true"/>
-                <Text text="{= 'Meg hozzaadhato versenytarsak: ' + (5 - ${jokers>/dummy12Companies}.length) }" wrapping="true"/>
+                <ObjectStatus text="{= ${jokers>/dummy12Companies}.length + '/5 cég megadva'}" state="None" class="sapUiTinyMarginTop"/>
                 <MessageStrip
                   text="{jokers>/dummy12SessionInfoText}"
                   visible="{= ${jokers>/dummy12SessionInfoText} ? true : false }"
@@ -1389,84 +1388,118 @@
               <Text text="A Konkurencia elemzés modul a megadott saját és versenytárs cégek adatait dolgozza fel: a feltöltött éves beszámolók PDF-jeiből pénzügyi mutatókat (árbevétel, eredmény, mérlegfőösszeg) nyer ki, a weboldal és LinkedIn adatok alapján piaci pozíciót becsül, ezekből KPI-kat számol és hasonlít össze, majd a kiválasztott elemzéstípusok alapján vezetői (CFO-szintű) összefoglalót és/vagy sajtómegjelenés-listát állít össze." wrapping="true" class="sapUiTinyMarginTop"/>
             </VBox>
 
-            <HBox wrap="Wrap" class="sapUiSmallMarginTop" renderType="Bare">
-              <Panel headerText="Sajat ceg" width="18rem" class="sapUiTinyMarginEnd sapUiTinyMarginBottom">
-                <VBox class="sapUiSmallMargin">
-                  <ObjectStatus text="Mindig kotelezo" state="Success"/>
-                  <Text text="Tolts fel 1 eves beszamolo PDF-et. Ebbol jon a merleg, az eredmenykimutatas, valamint az elozo es targyevi trendek." wrapping="true" class="sapUiTinyMarginTop"/>
-                </VBox>
-              </Panel>
-              <Panel headerText="Versenytarsak" width="18rem" class="sapUiTinyMarginEnd sapUiTinyMarginBottom">
-                <VBox class="sapUiSmallMargin">
-                  <ObjectStatus text="Maximum 4 versenytars" state="Information"/>
-                  <Text text="A versenytarsakhoz weboldal, LinkedIn es opcionális PDF-ek adhatoak meg benchmark celra." wrapping="true" class="sapUiTinyMarginTop"/>
-                </VBox>
-              </Panel>
-              <Panel headerText="Elemzéstípusok" width="22rem" class="sapUiTinyMarginBottom">
-                <List items="{jokers>/dummy12AnalysisSteps}" showSeparators="None" class="sapUiTinyMarginTop sapUiTinyMarginBottom">
-                  <items>
-                    <CustomListItem>
-                      <VBox class="sapUiTinyMarginBegin sapUiTinyMarginTop sapUiTinyMarginBottom">
-                        <CheckBox text="{jokers>label}" selected="{jokers>selected}" enabled="{jokers>enabled}" select=".onDummy12StepChange"/>
-                        <Text text="{jokers>description}" wrapping="true" class="sapUiTinyMarginBegin"/>
-                      </VBox>
-                    </CustomListItem>
-                  </items>
-                </List>
-              </Panel>
-            </HBox>
-
-            <MessageStrip text="A sajat ceg kartya nem torolheto. Cegenkent egy darab Eves beszamolo PDF adhato meg, amely tartalmazza a merleget es az eredmenykimutatast is." type="Information" showIcon="true" class="sapUiSmallMarginTop"/>
-
-            <Table items="{jokers>/dummy12Companies}" inset="false" growing="true" class="sapUiSmallMarginTop">
-              <columns>
-                <Column width="10rem"><Text text="Tipus"/></Column>
-                <Column width="14rem"><Text text="Ceg neve"/></Column>
-                <Column width="14rem"><Text text="Weboldal"/></Column>
-                <Column width="14rem"><Text text="LinkedIn"/></Column>
-                <Column width="16rem"><Text text="Eves beszamolo PDF"/></Column>
-                <Column width="10rem"><Text text="Muveletek"/></Column>
-              </columns>
-              <items>
-                <ColumnListItem>
-                  <cells>
-                    <VBox class="sapUiTinyMarginTop sapUiTinyMarginBottom">
-                      <ObjectStatus text="{jokers>slotLabel}" state="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Success' : 'Information' }"/>
-                      <Text text="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Kotelezo' : 'Opcionális' }" wrapping="true"/>
+            <Panel headerText="Elemzéstípusok" width="26rem" class="sapUiSmallMarginTop">
+              <List items="{jokers>/dummy12AnalysisSteps}" showSeparators="None" class="sapUiTinyMarginTop sapUiTinyMarginBottom">
+                <items>
+                  <CustomListItem>
+                    <VBox class="sapUiTinyMarginBegin sapUiTinyMarginTop sapUiTinyMarginBottom">
+                      <CheckBox text="{jokers>label}" selected="{jokers>selected}" enabled="{jokers>enabled}" select=".onDummy12StepChange"/>
+                      <Text text="{jokers>description}" wrapping="true" class="sapUiTinyMarginBegin"/>
                     </VBox>
-                    <Input value="{jokers>companyName}" liveChange=".onDummy12CompanyFieldChange" placeholder="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Pl. Techwave Hungary Zrt.' : 'Pl. Competitor Kft.' }"/>
-                    <Input value="{jokers>websiteUrl}" liveChange=".onDummy12CompanyFieldChange" placeholder="https://www.pelda.hu"/>
-                    <Input value="{jokers>linkedinUrl}" liveChange=".onDummy12CompanyFieldChange" placeholder="https://www.linkedin.com/company/..."/>
-                    <VBox>
+                  </CustomListItem>
+                </items>
+              </List>
+            </Panel>
+
+            <!-- Céglista – kártyás elrendezés -->
+            <List
+              items="{jokers>/dummy12Companies}"
+              showSeparators="None"
+              backgroundDesign="Transparent"
+              class="dummy12CardList sapUiSmallMarginTop">
+              <items>
+                <CustomListItem type="Inactive" class="dummy12CompanyListItem">
+                  <VBox class="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'dummy12CompanyCard dummy12CardOwn' : 'dummy12CompanyCard dummy12CardCompetitor' }">
+                    <HBox justifyContent="SpaceBetween" alignItems="Center">
+                      <ObjectStatus
+                        text="{jokers>slotLabel}"
+                        state="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Success' : 'Information' }"/>
+                      <Button
+                        icon="sap-icon://decline"
+                        type="Transparent"
+                        tooltip="Versenytárs eltávolítása"
+                        press=".onDummy12RemoveCompany"
+                        visible="{= ${jokers>slotLabel} !== 'Sajat ceg' }"
+                        class="dummy12CardRemoveBtn"/>
+                    </HBox>
+                    <Text
+                      text="Kötelező. A saját cég kártyája nem törölhető."
+                      visible="{= ${jokers>slotLabel} === 'Sajat ceg' }"
+                      wrapping="false"
+                      class="dummy12CardHelperText sapUiTinyMarginTop"/>
+                    <HBox wrap="Wrap" class="dummy12CardFieldRow sapUiTinyMarginTop">
+                      <VBox class="dummy12CardField sapUiTinyMarginEnd sapUiTinyMarginTop">
+                        <Label text="Cég neve" required="{= ${jokers>slotLabel} === 'Sajat ceg' }"/>
+                        <Input
+                          value="{jokers>companyName}"
+                          liveChange=".onDummy12CompanyFieldChange"
+                          placeholder="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Pl. Techwave Hungary Zrt.' : 'Pl. Competitor Kft.' }"
+                          width="100%"/>
+                      </VBox>
+                      <VBox class="dummy12CardField sapUiTinyMarginEnd sapUiTinyMarginTop">
+                        <Label text="Weboldal"/>
+                        <Input
+                          value="{jokers>websiteUrl}"
+                          liveChange=".onDummy12CompanyFieldChange"
+                          placeholder="https://www.pelda.hu"
+                          width="100%"/>
+                      </VBox>
+                      <VBox class="dummy12CardField sapUiTinyMarginEnd sapUiTinyMarginTop">
+                        <Label text="LinkedIn"/>
+                        <Input
+                          value="{jokers>linkedinUrl}"
+                          liveChange=".onDummy12CompanyFieldChange"
+                          placeholder="https://www.linkedin.com/company/..."
+                          width="100%"/>
+                      </VBox>
+                    </HBox>
+                    <VBox class="sapUiSmallMarginTop">
+                      <Label
+                        text="Éves beszámoló PDF"
+                        required="{= ${jokers>slotLabel} === 'Sajat ceg' }"/>
                       <unif:FileUploader
-                        width="100%"
+                        width="auto"
                         sameFilenameAllowed="true"
                         multiple="false"
                         uploadOnChange="false"
                         fileType="pdf"
-                        buttonText="PDF kivalasztasa"
+                        buttonText="PDF kiválasztása"
                         change=".onDummy12ReportFileChange"/>
-                      <Text text="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Merleg + eredmenykimutatas egy PDF-ben.' : 'Opcionális benchmark PDF.' }" wrapping="true" class="sapUiTinyMarginTop"/>
-                      <List items="{jokers>annualReportFiles}" visible="{= ${jokers>annualReportFiles}.length > 0 }" class="sapUiTinyMarginTop">
+                      <Text
+                        text="{= ${jokers>slotLabel} === 'Sajat ceg' ? 'Mérleg + eredménykimutatás egy PDF-ben.' : 'Opcionális benchmark PDF.' }"
+                        wrapping="true"
+                        class="dummy12CardHelperText sapUiTinyMarginTop"/>
+                      <List items="{jokers>annualReportFiles}" visible="{= ${jokers>annualReportFiles}.length > 0 }" showSeparators="None" class="sapUiTinyMarginTop">
                         <CustomListItem>
                           <HBox justifyContent="SpaceBetween" alignItems="Center">
                             <VBox>
                               <Text text="{= ${jokers>name} }" wrapping="true"/>
-                              <ObjectStatus text="{= ${jokers>__persistedOnly} ? 'Elozo session PDF-nev' : 'Aktiv PDF' }" state="{= ${jokers>__persistedOnly} ? 'Warning' : 'Success' }"/>
+                              <ObjectStatus
+                                text="{= ${jokers>__persistedOnly} ? 'Előző session PDF-neve' : 'Aktív PDF' }"
+                                state="{= ${jokers>__persistedOnly} ? 'Warning' : 'Success' }"/>
                             </VBox>
                             <Button icon="sap-icon://decline" type="Transparent" press=".onDummy12RemoveReportFile"/>
                           </HBox>
                         </CustomListItem>
                       </List>
                     </VBox>
-                    <VBox>
-                      <Button text="Versenytars melle" type="Emphasized" press=".onDummy12AddCompetitor" visible="{= ${jokers>slotLabel} === 'Sajat ceg' }" enabled="{= ${jokers>/dummy12Companies}.length &lt; 5 }"/>
-                      <Button text="Torles" type="Transparent" press=".onDummy12RemoveCompany" visible="{= ${jokers>slotLabel} !== 'Sajat ceg' }" class="sapUiTinyMarginTop"/>
-                    </VBox>
-                  </cells>
-                </ColumnListItem>
+                  </VBox>
+                </CustomListItem>
               </items>
-            </Table>
+            </List>
+
+            <HBox class="sapUiSmallMarginTop" alignItems="Center">
+              <Button
+                text="+ Versenytárs hozzáadása"
+                type="Default"
+                press=".onDummy12AddCompetitor"
+                enabled="{= ${jokers>/dummy12Companies}.length &lt; 5 }"
+                class="dummy12AddCompetitorBtn"/>
+              <Text
+                text="Elérted a maximum 4 versenytárs korlátot."
+                visible="{= ${jokers>/dummy12Companies}.length >= 5 }"
+                class="dummy12CardHelperText sapUiTinyMarginBegin"/>
+            </HBox>
 
             <HBox class="jokerPromptButtons sapUiSmallMarginTop" wrap="Wrap">
               <Button text="Elemzes inditasa" type="Emphasized" press=".onRunDummy12Analysis" busy="{jokers>/dummy12Busy}" enabled="{= ${jokers>/dummy12Busy} ? false : true }"/>

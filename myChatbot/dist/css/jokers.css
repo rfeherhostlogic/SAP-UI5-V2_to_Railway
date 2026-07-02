@@ -677,6 +677,44 @@
   padding-top: 0.25rem;
 }
 
+/* ─── Dummy-12 company card list ──────────────────────────────── */
+.dummy12CardList .sapMLIBContent { padding: 0 !important; }
+.dummy12CardList .sapMLIB {
+  background: transparent !important;
+  border-bottom: none !important;
+  margin-bottom: 0.625rem;
+}
+.dummy12CompanyCard {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.07);
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #aaa;
+  padding: 0.875rem 1rem 1rem 1rem;
+}
+.dummy12CardOwn {
+  border-left-color: #1a9a55 !important;
+  background: #f7fdf9 !important;
+}
+.dummy12CardCompetitor {
+  border-left-color: #0070d2 !important;
+  background: #f7f9fd !important;
+}
+.dummy12CardHelperText {
+  font-size: 0.75rem;
+  color: #6b7a8d;
+}
+.dummy12CardRemoveBtn.sapMBtn {
+  min-width: 2rem !important;
+  height: 2rem !important;
+  margin: -0.25rem -0.25rem 0 0;
+}
+.dummy12CardFieldRow { gap: 0; }
+.dummy12CardField { min-width: 13rem; max-width: 22rem; flex: 1; box-sizing: border-box; }
+.dummy12AddCompetitorBtn.sapMBtn { min-width: 12rem; }
+
 @media (max-width: 900px) {
   .jokerTile {
     width: 100%;
